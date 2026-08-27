@@ -44,6 +44,18 @@ private func loadNALReference() throws -> [NALReferenceEntry] {
     return try JSONDecoder().decode([NALReferenceEntry].self, from: data)
 }
 
+// KNOWN LIMITATION: Tools/gen_nal_reference.py is a line-by-line Python
+// port of FrameReassembler.swift's own corrected algorithm, not an
+// independently-derived reference. A pass here proves internal
+// self-consistency (the Swift implementation matches its own algorithm
+// as re-derived in Python) -- it does NOT independently verify
+// correctness against the actual hardware/bitstream, since a same-shaped
+// bug in both the Swift correction and the Python port would pass this
+// comparison undetected. Genuine ground-truth confidence in the
+// reassembly algorithm (eviction/discard behavior) comes from the
+// hand-built synthetic regression tests in FrameReassemblerTests.swift
+// (task 1.3), e.g. staleEntryRegressionDoesNotMergeUnrelatedFrames, not
+// from this comparison.
 @Test func fullPipelineOverCleanStartCaptureMatchesPythonNALReference() async throws {
     let reference = try loadNALReference()
     #expect(!reference.isEmpty, "reference fixture should be non-empty (regenerate with Tools/gen_nal_reference.py if this fails)")

@@ -41,6 +41,23 @@ bug above and reusing the proven-correct implementation (task 0.4's golden
 vectors already cover it byte-for-byte against the Swift port) is strictly
 more robust than re-deriving Ethernet offsets by hand a second time.
 
+KNOWN LIMITATION -- this is not an independent reference implementation.
+This script deliberately reimplements the SAME corrected reassembly
+algorithm as FrameReassembler.swift (same eviction thresholds, same
+distance formula, same discard-not-merge, same entry lifecycle), not an
+independently-derived one. A passing integration test comparing against
+this script's output therefore proves internal self-consistency -- that
+the Swift implementation matches its own algorithm as re-derived in
+Python -- not correctness against ground truth from the actual
+hardware/bitstream. A same-shaped mistake present in both the Swift
+correction and this Python port (plausible, since they were reasoned
+about together) would not be caught by this comparison. Only the
+Ethernet/IPv4/UDP framing step below is genuinely independent (it's
+imported from the prototype and separately golden-vector-tested). Real
+ground-truth confidence in the reassembly algorithm comes from the
+hand-built synthetic regression fixtures in FrameReassemblerTests.swift
+(task 1.3), not from this generated reference.
+
 Output: Fixtures/clean_start_nal_reference.json, a JSON array of
 {"nalType": int, "length": int} objects (length is the length of the fully
 reassembled NAL INCLUDING the prepended 4-byte 0x00000001 start code, since
