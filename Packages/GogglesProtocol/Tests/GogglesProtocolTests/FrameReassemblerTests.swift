@@ -92,8 +92,21 @@ private let t0 = Date(timeIntervalSince1970: 1_700_000_000)
     #expect(r.droppedFrameCount == 1, "the incomplete frame 40 should have been evicted and counted exactly once")
 
     // A later, unrelated frame 40 (wrapped around, or just reused) must
-    // start clean -- not see the old fragment 0 bytes.
-    #expect(r.process(videoPayload: makeVideoPayload(frameNum: 40, fragNum: 0, fragCount: 1, chunk: [0x99]), receivedAt: t0) == Data([0x00, 0x00, 0x00, 0x01, 0x99]))
+    // start clean -- not see the old fragment 0 bytes. Deliberately tagged
+    // fragNum: 1 (not 0) so this packet does NOT resend the fragment index
+    // ([0xDE, 0xAD]) the stale entry occupied -- a dictionary-key
+    // overwrite at index 0 would "self-heal" a broken/no-op eviction and
+    // let a naive byte-content assertion pass even without real eviction
+    // (see review finding on this test). With only index 1 ever written,
+    // a naive impl that fails to evict would merge into the stale
+    // {0: [0xDE, 0xAD]} entry, producing fragments {0: [0xDE, 0xAD],
+    // 1: [0x99]}; since count (2) >= this packet's fragCount (1) it would
+    // complete immediately with the stale bytes spliced in front, which
+    // the assertions below catch.
+    let result = r.process(videoPayload: makeVideoPayload(frameNum: 40, fragNum: 1, fragCount: 1, chunk: [0x99]), receivedAt: t0)
+    #expect(result == Data([0x00, 0x00, 0x00, 0x01, 0x99]))
+    #expect(!(result?.contains(0xDE) ?? false), "reassembled NAL must not contain any byte from the stale, evicted fragment")
+    #expect(!(result?.contains(0xAD) ?? false), "reassembled NAL must not contain any byte from the stale, evicted fragment")
 }
 
 // MARK: - frame-number wrap 255 -> 0
@@ -181,21 +194,34 @@ private let t0 = Date(timeIntervalSince1970: 1_700_000_000)
 
     // Step 3: frame number 250 comes around again (well under 256 more
     // frames later in a real stream, but the reassembler doesn't care how
-    // it got here) carrying an entirely new, unrelated frame's fragment
-    // 1 of 2 -- fragment 0 for *this* new frame 250 arrives first.
-    let newFragment0: [UInt8] = [0x4E, 0x45] // "NE"
-    let newFragment1: [UInt8] = [0x57]       // "W"
+    // it got here) carrying an entirely new, unrelated frame's two
+    // fragments -- deliberately tagged at indices 1 and 2, NOT index 0,
+    // the index the stale entry occupied.
+    //
+    // This is a deliberate departure from a literal fragment-index-0/1
+    // frame: if the new frame instead resent index 0, the dictionary
+    // write `entry.fragments[0] = chunk` would silently overwrite the
+    // stale "OLD" value regardless of whether eviction ever actually ran
+    // -- a broken/no-op eviction implementation would still pass a
+    // byte-content assertion in that case (this was the exact gap an
+    // earlier version of this test had, per review). By never writing to
+    // index 0 at all, this version can only produce a result free of
+    // "OLD"'s bytes if the stale entry was genuinely evicted first; a
+    // naive impl that fails to evict would merge into the stale
+    // {0: "OLD"} entry and produce a completed frame containing "OLD"'s
+    // bytes on the very first of these two packets, which the assertions
+    // below catch.
+    let newFragment1: [UInt8] = [0x4E, 0x45] // "NE" (fragment index 1)
+    let newFragment2: [UInt8] = [0x57]       // "W"  (fragment index 2)
     t = t.addingTimeInterval(0.010)
-    #expect(r.process(videoPayload: makeVideoPayload(frameNum: 250, fragNum: 0, fragCount: 2, chunk: newFragment0), receivedAt: t) == nil)
+    #expect(r.process(videoPayload: makeVideoPayload(frameNum: 250, fragNum: 1, fragCount: 2, chunk: newFragment1), receivedAt: t) == nil)
     t = t.addingTimeInterval(0.010)
-    let result = r.process(videoPayload: makeVideoPayload(frameNum: 250, fragNum: 1, fragCount: 2, chunk: newFragment1), receivedAt: t)
+    let result = r.process(videoPayload: makeVideoPayload(frameNum: 250, fragNum: 2, fragCount: 2, chunk: newFragment2), receivedAt: t)
 
-    // Must be exactly the new frame's two fragments concatenated -- NOT
-    // the old fragment 0 ("OLD") spliced in front of anything. Under the
-    // naive Python logic this assertion is exactly what fails: the
-    // result there is b"OLD" + b"W" (fragment index 1 from the new
-    // frame merging with the stale index-0 slot from the old one).
-    let expected = Data([0x00, 0x00, 0x00, 0x01]) + Data(newFragment0) + Data(newFragment1)
+    // Must be exactly the new frame's two fragments concatenated (index 1
+    // then index 2) -- NOT the old fragment 0 ("OLD") spliced in front of
+    // anything.
+    let expected = Data([0x00, 0x00, 0x00, 0x01]) + Data(newFragment1) + Data(newFragment2)
     #expect(result == expected)
     #expect(!(result?.contains(0x4F) ?? false), "reassembled NAL must not contain any byte from the stale, evicted fragment")
 }
