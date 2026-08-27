@@ -127,6 +127,53 @@ public enum WireProtocol {
         return Data(header) + body
     }
 
+    /// A decoded 8-byte outer header plus the body bytes that follow it.
+    /// Counterpart to `buildOuter` for the receive path (task 1.4): a
+    /// transport hands raw inbound UDP-payload bytes to `parseOuter`, which
+    /// splits off the fixed header fields so the caller (DUML telemetry
+    /// parsing, `FrameReassembler`, an ack-tracking receive loop, etc.) can
+    /// dispatch on `pktType` without re-deriving header offsets itself.
+    public struct ParsedOuter: Equatable {
+        /// Raw little-endian value of header bytes 0..1, including the
+        /// observed 0x8000 high bit `buildOuter` always sets -- not
+        /// stripped here, so a caller that cares can mask it off itself.
+        public let totalLen: UInt16
+        public let sessionId: UInt16
+        public let seq: UInt16
+        public let pktType: UInt8
+        /// The XOR checksum byte at header offset 7. Not verified by
+        /// `parseOuter` itself (no observed rejection behavior for a bad
+        /// checksum has been characterized against real hardware yet) --
+        /// exposed so a caller can check it if desired.
+        public let checksum: UInt8
+        /// Every byte after the 8-byte header -- i.e. what design §5.2
+        /// calls "outer-header offset 8", and exactly what
+        /// `FrameReassembler.process(videoPayload:receivedAt:)` expects for
+        /// a video (`pktType == packetTypeVideo`) packet.
+        public let body: Data
+    }
+
+    /// Parses the 8-byte outer header + body from a raw inbound UDP-payload
+    /// packet (design §3.3). Returns `nil` if `packet` is shorter than the
+    /// 8-byte header. Matches `buildOuter`'s field layout byte-for-byte
+    /// (little-endian sessionId/seq/totalLen at offsets 0-1/2-3/4-5,
+    /// pktType at offset 6, checksum at offset 7).
+    public static func parseOuter(_ packet: Data) -> ParsedOuter? {
+        guard packet.count >= 8 else { return nil }
+        let bytes = [UInt8](packet)
+        let totalLen = UInt16(bytes[0]) | (UInt16(bytes[1]) << 8)
+        let sessionId = UInt16(bytes[2]) | (UInt16(bytes[3]) << 8)
+        let seq = UInt16(bytes[4]) | (UInt16(bytes[5]) << 8)
+        let pktType = bytes[6]
+        let checksum = bytes[7]
+        let bodyStart = packet.index(packet.startIndex, offsetBy: 8)
+        let body = packet.subdata(in: bodyStart..<packet.endIndex)
+        return ParsedOuter(
+            totalLen: totalLen, sessionId: sessionId, seq: seq,
+            pktType: pktType, checksum: checksum, body: body
+        )
+    }
+
     /// Generates a fresh random session id, matching Python's
     /// `random.randint(1, 0xFFFE)`. Intended to be called exactly once
     /// per connection (by the caller that owns the session), never
