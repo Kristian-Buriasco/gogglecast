@@ -1,23 +1,41 @@
 # Fixtures
 
 Capture corpus for offline (no-hardware) testing of the protocol core, per
-design.md §9.1 and plan task 0.3. **As of this commit, no real captures
-exist yet.** This README specifies the format and lists exactly what a
-human with the goggles needs to record next.
+design.md §9.1 and plan task 0.3.
 
 ## Status
 
-- [ ] `clean-start.gvcap` — clean start including SPS+IDR
-- [ ] `steady-state-60s.gvcap` — 60 s of mid-stream steady state
-- [ ] `unplug-mid-stream.gvcap` — deliberate USB unplug while streaming
-- [ ] `fragment-loss.gvcap` — a session with visible fragment loss
-- [ ] `sps_pps.bin` — the raw ~40-byte bundled SPS+PPS blob, extracted from
-      one of the above via `Tools/gen_sps_pps_fixture.py`
+- [x] `clean-start.gvcap` — clean start including SPS+IDR (23.5 MB, ~10 s
+      captured after the IDR arrived)
+- [x] `steady-state-60s.gvcap` — 60 s of mid-stream steady state (100 MB)
+- [x] `unplug-mid-stream.gvcap` — deliberate USB unplug while streaming
+      (12.9 MB) — capture ends in a `USBError: [Errno 19] No such device`,
+      which is the expected/correct tail behavior for this scenario
+- [x] `fragment-loss.gvcap` — a session with visible fragment loss
+      (191 MB — ran longer than the intended ~45 s due to an unrelated
+      shell/sudo delay while stopping it; not deliberately induced beyond
+      ordinary session length, see note below)
+- [x] `sps_pps.bin` — the raw 40-byte bundled SPS+PPS blob (`67 64 00 34
+      ac 4d 00 f0 04 4f cb 35 01 01 01 40 00 00 03 00 40 00 00 1e 03 c7
+      0c a8` + PPS `68 ee 3c b0`), extracted from `clean-start.gvcap` via
+      `Tools/gen_sps_pps_fixture.py` — matches byte-for-byte an earlier
+      independent manual capture of the same device's SPS/PPS, cross-
+      confirming both the capture pipeline and the extraction script.
 
-None of these are present yet. `Tools/gen_sps_pps_fixture.py` exists and is
-tested against a synthetic (fabricated) capture — see that script's module
-docstring and the dji-goggles3-videoout repo's task-0.3 commit for how it
-was verified. It has **not** been run against real hardware data.
+`Tools/gen_sps_pps_fixture.py` was originally tested only against synthetic
+data (see the dji-goggles3-videoout repo's task-0.3 commit); it has now also
+been run successfully against this real `clean-start.gvcap` capture.
+
+**Note on fragment-loss.gvcap size:** at 191 MB this is the largest file in
+the corpus by a wide margin (target was ~45 s of ordinary streaming; it
+ended up closer to ~90 s because stopping it was delayed by an unrelated
+sudo-auth issue, not a deliberate choice). Loss was not artificially
+induced (no cable-wiggling, etc.) — whether it actually contains visible
+fragment loss needs to be confirmed by whoever writes the Phase 1
+reassembler tests against it (design §9.1 item 3); if it doesn't contain
+loss, a shorter, deliberately-flaky-connection recapture may still be
+needed. Flagging the file size here since it's large to keep committing to
+git if a smaller capture would do just as well.
 
 ## Capture file format ("GVCAP001")
 
@@ -79,7 +97,12 @@ free-text form before committing. The MAC addresses and any embedded
 device identifiers in the DUML/handshake payloads are fine to keep as-is;
 they are not credentials.
 
-## Four sessions still needed (human, with hardware)
+## How the four sessions were recorded (kept for future re-recording)
+
+All four sessions above are now recorded (see Status). Instructions below
+are left in place in case the corpus ever needs re-recording (e.g. after a
+firmware update, or if `fragment-loss.gvcap` turns out not to contain real
+loss and needs a deliberate-flaky-connection retake).
 
 All four use the same `--capture` invocation above; only what happens
 during the session differs. Record with the goggles powered on, USB
@@ -122,8 +145,13 @@ section (or leave it for future re-recording — your call).
 
 ## Device provenance
 
+- **Product string:** `Goggles3-<serial, scrubbed>` (DJI Goggles 3)
 - **Firmware:** `zv300 gl Ver.02`
-- **bcdDevice:** `<fill in from live device>` — `stream.py` prints this at
-  startup (`USB ID: vvvv:pppp (bcdDevice 0xbbbb)`); copy the printed value
-  here once a real capture session has been run. Not filled in yet because
-  no live session has occurred as part of this task.
+- **bcdDevice:** `0x0504`
+- **USB VID:PID:** `2ca3:0020`
+- **Goggles RNDIS MAC:** rotates on every goggles reboot — do not treat any
+  MAC seen in these captures as fixed. At capture time it was
+  `6e:27:68:45:bf:4b`; a prior session the same evening saw
+  `ca:3c:b4:8d:51:c3`. The `dji-goggles3-videoout` prototype's `stream.py`
+  now resolves this live via ARP at startup (`resolve_goggles_mac()`)
+  rather than hardcoding it, matching what Phase 1.6 does in Swift.
