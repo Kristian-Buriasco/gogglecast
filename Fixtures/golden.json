@@ -1,0 +1,348 @@
+[
+  {
+    "name": "checksum16_even_length",
+    "description": "IPv4 header checksum over an even-length byte string (RFC 1071-style worked example).",
+    "inputs": {
+      "data": "4500003c1c4640004006"
+    },
+    "output": 7799
+  },
+  {
+    "name": "checksum16_odd_length_padding",
+    "description": "checksum16 with an odd-length input, exercising the trailing zero-byte pad before summing.",
+    "inputs": {
+      "data": "45000001"
+    },
+    "output": 47870
+  },
+  {
+    "name": "checksum16_real_ipv4_header",
+    "description": "checksum16 over a realistic 20-byte IPv4 header (checksum field zeroed), matching what build_udp computes internally.",
+    "inputs": {
+      "data": "4500002812340000400011000000c0a83c01c0a83c02"
+    },
+    "output": 24142
+  },
+  {
+    "name": "build_udp_basic",
+    "description": "build_udp with a small non-empty payload; covers Ethernet+IPv4+UDP header assembly and the IPv4 checksum.",
+    "inputs": {
+      "srcMac": "020000000001",
+      "dstMac": "aabbccddeeff",
+      "srcIp": "192.168.60.1",
+      "dstIp": "192.168.60.2",
+      "srcPort": 54321,
+      "dstPort": 9003,
+      "payload": "deadbeef00010203"
+    },
+    "output": "aabbccddeeff0200000000010800450000241234400040112f41c0a83c01c0a83c02d431232b00100000deadbeef00010203"
+  },
+  {
+    "name": "build_udp_empty_payload",
+    "description": "build_udp with a zero-length payload -- edge case for the length/checksum fields.",
+    "inputs": {
+      "srcMac": "020000000001",
+      "dstMac": "aabbccddeeff",
+      "srcIp": "192.168.60.1",
+      "dstIp": "192.168.60.2",
+      "srcPort": 54321,
+      "dstPort": 9003,
+      "payload": ""
+    },
+    "output": "aabbccddeeff02000000000108004500001c1234400040112f49c0a83c01c0a83c02d431232b00080000"
+  },
+  {
+    "name": "build_arp_request_basic",
+    "description": "build_arp_request: a broadcast 'who-has GOGGLES_IP' ARP request, as sent by resolve_goggles_mac.",
+    "inputs": {
+      "srcMac": "020000000001",
+      "srcIp": "192.168.60.1",
+      "targetIp": "192.168.60.2"
+    },
+    "output": "ffffffffffff02000000000108060001080006040001020000000001c0a83c01000000000000c0a83c02"
+  },
+  {
+    "name": "build_arp_reply_basic",
+    "description": "build_arp_reply: a unicast ARP reply to the goggles, as sent by main()'s ARP-request handler.",
+    "inputs": {
+      "srcMac": "020000000001",
+      "srcIp": "192.168.60.1",
+      "dstMac": "aabbccddeeff",
+      "dstIp": "192.168.60.2"
+    },
+    "output": "aabbccddeeff02000000000108060001080006040002020000000001c0a83c01aabbccddeeffc0a83c02"
+  },
+  {
+    "name": "parse_udp_round_trip",
+    "description": "parse_udp fed the exact output of build_udp_basic -- round-trip success case.",
+    "inputs": {
+      "frame": "aabbccddeeff0200000000010800450000241234400040112f41c0a83c01c0a83c02d431232b00100000deadbeef00010203"
+    },
+    "output": {
+      "srcIp": "192.168.60.1",
+      "dstIp": "192.168.60.2",
+      "srcPort": 54321,
+      "dstPort": 9003,
+      "payloadHex": "deadbeef00010203"
+    }
+  },
+  {
+    "name": "parse_udp_too_short_returns_none",
+    "description": "parse_udp on a frame shorter than the minimum Ethernet+IPv4+UDP length -- must return None.",
+    "inputs": {
+      "frame": "00000000000000000000"
+    },
+    "output": null
+  },
+  {
+    "name": "parse_udp_wrong_ethertype_returns_none",
+    "description": "parse_udp on a long-enough frame whose EtherType is ARP (0x0806), not IPv4 (0x0800) -- must return None.",
+    "inputs": {
+      "frame": "000000000000000000000000080600000000000000000000000000000000000000000000000000000000"
+    },
+    "output": null
+  },
+  {
+    "name": "parse_arp_round_trip_request",
+    "description": "parse_arp fed the exact output of build_arp_request_basic -- round-trip success case (op=1, who-has).",
+    "inputs": {
+      "frame": "ffffffffffff02000000000108060001080006040001020000000001c0a83c01000000000000c0a83c02"
+    },
+    "output": {
+      "op": 1,
+      "senderMac": "020000000001",
+      "senderIp": "192.168.60.1",
+      "targetMac": "000000000000",
+      "targetIp": "192.168.60.2"
+    }
+  },
+  {
+    "name": "parse_arp_round_trip_reply",
+    "description": "parse_arp fed the exact output of build_arp_reply_basic -- round-trip success case (op=2, is-at).",
+    "inputs": {
+      "frame": "aabbccddeeff02000000000108060001080006040002020000000001c0a83c01aabbccddeeffc0a83c02"
+    },
+    "output": {
+      "op": 2,
+      "senderMac": "020000000001",
+      "senderIp": "192.168.60.1",
+      "targetMac": "aabbccddeeff",
+      "targetIp": "192.168.60.2"
+    }
+  },
+  {
+    "name": "parse_arp_too_short_returns_none",
+    "description": "parse_arp on a frame shorter than the minimum ARP-over-Ethernet length -- must return None.",
+    "inputs": {
+      "frame": "0000000000000000000000000000000000000000"
+    },
+    "output": null
+  },
+  {
+    "name": "wrap_packet_msg_single",
+    "description": "wrap_packet_msg over one small Ethernet frame -- basic RNDIS_PACKET_MSG framing.",
+    "inputs": {
+      "frame": "deadbeefcafe01020304050608001111111111111111111111111111111111111111"
+    },
+    "output": "010000004e000000240000002200000000000000000000000000000000000000000000000000000000000000deadbeefcafe01020304050608001111111111111111111111111111111111111111"
+  },
+  {
+    "name": "unwrap_packet_msg_single",
+    "description": "unwrap_packet_msg fed the exact output of wrap_packet_msg_single -- single-message round trip.",
+    "inputs": {
+      "buf": "010000004e000000240000002200000000000000000000000000000000000000000000000000000000000000deadbeefcafe01020304050608001111111111111111111111111111111111111111"
+    },
+    "output": [
+      "deadbeefcafe01020304050608001111111111111111111111111111111111111111"
+    ]
+  },
+  {
+    "name": "unwrap_packet_msg_multi_message_buffer",
+    "description": "unwrap_packet_msg over a buffer containing three back-to-back RNDIS_PACKET_MSG structures (as a single bulk-IN read can deliver) -- multi-message round trip required by design.md \u00a79.1 item 2.",
+    "inputs": {
+      "buf": "010000004e000000240000002200000000000000000000000000000000000000000000000000000000000000deadbeefcafe010203040506080011111111111111111111111111111111111111110100000056000000240000002a00000000000000000000000000000000000000000000000000000000000000ffffffffffff0200000000010806222222222222222222222222222222222222222222222222222222220100000040000000240000001400000000000000000000000000000000000000000000000000000000000000aabbccddeeff1122334455660800333333333333"
+    },
+    "output": [
+      "deadbeefcafe01020304050608001111111111111111111111111111111111111111",
+      "ffffffffffff020000000001080622222222222222222222222222222222222222222222222222222222",
+      "aabbccddeeff1122334455660800333333333333"
+    ]
+  },
+  {
+    "name": "build_outer_pkt_type_handshake",
+    "description": "build_outer with pkt_type=0x00 (handshake), a fixed SESSION_ID (0x1234), and a small body -- exercises the XOR checksum byte and the 0x8000 length-field bit for this packet type.",
+    "inputs": {
+      "pktType": 0,
+      "seq": 7,
+      "body": "00112233",
+      "sessionId": 4660
+    },
+    "output": "0c803412070000ad00112233"
+  },
+  {
+    "name": "build_outer_pkt_type_telemetry",
+    "description": "build_outer with pkt_type=0x01 (telemetry), a fixed SESSION_ID (0x1234), and a small body -- exercises the XOR checksum byte and the 0x8000 length-field bit for this packet type.",
+    "inputs": {
+      "pktType": 1,
+      "seq": 7,
+      "body": "00112233",
+      "sessionId": 4660
+    },
+    "output": "0c803412070001ac00112233"
+  },
+  {
+    "name": "build_outer_pkt_type_video",
+    "description": "build_outer with pkt_type=0x02 (video), a fixed SESSION_ID (0x1234), and a small body -- exercises the XOR checksum byte and the 0x8000 length-field bit for this packet type.",
+    "inputs": {
+      "pktType": 2,
+      "seq": 7,
+      "body": "00112233",
+      "sessionId": 4660
+    },
+    "output": "0c803412070002af00112233"
+  },
+  {
+    "name": "build_outer_pkt_type_ack",
+    "description": "build_outer with pkt_type=0x04 (ack), a fixed SESSION_ID (0x1234), and a small body -- exercises the XOR checksum byte and the 0x8000 length-field bit for this packet type.",
+    "inputs": {
+      "pktType": 4,
+      "seq": 7,
+      "body": "00112233",
+      "sessionId": 4660
+    },
+    "output": "0c803412070004a900112233"
+  },
+  {
+    "name": "handshake_48_bytes",
+    "description": "The full 48-byte handshake frame: build_outer(0x00, seq=0, HANDSHAKE_BODY) with the fixed SESSION_ID -- HANDSHAKE_BODY is the prototype's 40-byte empirically-derived constant.",
+    "inputs": {
+      "seq": 0,
+      "handshakeBody": "d0e964006400c0051400000a0064006400c005140000640014006400c00514000064000101040a02",
+      "sessionId": 4660
+    },
+    "output": "3080341200000096d0e964006400c0051400000a0064006400c005140000640014006400c00514000064000101040a02"
+  },
+  {
+    "name": "ack_22_byte_body",
+    "description": "The full ack frame from build_ack: an 8-byte build_outer(0x04, ...) header wrapping the 22-byte ack body (4-byte start/end seq range + the 18-byte ACK_TEMPLATE_TAIL constant) -- 30 bytes total.",
+    "inputs": {
+      "startSeq": 16,
+      "endSeq": 21,
+      "seq": 32,
+      "sessionId": 4660
+    },
+    "output": "1e8034122000049c100015000000d0e9d0e90000d0e9d8e9000000000000"
+  },
+  {
+    "name": "duml_crc8_header",
+    "description": "duml.crc8 over a 3-byte DUML header prefix (magic + length/version bytes), the standard header-CRC use, default seed 0x77.",
+    "inputs": {
+      "data": "550d04"
+    },
+    "output": 51
+  },
+  {
+    "name": "duml_crc16_whole_frame_prefix",
+    "description": "duml.crc16 over an 11-byte DUML header (everything but the trailing CRC-16 itself), default seed 0x3692.",
+    "inputs": {
+      "data": "550d04002abc00904002b3"
+    },
+    "output": 34545
+  },
+  {
+    "name": "duml_build_02_b3_iframe_request",
+    "description": "duml.build reproducing send_request_iframe's exact call -- the I-frame-request DUML frame (cmd_set=0x02, cmd_id=0xB3), empty payload.",
+    "inputs": {
+      "sender": 42,
+      "receiver": 188,
+      "seq": 36864,
+      "cmdType": 64,
+      "cmdSet": 2,
+      "cmdId": 179,
+      "payload": ""
+    },
+    "output": "550d04332abc00904002b3a9e1"
+  },
+  {
+    "name": "duml_build_with_nonempty_payload",
+    "description": "duml.build with a non-empty 6-byte payload -- edge case exercising the payload-length-dependent CRC-16 over the whole frame.",
+    "inputs": {
+      "sender": 1,
+      "receiver": 2,
+      "seq": 4660,
+      "cmdType": 64,
+      "cmdSet": 2,
+      "cmdId": 128,
+      "payload": "deadbeef00ff"
+    },
+    "output": "5513040301023412400280deadbeef00ffc510"
+  },
+  {
+    "name": "duml_parse_stream_synthetic_if4",
+    "description": "SYNTHETIC (not a hardware capture): duml.parse_stream over a hand-built buffer of two valid duml.build() frames, one frame with a corrupted CRC-16 (must be rejected/skipped), and a truncated trailing partial frame (must be left as the unconsumed tail) -- exercises CRC-8 and CRC-16 both.",
+    "inputs": {
+      "buf": "550d04332abc01004002b32204551204c72abc02000008010102030405e384550e04662abc0300000802992d2f550d04332a"
+    },
+    "output": {
+      "packets": [
+        {
+          "version": 1,
+          "sender": 42,
+          "receiver": 188,
+          "seq": 1,
+          "cmdType": 64,
+          "cmdSet": 2,
+          "cmdId": 179,
+          "payloadHex": "",
+          "rawHex": "550d04332abc01004002b32204"
+        },
+        {
+          "version": 1,
+          "sender": 42,
+          "receiver": 188,
+          "seq": 2,
+          "cmdType": 0,
+          "cmdSet": 8,
+          "cmdId": 1,
+          "payloadHex": "0102030405",
+          "rawHex": "551204c72abc02000008010102030405e384"
+        }
+      ],
+      "tailHex": "550d04332a"
+    }
+  },
+  {
+    "name": "duml_parse_stream_synthetic_clean_two_frames",
+    "description": "SYNTHETIC (not a hardware capture): duml.parse_stream over exactly two valid, back-to-back duml.build() frames with no corruption and no trailing partial data -- baseline multi-frame case, empty tail expected.",
+    "inputs": {
+      "buf": "550d04332abc01004002b32204551204c72abc02000008010102030405e384"
+    },
+    "output": {
+      "packets": [
+        {
+          "version": 1,
+          "sender": 42,
+          "receiver": 188,
+          "seq": 1,
+          "cmdType": 64,
+          "cmdSet": 2,
+          "cmdId": 179,
+          "payloadHex": "",
+          "rawHex": "550d04332abc01004002b32204"
+        },
+        {
+          "version": 1,
+          "sender": 42,
+          "receiver": 188,
+          "seq": 2,
+          "cmdType": 0,
+          "cmdSet": 8,
+          "cmdId": 1,
+          "payloadHex": "0102030405",
+          "rawHex": "551204c72abc02000008010102030405e384"
+        }
+      ],
+      "tailHex": ""
+    }
+  }
+]
