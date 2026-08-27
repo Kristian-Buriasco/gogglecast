@@ -1,0 +1,20 @@
+# Swift Package Manager
+.build/
+.swiftpm/
+Packages/*/.build/
+Packages/*/.swiftpm/
+
+# Xcode
+DerivedData/
+*.xcuserstate
+*.xcuserdatad/
+xcuserdata/
+*.xccheckout
+*.xcscmblueprint
+*.moved-aside
+
+# macOS
+.DS_Store
+
+# This project's SDD scratch directory (not part of the deliverable)
+.superpowers/
