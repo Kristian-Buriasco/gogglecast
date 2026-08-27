@@ -232,4 +232,38 @@ public enum WireProtocol {
         unknownPacketTypeHandler(rawType, context)
         return false
     }
+
+    // MARK: - §8.6 diagnosability: malformed DUML frames
+
+    /// Injectable sink for "`DUML.parseStream` found something that isn't
+    /// a valid frame and is skipping forward" diagnostics (design §8.6:
+    /// log, don't silently drop). Used by `DUML.parseStream`'s
+    /// bad-magic / implausible-length / CRC-8 / CRC-16 skip branches.
+    ///
+    /// A sibling of `unknownPacketTypeHandler` above rather than a reuse of
+    /// it: that handler's `rawType` parameter and the `knownPacketTypes`
+    /// gate in `logUnknownPacketType` are specifically about *outer-header*
+    /// packet-type bytes (a future receive loop's concern). Reusing them
+    /// here would let a DUML payload byte that happens to collide with a
+    /// known outer packet-type value (0x00/0x01/0x02/0x04/0x06) get
+    /// silently swallowed by that classification check -- exactly the
+    /// silent-drop behavior §8.6 exists to prevent. This hook has the same
+    /// shape (closure, `#if DEBUG`-gated stderr default, zero extra
+    /// dependencies beyond Foundation) for consistency and testability,
+    /// but no gating: every call site already knows it found something
+    /// malformed, there's nothing to classify.
+    public static var malformedFrameHandler: (_ reason: String, _ context: String) -> Void = { reason, context in
+        #if DEBUG
+        FileHandle.standardError.write(
+            Data("[GogglesProtocol] malformed DUML frame skipped: \(reason)\(context.isEmpty ? "" : " (\(context))")\n".utf8)
+        )
+        #endif
+    }
+
+    /// Reports a position in the stream that `DUML.parseStream` determined
+    /// is not (the start of) a valid frame, immediately before it advances
+    /// past it, via `malformedFrameHandler`.
+    public static func logMalformedFrame(reason: String, context: String = "") {
+        malformedFrameHandler(reason, context)
+    }
 }

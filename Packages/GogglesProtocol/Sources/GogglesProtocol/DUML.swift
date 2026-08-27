@@ -169,6 +169,10 @@ public enum DUML {
         let n = bytes.count
         while i < n {
             if bytes[i] != magic {
+                WireProtocol.logMalformedFrame(
+                    reason: "bad magic byte 0x\(String(format: "%02X", bytes[i])) (expected 0x\(String(format: "%02X", magic)))",
+                    context: "offset \(i)"
+                )
                 i += 1
                 continue
             }
@@ -179,6 +183,10 @@ public enum DUML {
             let length = Int(rawLen & 0x03FF)
             let version = UInt8(rawLen >> 10)
             if length < minLen {
+                WireProtocol.logMalformedFrame(
+                    reason: "implausible frame length \(length) (minimum \(minLen))",
+                    context: "offset \(i)"
+                )
                 i += 1
                 continue
             }
@@ -188,11 +196,19 @@ public enum DUML {
             let frame = Data(bytes[i..<(i + length)])
             let frameBytes = [UInt8](frame)
             if crc8(Data(frameBytes[0..<3])) != frameBytes[3] {
+                WireProtocol.logMalformedFrame(
+                    reason: "CRC-8 header mismatch",
+                    context: "offset \(i), length \(length)"
+                )
                 i += 1
                 continue
             }
             let want = UInt16(frameBytes[length - 2]) | (UInt16(frameBytes[length - 1]) << 8)
             if crc16(Data(frameBytes[0..<(length - 2)])) != want {
+                WireProtocol.logMalformedFrame(
+                    reason: "CRC-16 frame mismatch",
+                    context: "offset \(i), length \(length)"
+                )
                 i += 1
                 continue
             }
