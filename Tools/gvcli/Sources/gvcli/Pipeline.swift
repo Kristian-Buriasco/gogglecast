@@ -7,8 +7,8 @@ import Darwin
 // ─────────────────────────────────────────────────────────────────────────
 // Task 1.7: the shared driving loop behind `gvcli stream` and `gvcli
 // replay`. Ports `stream.py`'s `main()` receive loop (handshake, I-frame
-// request/retry, ack-per-completed-frame, SPS/IDR started-gate, fps
-// reporting) on top of the transport-agnostic pieces tasks 1.1-1.6 already
+// request/retry, ack-per-frame-boundary (complete or not), SPS/IDR
+// started-gate, fps reporting) on top of the transport-agnostic pieces tasks 1.1-1.6 already
 // built (`GogglesTransport`, `WireProtocol`, `FrameReassembler`) -- no
 // protocol logic is re-derived here, this file only wires those pieces
 // together and adds the ack-tracking / started-gate / stats bookkeeping
@@ -60,7 +60,7 @@ private struct FrameGateState {
 
 /// Runs the full receive/decode/emit pipeline against `transport` --
 /// handshake, I-frame request + 1.5s retry until started, 2s data-silence
-/// handshake resend, per-completed-frame ack, `FrameReassembler`-driven
+/// handshake resend, per-frame-boundary ack (complete or not), `FrameReassembler`-driven
 /// reassembly, SPS/IDR started-gate, and Annex-B emission to `outPath` (if
 /// given) -- optionally reporting per-second fps/bitrate/drop stats to
 /// stderr.
@@ -115,7 +115,12 @@ func runPipeline(transport: GogglesTransport, outPath: String?, stats: Bool) asy
     FileHandle.standardError.write(Data("[gvcli] Requested fresh I-frame (DUML 02:B3).\n".utf8))
 
     var gate = FrameGateState()
-    var frameSeqRanges: [UInt8: (first: UInt16, last: UInt16)] = [:]
+
+    // Reproduces stream.py's ack-on-every-frame-boundary behavior
+    // (`FrameBoundaryAckTracker.swift`), independent of whatever
+    // `FrameReassembler`'s own age/distance eviction does -- see that
+    // file for the stream.py correspondence.
+    var ackTracker = FrameBoundaryAckTracker()
 
     try await withThrowingTaskGroup(of: Void.self) { group in
         // MARK: inbound-packet consumer
@@ -132,11 +137,16 @@ func runPipeline(transport: GogglesTransport, outPath: String?, stats: Bool) asy
 
                 let base = outer.body.startIndex
                 let frameNum = outer.body[base + 8]
-                if var range = frameSeqRanges[frameNum] {
-                    range.last = outer.seq
-                    frameSeqRanges[frameNum] = range
-                } else {
-                    frameSeqRanges[frameNum] = (first: outer.seq, last: outer.seq)
+
+                // Frame-boundary ack: fires whenever this packet's
+                // frame_num differs from the previous packet's, covering
+                // the *previous* frame's accumulated seq range regardless
+                // of whether FrameReassembler ever completed it. Matches
+                // stream.py's boundary-transition ack -- see
+                // `FrameBoundaryAckTracker.swift`.
+                if let range = ackTracker.recordPacket(frameNum: frameNum, seq: outer.seq) {
+                    let ackSeq = await state.nextSeq()
+                    send(WireProtocol.buildAck(startSeq: range.first, endSeq: range.last, seq: ackSeq, sessionId: sessionId))
                 }
 
                 guard let nal = reassembler.process(videoPayload: outer.body, receivedAt: Date()) else {
@@ -145,11 +155,11 @@ func runPipeline(transport: GogglesTransport, outPath: String?, stats: Bool) asy
                 }
                 await state.updateDroppedTotal(reassembler.droppedFrameCount)
 
-                // One ack per completed frame, covering that frame's
-                // outer-header seq range -- matches stream.py's
-                // build_ack(last_frame_first_seq, last_frame_last_seq, ...)
-                // call in its frag-count-reached branch.
-                if let range = frameSeqRanges.removeValue(forKey: frameNum) {
+                // Completion ack: fires immediately when a frame
+                // completes, in addition to (never instead of) the
+                // boundary ack above -- matches stream.py's
+                // frag-count-reached branch.
+                if let range = ackTracker.recordCompletion(frameNum: frameNum) {
                     let ackSeq = await state.nextSeq()
                     send(WireProtocol.buildAck(startSeq: range.first, endSeq: range.last, seq: ackSeq, sessionId: sessionId))
                 }

@@ -27,6 +27,15 @@ let package = Package(
                 .product(name: "GogglesProtocol", package: "GogglesProtocol"),
                 .product(name: "GogglesUSB", package: "GogglesUSB")
             ]
+        ),
+        // Task 1.7 fix round: unit tests for the pure, transport-free
+        // pieces of gvcli's driving loop -- currently just
+        // `FrameBoundaryAckTracker` (the frame-boundary-ack review fix).
+        // `@testable import gvcli` works against an executableTarget the
+        // same way it does against a library target.
+        .testTarget(
+            name: "gvcliTests",
+            dependencies: ["gvcli"]
         )
     ]
 )
