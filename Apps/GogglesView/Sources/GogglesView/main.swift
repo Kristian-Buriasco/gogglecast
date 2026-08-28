@@ -22,6 +22,11 @@
 //                                          startStreaming, log fps for `secs`
 //                                          seconds (default 10), then
 //                                          disconnect and exit.
+//   ./GogglesView --run                   Task 3.5: real end-to-end -- connect,
+//                                          startStreaming, and show the real
+//                                          GogglesConnectionView (including the
+//                                          real .waitingForKeyframe card) with a
+//                                          temporary "Goggles > Reconnect" menu.
 //
 // None of these run by default -- with no recognized flag this prints
 // usage and exits 0, so simply building/importing this repo never
@@ -175,6 +180,84 @@ if args.contains("--live-view") {
     app.run()
     exit(0)
 }
+if args.contains("--run") {
+    // Task 3.5: the first real end-to-end harness -- unlike `--live-view`
+    // (Task 3.3, which drives `GogglesVideoView` directly off a raw
+    // `HelperClient` and never touches the state machine at all) and
+    // `--force-state` (Task 3.4, which never opens a real XPC connection),
+    // this wires a real `HelperClient` through the real
+    // `GogglesConnectionCoordinator` into the real `GogglesConnectionView`
+    // -- i.e. exactly what a user would see, including the real
+    // `.waitingForKeyframe` card this task builds. Still not the real app
+    // shell (no dock icon curation, no persistent menu bar item -- Task
+    // 3.6's job); the temporary "Goggles > Reconnect" menu item this task's
+    // brief calls for lives here.
+    print("--run: connecting to \(helperMachServiceName) and opening the real connection view...")
+
+    let client = HelperClient()
+    let coordinator = GogglesConnectionCoordinator(client: client)
+    let session = DecodeSession()
+    session.onDroppedSample = { error in
+        print("[run] dropped sample: \(error)")
+    }
+    session.onTeardown = {
+        print("[run] decode session torn down after \(DecodeSession.maxConsecutiveFailures) consecutive failures -- waiting for next parameter set")
+    }
+    // `coordinator.onNALUnit`, not `client.onNALUnit` directly -- the
+    // coordinator already owns `client.onNALUnit` itself (watchdog-activity
+    // bookkeeping) and forwards raw NAL data through its own `onNALUnit`
+    // passthrough precisely so a real decode consumer can sit alongside
+    // that without clobbering it (see that property's doc comment).
+    coordinator.onNALUnit = { data, nalType, isParameterSet, hostTime in
+        session.handle(nalData: data, nalType: nalType, isParameterSet: isParameterSet, hostTime: hostTime)
+    }
+
+    let app = NSApplication.shared
+    app.setActivationPolicy(.regular)
+
+    let hostingController = NSHostingController(rootView: GogglesConnectionView(coordinator: coordinator, session: session))
+    let window = NSWindow(contentViewController: hostingController)
+    window.title = "GogglesView"
+    window.setContentSize(NSSize(width: 480, height: 420))
+    window.styleMask = [.titled, .closable, .resizable, .miniaturizable]
+    window.center()
+    window.makeKeyAndOrderFront(nil)
+
+    // Temporary "Goggles > Reconnect" menu item (task brief: "a menu item
+    // is a fine temporary home for this -- Task 3.6 will build the real
+    // menu bar and can relocate it"). Reachable at any time regardless of
+    // `uiState`, per design §8.1.
+    let reconnectTarget = MenuActionTarget { coordinator.reconnect() }
+    let mainMenu = NSMenu()
+    let appMenuItem = NSMenuItem()
+    mainMenu.addItem(appMenuItem)
+    let appMenu = NSMenu()
+    appMenu.addItem(withTitle: "Quit GogglesView", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+    appMenuItem.submenu = appMenu
+
+    let gogglesMenuItem = NSMenuItem()
+    mainMenu.addItem(gogglesMenuItem)
+    let gogglesMenu = NSMenu(title: "Goggles")
+    let reconnectItem = NSMenuItem(title: "Reconnect", action: #selector(MenuActionTarget.invoke), keyEquivalent: "r")
+    reconnectItem.target = reconnectTarget
+    gogglesMenu.addItem(reconnectItem)
+    gogglesMenuItem.submenu = gogglesMenu
+    app.mainMenu = mainMenu
+
+    let delegate = LiveViewAppDelegate()
+    app.delegate = delegate
+
+    client.connect()
+    DispatchQueue.global().asyncAfter(deadline: .now() + 1.0) {
+        client.startStreaming { ok, error in
+            print("[run] startStreaming -> ok=\(ok) error=\(error.map { String(describing: $0) } ?? "nil")")
+        }
+    }
+
+    app.activate(ignoringOtherApps: true)
+    app.run()
+    exit(0)
+}
 if args.contains("--force-state") {
     // Task 3.4 exit criterion ("verified by forcing each one"): opens a
     // window showing `GogglesConnectionView` with its `uiState` directly
@@ -308,6 +391,7 @@ print("  --unregister            unregister() the helper daemon")
 print("  --test-client [secs]    connect via HelperClient, startStreaming, log fps, exit (default 10s)")
 print("  --live-view             open a minimal AVSampleBufferDisplayLayer window and stream decoded video")
 print("  --force-state <name>    open GogglesConnectionView with uiState forced to <name> (Task 3.4 manual verification)")
+print("  --run                   real end-to-end: connect, startStreaming, show GogglesConnectionView + Goggles>Reconnect menu (Task 3.5 hardware verification)")
 exit(0)
 
 #if canImport(AppKit)
@@ -316,6 +400,20 @@ exit(0)
 /// windowless background app.
 final class LiveViewAppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+}
+
+/// Task 3.5: `NSMenuItem.action` needs an `@objc` selector on some target
+/// object -- this is the smallest thing that adapts a plain Swift closure
+/// (`--run`'s "Goggles > Reconnect" item) to that, without inventing a
+/// bigger menu-building abstraction that's Task 3.6's job, not this one's.
+final class MenuActionTarget: NSObject {
+    private let action: () -> Void
+    init(_ action: @escaping () -> Void) {
+        self.action = action
+    }
+    @objc func invoke() {
+        action()
+    }
 }
 
 /// Maps `--force-state`'s string argument to a `GogglesUIState`, using

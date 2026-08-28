@@ -61,9 +61,19 @@ struct GogglesConnectionView: View {
             ProgressView("Handshaking… \(elapsedSeconds)s")
 
         case .waitingForKeyframe:
-            // Placeholder only -- Task 3.5 builds the real §8.1 card
-            // (elapsed counter, secondary button, etc.).
-            ProgressView("Waiting for the first keyframe…")
+            // Task 3.5: the real design §8.1 card -- verbatim copy, live
+            // elapsed counter, and the secondary/unreliable
+            // requestIFrame() button. `enteredAt` defaults to "now" only as
+            // a display-time fallback (e.g. a race on the very first
+            // render before the coordinator's own timestamp lands); in
+            // practice `waitingForKeyframeEnteredAt` is always set by the
+            // time this case is reachable (`handleHelperStateChanged`/
+            // `forceState` both set it in the same update as `uiState`
+            // itself).
+            WaitingForKeyframeCard(
+                enteredAt: coordinator.waitingForKeyframeEnteredAt ?? Date(),
+                onRequestKeyframe: { coordinator.requestKeyframe() }
+            )
 
         case .live:
             GogglesVideoView(session: session)

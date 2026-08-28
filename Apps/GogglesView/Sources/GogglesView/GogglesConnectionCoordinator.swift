@@ -36,6 +36,13 @@ public final class GogglesConnectionCoordinator: ObservableObject {
     @Published public private(set) var uiState: GogglesUIState = .noHelper(reason: nil)
     @Published public private(set) var deviceInfo: DeviceInfo?
     @Published public private(set) var stats: StreamStats?
+    /// Task 3.5: when the current run of `.waitingForKeyframe` was entered --
+    /// `WaitingForKeyframeCard`'s live "Waiting… m:ss" counter ticks from
+    /// this via its own `TimelineView`, so no coordinator-owned repeating
+    /// timer is needed for it (unlike `.handshaking`'s `elapsedSeconds`,
+    /// which predates this task -- see `tick()`). `nil` until the state is
+    /// reached at least once.
+    @Published public private(set) var waitingForKeyframeEnteredAt: Date?
 
     private let client: HelperClient
     /// Injectable clock -- tests pass a controllable one so the 2s/5s
@@ -46,6 +53,17 @@ public final class GogglesConnectionCoordinator: ObservableObject {
     private var lastActivityAt: Date
     private var handshakingEnteredAt: Date?
     private var watchdogTimer: Timer?
+
+    /// Task 3.5: passthrough for NAL data to a real decode consumer
+    /// (`DecodeSession`), alongside (not instead of) this coordinator's own
+    /// `handleActivitySignal()` bookkeeping. `client.onNALUnit` itself is
+    /// fully owned by `wireCallbacks()` below -- a caller that also wants
+    /// the raw NAL data (e.g. `main.swift`'s real end-to-end harness, which
+    /// needs both this coordinator's state machine AND a `DecodeSession` to
+    /// actually paint video for `.live`) sets this closure instead of
+    /// touching `client.onNALUnit` directly, which would silently clobber
+    /// the watchdog-activity wiring.
+    public var onNALUnit: ((Data, UInt8, Bool, UInt64) -> Void)?
 
     /// - Parameters:
     ///   - client: the `HelperClient` to drive from. Not connected here --
@@ -80,6 +98,40 @@ public final class GogglesConnectionCoordinator: ObservableObject {
         client.reconnectHelper()
     }
 
+    /// Task 3.5: the "Reconnect" command's action -- design §8.1: "reachable
+    /// at any time from a 'Reconnect' menu item, which performs a full §5.1
+    /// teardown-and-reconnect (new random session id included) and then
+    /// shows the [waitingForKeyframe] card." Functionally identical to
+    /// `retry()` above (same `HelperClient.reconnectHelper()` ->
+    /// `GogglesHelperProtocol.reconnect(reply:)` call, whose helper-side
+    /// implementation already regenerates the session id per design §5.1
+    /// step 5 -- nothing to add on this side), kept as a separate,
+    /// separately-named entry point since the two are semantically distinct
+    /// UI affordances (`claimFailed`'s error-recovery "Retry" vs. an
+    /// always-available "Reconnect" command) even though today they do the
+    /// same thing. `main.swift`'s temporary "Goggles > Reconnect" menu item
+    /// calls this. "then shows the waitingForKeyframe card" is not
+    /// special-cased here -- it falls out naturally: `reconnect()` re-runs
+    /// the full connect sequence, and `handleHelperStateChanged` already
+    /// drives `uiState` through `.noDevice` -> `.claiming` -> ... ->
+    /// `.waitingForKeyframe` from the helper's own real `stateChanged`
+    /// callbacks as it does so.
+    public func reconnect() {
+        client.reconnectHelper()
+    }
+
+    /// Task 3.5: the waitingForKeyframe card's secondary, explicitly
+    /// unreliable "Try requesting a keyframe" button -- forwards to
+    /// `HelperClient.requestIFrame(reply:)` -> `GogglesHelperProtocol
+    /// .requestIFrame(reply:)`. Deliberately does not touch `uiState`: the
+    /// helper has no reliable "it worked" signal for this (see
+    /// `HelperService.requestIFrame`'s doc comment), so the only honest
+    /// state transition remains the real one -- a fresh keyframe actually
+    /// arriving, mapped by `mapHelperState` like any other.
+    public func requestKeyframe() {
+        client.requestIFrame()
+    }
+
     /// The `noHelper` state's "Set up" action (design §6:
     /// `"Set up" button -> SMAppService.register()`).
     public func setUpHelper() throws {
@@ -100,8 +152,9 @@ public final class GogglesConnectionCoordinator: ObservableObject {
         client.onHelperStateChanged = { [weak self] raw, detail in
             self?.handleHelperStateChanged(raw, detail: detail)
         }
-        client.onNALUnit = { [weak self] _, _, _, _ in
+        client.onNALUnit = { [weak self] data, nalType, isParameterSet, hostTime in
             self?.handleActivitySignal()
+            self?.onNALUnit?(data, nalType, isParameterSet, hostTime)
         }
         client.onStats = { [weak self] stats in
             self?.stats = stats
@@ -132,6 +185,13 @@ public final class GogglesConnectionCoordinator: ObservableObject {
 
     private func handleHelperStateChanged(_ raw: Int, detail: String?) {
         let mapped = GogglesUIStateMachine.mapHelperState(raw, detail: detail)
+        // Only stamp a fresh `waitingForKeyframeEnteredAt` on actual entry
+        // into the state, not on every repeated `stateChanged` callback the
+        // helper might send while already in it -- otherwise the card's
+        // elapsed counter would keep resetting to 0 instead of counting up.
+        if mapped.kind == .waitingForKeyframe, uiState.kind != .waitingForKeyframe {
+            waitingForKeyframeEnteredAt = now()
+        }
         uiState = mapped
         if case .handshaking = mapped {
             handshakingEnteredAt = now()
@@ -189,6 +249,9 @@ public final class GogglesConnectionCoordinator: ObservableObject {
         uiState = state
         if case .handshaking = state {
             handshakingEnteredAt = now()
+        }
+        if state.kind == .waitingForKeyframe {
+            waitingForKeyframeEnteredAt = now()
         }
     }
 }
