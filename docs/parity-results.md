@@ -307,7 +307,52 @@ recovered identically once that fix landed, confirming the fix is per-subscriber
 agnostic (it lives in the helper's single source of truth, not duplicated app-side
 logic).
 
-## Scenario 8 — 30-minute `live` soak, memory must be flat: See `task-3.7-report.md` for the final sampled numbers (started early, ran in the background across scenarios 9/1-7's fix-and-reverify cycles per the task brief's own instruction not to run it serially at the end)
+## Scenario 8 — `live` memory soak: PARTIAL (5 minutes observed, not the mandatory 30)
+
+**Explicit, documented deviation from the exit gate, not a silent shortcut.** The task
+brief calls this scenario out twice as mandatory ("not something to shortcut or
+approximate"), specifically because a slow leak can look flat well before 30 minutes
+and only show up later. It was started early (per the brief's own instruction) and ran
+unattended in the background across the whole scenario 9 and scenario 1-7 fix-and-
+reverify cycle above, using the same stable `live` app instance (PID 38849) that
+survived scenarios 5's helper-kill/reconnect and 9's sleep/wake immediately before it.
+Partway through, the user asked to cut the soak short (first to 15 minutes, then
+settled on 5) because of the late hour and other commitments — this is recorded exactly
+as it happened, not glossed over.
+
+**Sampled data (`ps -o rss=`, every 30s, `app_rss`/`helper_rss` in KB):**
+
+| t (s) | app_rss | helper_rss |
+|---|---|---|
+| 0 | 91040 | 10688 |
+| 30 | 92272 | 10672 |
+| 60 | 68576 | 10320 |
+| 90 | 62576 | 10464 |
+| 120 | 58560 | 10480 |
+| 150 | 56240 | 10576 |
+| 180 | 56320 | 10656 |
+| 210 | 56560 | 10672 |
+| 240 | 56688 | 10672 |
+| 270 | 56704 | 10672 |
+| 300 | 56800 | 10672 |
+
+Over the observed 5 minutes: app RSS actually **dropped** from ~91MB to ~57MB in the
+first 2 minutes (consistent with one-time warm-up allocations — image queues, decoder
+buffers — settling, not a leak) and then held essentially flat (56.2-56.8MB, a ~1%
+band) for the remaining 3 minutes. Helper RSS was flat throughout, 10.3-10.7MB, the
+same tight band the whole time. Neither process showed the monotonic climb a `§5.2`
+`FrameReassembler` leak (the specific regression this scenario exists to catch) would
+produce.
+
+**This is a genuinely reassuring 5-minute signal, not a substitute for the real
+30-minute gate.** A slow leak (a few KB/s, easily masked by the initial 2-minute
+settling noise above) would not necessarily be visible yet at this sample size.
+
+**Follow-up required before v1 fully ships:** run the full, uninterrupted 30-minute
+soak in a future session, sampling on the same cadence, and append the completed result
+here. Until that happens, scenario 8 is **not** fully closed out per design §9.3's
+literal bar, and this task's overall verdict is qualified accordingly (see
+`task-3.7-report.md`).
 
 ## Scenario 9 — Sleep/wake the Mac while connected: PASS
 
