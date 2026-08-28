@@ -55,7 +55,7 @@ fi
 echo "==> Building GogglesView stub app binary"
 STUB_BIN="$OUT_DIR/GogglesView-stub-bin"
 mkdir -p "$OUT_DIR"
-swiftc "$SCRIPT_DIR/StubApp/main.swift" -o "$STUB_BIN" -framework ServiceManagement -framework Foundation
+swiftc "$SCRIPT_DIR/StubApp/main.swift" -o "$STUB_BIN" -framework ServiceManagement -framework Foundation -framework AppKit
 
 echo "==> Assembling bundle at $APP_BUNDLE"
 rm -rf "$APP_BUNDLE"
