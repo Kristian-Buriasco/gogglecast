@@ -51,7 +51,10 @@ let package = Package(
         ),
         .testTarget(
             name: "GogglesUSBTests",
-            dependencies: ["GogglesUSB"]
+            dependencies: [
+                "GogglesUSB",
+                .product(name: "GogglesProtocol", package: "GogglesProtocol")
+            ]
         )
     ]
 )

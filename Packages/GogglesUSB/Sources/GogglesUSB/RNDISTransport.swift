@@ -9,26 +9,24 @@ import GogglesProtocol
 // `rndis_set`) and `stream.py`'s `main()` device-setup sequence -- see the
 // task-1.5 report for exact provenance notes.
 //
-// Scoping decision (documented per the task brief's step 5/6 wording,
-// which this type follows literally): `inbound` yields raw *Ethernet*
-// frames unwrapped from RNDIS_PACKET_MSG (`RNDIS.unwrapPacketMsg`'s
-// output, unfiltered), and `send(_:)` wraps its argument directly via
-// `RNDIS.wrapPacketMsg` with no Ethernet/IPv4/UDP framing added. This is a
-// narrower abstraction level than `GogglesTransport`'s own doc comment
-// describes (`Transport.swift`: "UDP:9003 payload bytes", matching what
-// `MockTransport` produces after its own Ethernet/UDP parsing). The
-// mismatch is deliberate for this task, not an oversight: task 1.5 is
-// scoped to "the USB transport" (device discovery, control transfers, the
-// bulk pool, RNDIS wrap/unwrap) per its brief, explicitly leaving the
-// Ethernet+IPv4+UDP framing and ARP MAC-resolution dance (Python's
-// `rawnet.build_udp`/`parse_udp` + `resolve_goggles_mac`) for a later task
-// to layer on top -- either inside this type or as a small adapter
-// wrapping it. `RawNet` (already built in task 1.1) is exactly the tool
-// that later task will reach for. Until that lands, a caller driving
-// `RNDISTransport` directly gets raw Ethernet frames on `inbound` and must
-// itself supply already-Ethernet-framed bytes to `send`, NOT bare
-// WireProtocol outer-header frames -- this is flagged clearly here and in
-// the task-1.5 report so the next task doesn't miss it.
+// Task 1.6: closes the abstraction-level gap task 1.5 deliberately left
+// open. `RNDISTransport` now conforms to `GogglesTransport`'s documented
+// contract exactly like `MockTransport` does: `inbound` yields UDP:9003
+// *payload* bytes (not raw Ethernet frames), and `send(_:)` takes a
+// UDP-payload `Data` and does its own Ethernet/IPv4/UDP framing
+// internally. This required two additions layered on top of task 1.5's
+// USB/RNDIS bring-up, both ported from the Python prototype:
+//
+//   1. ARP resolution of the goggles' current RNDIS MAC at connect time
+//      (`ARPResolver`, design §3.2) -- the goggles rotate this MAC every
+//      reboot, so it is resolved fresh every connect and never persisted
+//      or hardcoded anywhere in this codebase.
+//   2. Inbound Ethernet-frame filtering (design §5.2): ARP requests for
+//      the host IP get an ARP reply; everything else is parsed as UDP via
+//      `RawNet.parseUDP` and filtered to source port 9003, with only the
+//      payload forwarded to `inbound`. ARP traffic from the goggles' IP
+//      also continuously re-learns/refreshes the goggles MAC during the
+//      normal receive loop, matching `stream.py`'s main loop.
 // ─────────────────────────────────────────────────────────────────────────
 
 /// USB-descriptor-level identity of the connected goggles, extracted once
@@ -98,6 +96,15 @@ public final class RNDISTransport: GogglesTransport {
     private static let epBulkIn: UInt8 = 0x81
     private static let epBulkOut: UInt8 = 0x01
 
+    /// UDP source port `send`'s built frames use, and the destination port
+    /// on the goggles side. Matches `stream.py`'s `SRC_PORT`/`DST_PORT`.
+    private static let udpSrcPort: UInt16 = 54321
+    private static let udpDstPort: UInt16 = 9003
+    /// Inbound frames are only forwarded to `inbound` if their UDP source
+    /// port is this (the goggles' outbound port) -- matches `stream.py`'s
+    /// `sport != DST_PORT` filter and `MockTransport`'s identical filter.
+    private static let expectedInboundSrcPort: UInt16 = 9003
+
     /// §5.2: "a pool of 16 in-flight 64 KB transfers submitted round-robin."
     private static let transferPoolSize = 16
     private static let transferBufferSize = 64 * 1024
@@ -110,13 +117,34 @@ public final class RNDISTransport: GogglesTransport {
 
     // MARK: - GogglesTransport
 
+    /// Inbound UDP:9003 payload bytes -- matches `GogglesTransport`'s doc
+    /// comment and `MockTransport`'s contract exactly (task 1.6). ARP
+    /// requests for the host IP and any other non-matching traffic are
+    /// filtered out internally, never surfaced here.
     public let inbound: AsyncStream<Data>
 
-    /// Wraps `frame` via `RNDIS.wrapPacketMsg` and writes it synchronously
-    /// to IF1's bulk-OUT endpoint. Synchronous per the task brief: §5.2's
-    /// async-pool requirement is specifically about removing the inbound
-    /// read gap, not about outbound sends.
+    /// Builds a full Ethernet/IPv4/UDP frame addressed to the ARP-resolved
+    /// goggles MAC/IP (`RawNet.buildUDP`) and writes it synchronously to
+    /// IF1's bulk-OUT endpoint. `frame` is a UDP-payload `Data` (an 8-byte
+    /// outer header + body, as built by `WireProtocol`) -- matching
+    /// `GogglesTransport`'s documented contract, not a raw Ethernet frame.
+    /// Synchronous per the task brief: §5.2's async-pool requirement is
+    /// specifically about removing the inbound read gap, not about
+    /// outbound sends.
     public func send(_ frame: Data) throws {
+        let mac = currentGogglesMac()
+        let ethernetFrame = RawNet.buildUDP(
+            srcMac: ARPResolver.hostMac, dstMac: mac,
+            srcIp: ARPResolver.hostIp, dstIp: ARPResolver.gogglesIp,
+            srcPort: Self.udpSrcPort, dstPort: Self.udpDstPort,
+            payload: frame
+        )
+        try writeEthernetFrame(ethernetFrame)
+    }
+
+    /// Raw bulk-OUT write shared by `send(_:)`, the connect-time ARP
+    /// resolution, and the inbound-ARP-request auto-responder.
+    private func writeEthernetFrame(_ frame: Data) throws {
         guard let handle else {
             throw RNDISTransportError.libusbCall("send (no device handle)", 0)
         }
@@ -132,10 +160,45 @@ public final class RNDISTransport: GogglesTransport {
         }
     }
 
+    /// Thread-safe read of the (connect-time-resolved, continuously
+    /// re-learned per design §5.2) goggles MAC.
+    private func currentGogglesMac() -> Data {
+        poolLock.lock()
+        defer { poolLock.unlock() }
+        return _gogglesMac
+    }
+
+    /// Thread-safe update of the goggles MAC (initial resolution in
+    /// `init`, or a later learn/refresh from inbound ARP traffic).
+    private func updateGogglesMac(_ mac: Data) {
+        poolLock.lock()
+        _gogglesMac = mac
+        poolLock.unlock()
+    }
+
     // MARK: - Public state
 
     /// USB-descriptor identity captured once at connect time.
     public let deviceInfo: DeviceInfo
+
+    /// The ARP-resolved goggles RNDIS MAC (design §3.2). Never hardcoded,
+    /// never persisted across launches -- resolved fresh at connect time
+    /// in `init`, and continuously re-learned/refreshed thereafter from
+    /// any ARP traffic seen from `ARPResolver.gogglesIp` (design §5.2).
+    /// Guarded by `poolLock` (read via `currentGogglesMac()`) since it's
+    /// touched from both the event thread (learning) and `send(_:)`'s
+    /// caller thread (reading).
+    public var gogglesMac: Data {
+        currentGogglesMac()
+    }
+
+    /// Diagnostic-only: non-nil if connect-time resolution had to fall
+    /// back to the multi-subnet sweep (design §3.2 step 4) instead of
+    /// resolving `ARPResolver.gogglesIp` directly. Logged at connect time
+    /// regardless; also exposed here for a caller/test to inspect.
+    public let arpSweepDiagnostic: ARPResolver.SweepDiagnostic?
+
+    private var _gogglesMac: Data = Data()
 
     // MARK: - Private state
 
@@ -181,6 +244,8 @@ public final class RNDISTransport: GogglesTransport {
         }
 
         var claimed: [Int32] = []
+        var resolvedMac = Data()
+        var resolvedSweepDiagnostic: ARPResolver.SweepDiagnostic?
         do {
             for iface in [Self.ctrlInterface, Self.dataInterface] {
                 let active = libusb_kernel_driver_active(deviceHandle, iface)
@@ -220,6 +285,25 @@ public final class RNDISTransport: GogglesTransport {
             )
             _ = Self.waitNotification(deviceHandle)
             _ = try Self.getEncapsulatedResponse(deviceHandle)
+
+            // Task 1.6 / design §3.2: with the RNDIS link up, resolve the
+            // goggles' current MAC before any data is yielded on
+            // `inbound`. Runs synchronously on this (init) thread using
+            // blocking bulk transfers, since the async transfer pool and
+            // event thread haven't started yet -- no other consumer of
+            // IF1's bulk endpoints exists at this point.
+            var pendingResolutionFrames: [Data] = []
+            let resolved = try ARPResolver.resolve(
+                sendFrame: { frame in try Self.writeEthernetFrameBlocking(deviceHandle, frame) },
+                receiveFrame: { timeout in
+                    Self.readEthernetFrameBlocking(deviceHandle, timeout: timeout, pending: &pendingResolutionFrames)
+                },
+                log: { message in
+                    FileHandle.standardError.write(Data(("[RNDISTransport] " + message + "\n").utf8))
+                }
+            )
+            resolvedMac = resolved.mac
+            resolvedSweepDiagnostic = resolved.sweepDiagnostic
         } catch {
             for iface in claimed {
                 libusb_release_interface(deviceHandle, iface)
@@ -233,6 +317,8 @@ public final class RNDISTransport: GogglesTransport {
         self.handle = deviceHandle
         self.claimedInterfaces = claimed
         self.deviceInfo = Self.extractDeviceInfo(handle: deviceHandle)
+        self._gogglesMac = resolvedMac
+        self.arpSweepDiagnostic = resolvedSweepDiagnostic
 
         var continuation: AsyncStream<Data>.Continuation!
         self.inbound = AsyncStream<Data> { continuation = $0 }
@@ -346,16 +432,34 @@ public final class RNDISTransport: GogglesTransport {
     /// Invoked by `rndisTransportBulkInCallback` (the C-callable
     /// trampoline below) whenever one pooled bulk-IN transfer completes.
     /// Unwraps any RNDIS_PACKET_MSG structures in the completed buffer
-    /// into raw Ethernet frames, yields each to `inbound`, then
-    /// immediately resubmits the same transfer (round-robin reuse, per
-    /// §5.2) unless shutdown is in progress.
+    /// into raw Ethernet frames and filters each one (design §5.2, matching
+    /// `stream.py`'s main receive loop) before immediately resubmitting
+    /// the same transfer (round-robin reuse, per §5.2) unless shutdown is
+    /// in progress:
+    ///
+    ///   - An ARP request targeting the host IP gets an ARP reply sent
+    ///     back (dispatched off this thread -- see `respondToARPRequest`).
+    ///   - Any ARP traffic (reply or request, gratuitous or not) whose
+    ///     sender is the goggles' IP re-learns/refreshes `gogglesMac`, in
+    ///     case it changes mid-session (goggles reboot without a full app
+    ///     reconnect).
+    ///   - Everything else is parsed as UDP (`RawNet.parseUDP`) and, if
+    ///     its source port is 9003, its payload is yielded to `inbound`
+    ///     -- exactly `MockTransport`'s filter, so the two are
+    ///     interchangeable at this boundary. Non-UDP, wrong-port, and
+    ///     malformed frames are silently skipped, matching what a real
+    ///     consumer would see (this mirrors `MockTransport`'s documented
+    ///     behavior, not a gap -- unknown/malformed traffic at the
+    ///     Ethernet/ARP/UDP layer isn't a "state" design §8.6 asks us to
+    ///     log, unlike unrecognized higher-level packet types, which
+    ///     `WireProtocol` already logs).
     fileprivate func handleBulkInCompletion(_ transfer: UnsafeMutablePointer<libusb_transfer>) {
         if transfer.pointee.status == LIBUSB_TRANSFER_COMPLETED {
             let length = Int(transfer.pointee.actual_length)
             if length > 0, let buffer = transfer.pointee.buffer {
                 let data = Data(bytes: buffer, count: length)
                 for frame in RNDIS.unwrapPacketMsg(data) {
-                    continuation.yield(frame)
+                    handleInboundEthernetFrame(frame)
                 }
             }
         }
@@ -374,6 +478,43 @@ public final class RNDISTransport: GogglesTransport {
             if done {
                 allTransfersDone.signal()
             }
+        }
+    }
+
+    /// One inbound Ethernet frame's worth of filtering (design §5.2). See
+    /// `handleBulkInCompletion`'s doc comment for the full rationale.
+    private func handleInboundEthernetFrame(_ frame: Data) {
+        if let arp = RawNet.parseARP(frame) {
+            if arp.senderIp == ARPResolver.gogglesIp {
+                updateGogglesMac(arp.senderMac)
+            }
+            if arp.op == 1, arp.targetIp == ARPResolver.hostIp {
+                respondToARPRequest(from: arp.senderMac, senderIp: arp.senderIp)
+            }
+            return
+        }
+
+        guard let udp = RawNet.parseUDP(frame), udp.srcPort == Self.expectedInboundSrcPort else {
+            return
+        }
+        continuation.yield(udp.payload)
+    }
+
+    /// Sends an ARP reply for the host IP back to `senderMac`/`senderIp`,
+    /// per design §5.2 ("ARP request for 192.168.60.1 -> emit an ARP
+    /// reply"). Dispatched onto a background queue rather than written
+    /// synchronously here: this runs on the dedicated libusb event thread
+    /// (inside a transfer-completion callback fired from
+    /// `libusb_handle_events_timeout`), and issuing a synchronous
+    /// `libusb_bulk_transfer` re-enters libusb's event handling from
+    /// within its own callback, which is not safe to do on this thread.
+    private func respondToARPRequest(from senderMac: Data, senderIp: String) {
+        let reply = RawNet.buildARPReply(
+            srcMac: ARPResolver.hostMac, srcIp: ARPResolver.hostIp,
+            dstMac: senderMac, dstIp: senderIp
+        )
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            try? self?.writeEthernetFrame(reply)
         }
     }
 
@@ -404,6 +545,55 @@ public final class RNDISTransport: GogglesTransport {
             var tv = timeval(tv_sec: 0, tv_usec: 50_000)
             libusb_handle_events_timeout(ctx, &tv)
         }
+    }
+
+    // MARK: - Blocking bulk I/O for connect-time ARP resolution
+
+    /// RNDIS-wraps `frame` and writes it via a synchronous, 500ms-timeout
+    /// bulk-OUT transfer. Used only during `init`'s ARP-resolution phase
+    /// (before `handle`/the event thread exist), via a raw `deviceHandle`
+    /// rather than an instance method -- Swift's two-phase init forbids
+    /// calling instance methods on `self` before every stored property has
+    /// a value, which `_gogglesMac` (set from this call's result) does
+    /// not yet at this point in `init`.
+    private static func writeEthernetFrameBlocking(_ handle: OpaquePointer, _ frame: Data) throws {
+        var wrapped = RNDIS.wrapPacketMsg(frame)
+        let count = wrapped.count
+        var transferred: Int32 = 0
+        let rc: Int32 = wrapped.withUnsafeMutableBytes { raw in
+            let base = raw.bindMemory(to: UInt8.self).baseAddress
+            return libusb_bulk_transfer(handle, epBulkOut, base, Int32(count), &transferred, 500)
+        }
+        guard rc == 0 else {
+            throw RNDISTransportError.libusbCall("libusb_bulk_transfer(OUT, ARP resolution)", rc)
+        }
+    }
+
+    /// Blocks for up to `timeout` for one inbound Ethernet frame,
+    /// RNDIS-unwrapped. A single bulk-IN read can yield multiple
+    /// RNDIS_PACKET_MSGs; any beyond the first are queued in `pending` and
+    /// drained before issuing another hardware read. Returns `nil` if
+    /// nothing arrived within `timeout` (a genuine libusb timeout) or if
+    /// `timeout` is already non-positive.
+    private static func readEthernetFrameBlocking(
+        _ handle: OpaquePointer, timeout: TimeInterval, pending: inout [Data]
+    ) -> Data? {
+        if !pending.isEmpty {
+            return pending.removeFirst()
+        }
+        guard timeout > 0 else { return nil }
+        let timeoutMs = UInt32(min(timeout, 30) * 1000)
+        var buffer = [UInt8](repeating: 0, count: 16384)
+        var transferred: Int32 = 0
+        let rc: Int32 = buffer.withUnsafeMutableBufferPointer { buf in
+            libusb_bulk_transfer(handle, epBulkIn, buf.baseAddress, Int32(buf.count), &transferred, timeoutMs)
+        }
+        guard rc == 0, transferred > 0 else { return nil }
+        let data = Data(buffer.prefix(Int(transferred)))
+        let frames = RNDIS.unwrapPacketMsg(data)
+        guard !frames.isEmpty else { return nil }
+        pending = Array(frames.dropFirst())
+        return frames.first
     }
 
     // MARK: - Control-transfer helpers (§3.1)
