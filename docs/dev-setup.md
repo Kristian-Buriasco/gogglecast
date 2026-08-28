@@ -32,7 +32,8 @@ helper daemon (Task 2.2, `Helper/GogglesHelper`).
 
 ## The stub app's CLI flags
 
-`Contents/MacOS/GogglesView`, built from `Apps/GogglesView/StubApp/main.swift`:
+`Contents/MacOS/GogglesView`, built from `Apps/GogglesView/Sources/GogglesView/main.swift`
+(Task 3.1 replaced the old `StubApp/` layout with a real SPM package):
 
 | Flag | Effect |
 |---|---|
