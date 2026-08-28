@@ -216,9 +216,25 @@ if args.contains("--run") {
     app.setActivationPolicy(.regular)
 
     let hostingController = NSHostingController(rootView: GogglesConnectionView(coordinator: coordinator, session: session))
+    // Real bug found during tonight's window-sizing complaint while
+    // verifying the decode fix live: `NSHostingController`'s default
+    // `sizingOptions` (`.standardBounds`, which includes
+    // `.intrinsicContentSize`) makes AppKit auto-resize the window to fit
+    // the hosted SwiftUI content's ideal/intrinsic size on every content
+    // change -- and `GogglesConnectionView`'s content uses
+    // `.frame(maxWidth: .infinity, maxHeight: .infinity)` throughout (by
+    // design, so it fills whatever window size the user picks), which
+    // reports a huge ideal height. That combination is what made the
+    // window visibly grow taller each time the content changed (device
+    // card appearing, `.live`'s video view mounting) instead of staying at
+    // the size set below. Disabling `sizingOptions` here keeps the window
+    // exactly at the size this code sets (and whatever the user drags it
+    // to via `.resizable`), matching the intent of every other explicit
+    // `setContentSize` call in this file.
+    hostingController.sizingOptions = []
     let window = NSWindow(contentViewController: hostingController)
     window.title = "GogglesView"
-    window.setContentSize(NSSize(width: 480, height: 420))
+    window.setContentSize(NSSize(width: 640, height: 460))
     window.styleMask = [.titled, .closable, .resizable, .miniaturizable]
     window.center()
     window.makeKeyAndOrderFront(nil)
@@ -294,6 +310,9 @@ if args.contains("--force-state") {
     app.setActivationPolicy(.regular)
 
     let hostingController = NSHostingController(rootView: GogglesConnectionView(coordinator: coordinator, session: session))
+    // See the matching `sizingOptions = []` comment in `--run` above --
+    // same view type, same auto-grow behavior otherwise.
+    hostingController.sizingOptions = []
     let window = NSWindow(contentViewController: hostingController)
     window.title = "GogglesView -- --force-state \(name) (Task 3.4 manual verification)"
     window.setContentSize(NSSize(width: 480, height: 360))

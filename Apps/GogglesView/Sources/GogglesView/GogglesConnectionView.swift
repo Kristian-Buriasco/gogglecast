@@ -29,8 +29,51 @@ struct GogglesConnectionView: View {
         .accessibilityIdentifier("state-\(coordinator.uiState.kind.rawValue)")
     }
 
+    // Fix (Task 3.5 hardware bug, post-9c31c00): `GogglesVideoView` --
+    // and, critically, the `session.attach(renderer:)` call inside its
+    // `makeNSView` -- must be mounted ONCE, unconditionally, for the whole
+    // lifetime of this view, exactly like `main.swift --live-view` mounts
+    // it before `client.connect()` is ever called. It must NOT be created
+    // fresh only inside the `.live`/`.stalled` switch cases below (the
+    // pre-fix behavior): `coordinator.onNALUnit`/`session.handle(...)`
+    // starts processing real NAL data (including the very first
+    // live-transition IDR) the instant streaming starts, regardless of
+    // what's on screen, but `DecodeSession.renderer` is a `weak var` that
+    // silently no-ops `enqueue(_:)` until `attach(renderer:)` has run. When
+    // the video view was only created on first entry to `.live`, that
+    // `makeNSView`/`attach` call raced the real first IDR -- SwiftUI's
+    // render pass lands strictly after the `@Published uiState` mutation,
+    // by which point the coordinator's `onNALUnit` closure (wired
+    // unconditionally, independent of UI state) may have already handed
+    // that IDR to a still-`nil` renderer and dropped it. Every following
+    // sample was then a P-frame fed to a VideoToolbox decode session that
+    // never saw a keyframe, which VideoToolbox correctly rejects every
+    // single time (-12909/AVFoundationErrorDomain -11821) -- matching
+    // tonight's 100%-reproducible "(1/30 consecutive)" pattern exactly
+    // (each sample still *constructs* fine synchronously, resetting the
+    // counter, before failing async in decode). Always hosting
+    // `GogglesVideoView` here (hidden via opacity when not live/stalled)
+    // attaches the renderer at initial view construction, the same timing
+    // `--live-view` already uses and already hardware-verified tonight.
     @ViewBuilder
     private var content: some View {
+        ZStack {
+            GogglesVideoView(session: session)
+                .opacity(videoOpacity)
+            overlay
+        }
+    }
+
+    private var videoOpacity: Double {
+        switch coordinator.uiState {
+        case .live: return 1
+        case .stalled: return 0.4
+        default: return 0
+        }
+    }
+
+    @ViewBuilder
+    private var overlay: some View {
         switch coordinator.uiState {
         case .noHelper(let reason):
             VStack(spacing: 8) {
@@ -76,16 +119,12 @@ struct GogglesConnectionView: View {
             )
 
         case .live:
-            GogglesVideoView(session: session)
+            EmptyView()
 
         case .stalled:
-            ZStack {
-                GogglesVideoView(session: session)
-                    .opacity(0.4)
-                Text("Signal lost — reconnecting…")
-                    .padding(8)
-                    .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 8))
-            }
+            Text("Signal lost — reconnecting…")
+                .padding(8)
+                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 8))
         }
     }
 }
