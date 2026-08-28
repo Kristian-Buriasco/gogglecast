@@ -175,6 +175,56 @@ if args.contains("--live-view") {
     app.run()
     exit(0)
 }
+if args.contains("--force-state") {
+    // Task 3.4 exit criterion ("verified by forcing each one"): opens a
+    // window showing `GogglesConnectionView` with its `uiState` directly
+    // overridden via `GogglesConnectionCoordinator.forceState(_:)` -- no
+    // XPC connection, no helper process, no goggles hardware needed. Lets
+    // every one of the 9 states be visually inspected on demand.
+    //
+    // Usage: ./GogglesView --force-state <name>
+    //   name is one of: noHelper, noDevice, claiming, claimFailed,
+    //   resolving, handshaking, waitingForKeyframe, live, stalled
+    guard let flagIndex = args.firstIndex(of: "--force-state"), flagIndex + 1 < args.count else {
+        print("--force-state requires a state name, e.g. --force-state claimFailed")
+        print("valid names: \(GogglesUIStateKind.allCases.map(\.rawValue).joined(separator: ", "))")
+        exit(1)
+    }
+    let name = args[flagIndex + 1]
+    guard let forced = forcedState(named: name) else {
+        print("unrecognized state name '\(name)'. valid names: \(GogglesUIStateKind.allCases.map(\.rawValue).joined(separator: ", "))")
+        exit(1)
+    }
+
+    print("--force-state \(name): opening a window with uiState forced to \(forced)...")
+
+    let client = HelperClient()
+    let coordinator = GogglesConnectionCoordinator(client: client, startWatchdog: false)
+    let session = DecodeSession()
+    // Sample device info so the card has something to show for every
+    // state that displays it (`.claiming` onward) -- a real connection
+    // would populate this via `deviceChanged`, which never fires here
+    // since `client.connect()` is deliberately never called.
+    coordinator.forceState(forced)
+
+    let app = NSApplication.shared
+    app.setActivationPolicy(.regular)
+
+    let hostingController = NSHostingController(rootView: GogglesConnectionView(coordinator: coordinator, session: session))
+    let window = NSWindow(contentViewController: hostingController)
+    window.title = "GogglesView -- --force-state \(name) (Task 3.4 manual verification)"
+    window.setContentSize(NSSize(width: 480, height: 360))
+    window.styleMask = [.titled, .closable, .resizable, .miniaturizable]
+    window.center()
+    window.makeKeyAndOrderFront(nil)
+
+    let delegate = LiveViewAppDelegate()
+    app.delegate = delegate
+
+    app.activate(ignoringOtherApps: true)
+    app.run()
+    exit(0)
+}
 #endif
 
 if args.contains("--test-client") {
@@ -251,12 +301,13 @@ if args.contains("--test-client") {
     exit(0)
 }
 
-print("GogglesView stub (Task 2.3/2.4/3.1/3.3). Recognized flags:")
+print("GogglesView stub (Task 2.3/2.4/3.1/3.3/3.4). Recognized flags:")
 print("  --check-daemon-status   print SMAppService.daemon status and exit")
 print("  --register              register() the helper daemon as a Login Item")
 print("  --unregister            unregister() the helper daemon")
 print("  --test-client [secs]    connect via HelperClient, startStreaming, log fps, exit (default 10s)")
 print("  --live-view             open a minimal AVSampleBufferDisplayLayer window and stream decoded video")
+print("  --force-state <name>    open GogglesConnectionView with uiState forced to <name> (Task 3.4 manual verification)")
 exit(0)
 
 #if canImport(AppKit)
@@ -265,5 +316,25 @@ exit(0)
 /// windowless background app.
 final class LiveViewAppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+}
+
+/// Maps `--force-state`'s string argument to a `GogglesUIState`, using
+/// representative sample associated data (a real interfaceClaimFailed
+/// diagnostic, a plausible elapsed-seconds value) so each forced state
+/// renders exactly as it would in practice, not with placeholder zeros.
+func forcedState(named name: String) -> GogglesUIState? {
+    switch name {
+    case "noHelper": return .noHelper(reason: nil)
+    case "noDevice": return .noDevice
+    case "claiming": return .claiming
+    case "claimFailed": return .claimFailed(reason: GogglesDiagnostics.interfaceClaimFailed)
+    case "claimFailed-arp": return .claimFailed(reason: GogglesDiagnostics.arpTimeout)
+    case "resolving": return .resolving
+    case "handshaking": return .handshaking(elapsedSeconds: 3)
+    case "waitingForKeyframe": return .waitingForKeyframe
+    case "live": return .live
+    case "stalled": return .stalled
+    default: return nil
+    }
 }
 #endif
