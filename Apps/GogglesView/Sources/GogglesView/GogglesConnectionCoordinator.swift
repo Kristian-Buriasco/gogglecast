@@ -180,6 +180,23 @@ public final class GogglesConnectionCoordinator: ObservableObject {
             if case .noHelper = uiState {
                 uiState = .noDevice
             }
+            // Task 3.7, design §9.3 scenario 5 (`sudo killall GogglesHelper`
+            // while live): every reconnect (this callback fires on EVERY
+            // transition into `.connected`, not just the first) gets a
+            // brand new `NSXPCConnection` object on the helper side too, so
+            // `HelperService`'s `streamingSubscriberIDs` (keyed by that
+            // connection's own `ObjectIdentifier`) has no memory of this
+            // subscriber ever having called `startStreaming` -- the old
+            // registration died with the old connection. Without
+            // re-calling it here, the app was observed staying wedged at
+            // `.noDevice` forever after any reconnect (helper kill, or any
+            // other XPC interruption) even though the daemon and hardware
+            // were both fine: nothing was ever asking it to stream again.
+            // `startStreaming` is documented safe to call repeatedly (an
+            // already-streaming subscriber just re-registers into the same
+            // fan-out set), so this is unconditional and has no special
+            // case to get wrong.
+            client.startStreaming(reply: { _, _ in })
         }
     }
 

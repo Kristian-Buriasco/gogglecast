@@ -279,17 +279,31 @@ public final class HelperClient: NSObject {
             Logging.xpc.error("XPC connection invalidated")
             self?.handleInvalidation(newConnection)
         }
-        newConnection.interruptionHandler = {
-            // The connection object itself is still usable after an
-            // interruption (the remote process died/restarted, but this
-            // isn't a permanent teardown the way invalidation is) --
-            // `NSXPCConnection`'s own contract is that outstanding/future
-            // calls fail until either it recovers or invalidationHandler
-            // fires. No action taken here beyond logging: invalidation
-            // (above) is what actually drives reconnection, and it does
-            // reliably follow an interruption for a launchd Mach service
-            // that isn't coming back on this same connection object.
-            Logging.xpc.error("XPC connection interrupted (helper process likely restarted)")
+        newConnection.interruptionHandler = { [weak newConnection] in
+            // Task 3.7, design §9.3 scenario 5 (`sudo killall GogglesHelper`
+            // while live): the doc comment this replaced assumed
+            // invalidation reliably follows an interruption for a
+            // launchd/`SMAppService` Mach service. Verified against real
+            // hardware that this assumption is false, at least for a clean
+            // SIGTERM exit (as opposed to a genuine crash) -- interruption
+            // fired exactly once and invalidation never followed, even
+            // after 90+ seconds, leaving this connection permanently
+            // wedged (every future call just fails silently) with no
+            // reconnect ever scheduled, since `handleInvalidation` is the
+            // only thing that schedules one. A completely separate fresh
+            // process connecting to the same Mach service in the meantime
+            // connected and worked immediately, proving the daemon itself
+            // was respawning fine -- this was purely a client-side gap.
+            //
+            // Fix: explicitly invalidate here. `NSXPCConnection.invalidate()`
+            // is documented safe to call multiple times/redundantly (a
+            // later real invalidation, if it ever does arrive on this same
+            // object, is a harmless no-op via `handleInvalidation`'s own
+            // `invalidatedConnection === self.connection` guard), and it
+            // reliably drives `invalidationHandler` -> `handleInvalidation`
+            // -> the existing, already-correct 2s-delay reconnect loop.
+            Logging.xpc.error("XPC connection interrupted (helper process likely restarted) -- invalidating to force reconnect")
+            newConnection?.invalidate()
         }
 
         connection = newConnection
