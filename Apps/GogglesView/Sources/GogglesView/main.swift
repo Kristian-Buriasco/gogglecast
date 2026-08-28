@@ -1,18 +1,22 @@
-// Task 2.3/2.4/3.1 app entry point.
+// GogglesView app entry point.
 //
-// This is still NOT the real SwiftUI app (that's Task 3.4+'s job). Through
-// Task 3.1, `Apps/GogglesView` is now a real SPM executable package (see
-// `Package.swift`'s doc comment for why it moved off a bare `swiftc`
-// invocation) whose `main.swift` drives, and is testable ahead of, the
-// eventual SwiftUI UI:
-//   - `SMAppService.daemon(plistName:).status` registration harness
-//     (Task 2.3/2.4, unchanged in behavior from `StubApp/main.swift`).
-//   - `HelperClient` (Task 3.1): the real XPC client-connection layer this
-//     task builds, exercised here via `--test-client` so it's verifiable
-//     from the command line before any UI exists to drive it.
+// Task 3.6: this file's default (no-argument) path is now v1's real,
+// shippable launch behavior -- a plain double-click of `GogglesView.app`
+// (or running `Contents/MacOS/GogglesView` with no flags) connects to the
+// helper, opens the real `GogglesConnectionView` window (16:9 aspect-ratio
+// constrained, fullscreen-capable), and puts up a persistent `NSStatusItem`
+// menu bar presence (state glyph, Reconnect, show/hide window, Quit -- see
+// `MenuBarController.swift`). Everything through Task 3.5 built up to this
+// piece by piece but always behind an explicit flag (`--test-client`,
+// `--live-view`, `--force-state`, `--run`); this task is what finally makes
+// the no-flags path the real app instead of a usage printout.
 //
-// Usage (from inside the assembled .app's Contents/MacOS/, or directly via
-// `swift run` from this package during development):
+// The dev/debug flags below remain, for development use, and `--run`
+// specifically remains a named synonym for the same default real-app path
+// (useful for scripting/documentation that wants to be explicit about
+// intent rather than relying on "no arguments"):
+//   ./GogglesView                         Default: the real app (see above).
+//   ./GogglesView --run                   Explicit synonym for the above.
 //   ./GogglesView --check-daemon-status   Print SMAppService.daemon status and exit.
 //   ./GogglesView --register              Call register(), print status, and (if
 //                                          .requiresApproval) open System Settings'
@@ -22,15 +26,13 @@
 //                                          startStreaming, log fps for `secs`
 //                                          seconds (default 10), then
 //                                          disconnect and exit.
-//   ./GogglesView --run                   Task 3.5: real end-to-end -- connect,
-//                                          startStreaming, and show the real
-//                                          GogglesConnectionView (including the
-//                                          real .waitingForKeyframe card) with a
-//                                          temporary "Goggles > Reconnect" menu.
+//   ./GogglesView --live-view             Task 3.3 hardware-verification harness:
+//                                          bypasses the state machine entirely.
+//   ./GogglesView --force-state <name>    Task 3.4 manual-verification harness:
+//                                          force uiState without any XPC connection.
 //
-// None of these run by default -- with no recognized flag this prints
-// usage and exits 0, so simply building/importing this repo never
-// registers anything or opens a connection on a developer's machine.
+// An unrecognized `--something` flag prints usage and exits 1 (does not
+// fall through to the real app) -- see the bottom of this file.
 
 import Foundation
 import ServiceManagement
@@ -180,19 +182,26 @@ if args.contains("--live-view") {
     app.run()
     exit(0)
 }
-if args.contains("--run") {
-    // Task 3.5: the first real end-to-end harness -- unlike `--live-view`
-    // (Task 3.3, which drives `GogglesVideoView` directly off a raw
-    // `HelperClient` and never touches the state machine at all) and
-    // `--force-state` (Task 3.4, which never opens a real XPC connection),
-    // this wires a real `HelperClient` through the real
-    // `GogglesConnectionCoordinator` into the real `GogglesConnectionView`
-    // -- i.e. exactly what a user would see, including the real
-    // `.waitingForKeyframe` card this task builds. Still not the real app
-    // shell (no dock icon curation, no persistent menu bar item -- Task
-    // 3.6's job); the temporary "Goggles > Reconnect" menu item this task's
-    // brief calls for lives here.
-    print("--run: connecting to \(helperMachServiceName) and opening the real connection view...")
+if args.contains("--run") || !args.dropFirst().contains(where: { $0.hasPrefix("--") }) {
+    // Task 3.6: this is now v1's real default launch behavior, not just
+    // another debug flag -- the app bundle's actual entry point (no
+    // arguments, e.g. a normal Dock/Finder double-click) falls into this
+    // exact same branch as the explicit `--run` flag. `--run` is kept as an
+    // explicit, named synonym for development use (matches every other
+    // flag in this file's convention of being nameable from a terminal),
+    // but it is no longer the *only* way to reach this code path.
+    //
+    // History: originally Task 3.5's `--run` harness (first real
+    // end-to-end wiring -- unlike `--live-view`, Task 3.3, which drives
+    // `GogglesVideoView` directly off a raw `HelperClient` and never
+    // touches the state machine, and `--force-state`, Task 3.4, which never
+    // opens a real XPC connection). This task (3.6) promotes it to the
+    // default path and adds the real app shell around it: a persistent
+    // `NSStatusItem` menu bar presence (`MenuBarController` -- state glyph,
+    // Reconnect relocated here from its temporary home as a "Goggles" main
+    // -menu item, show/hide window), a 16:9 aspect-ratio window constraint,
+    // and fullscreen support.
+    print("GogglesView: connecting to \(helperMachServiceName) and opening the real connection view...")
 
     let client = HelperClient()
     let coordinator = GogglesConnectionCoordinator(client: client)
@@ -216,7 +225,7 @@ if args.contains("--run") {
     app.setActivationPolicy(.regular)
 
     let hostingController = NSHostingController(rootView: GogglesConnectionView(coordinator: coordinator, session: session))
-    // Real bug found during tonight's window-sizing complaint while
+    // Real bug found during Task 3.5's window-sizing complaint while
     // verifying the decode fix live: `NSHostingController`'s default
     // `sizingOptions` (`.standardBounds`, which includes
     // `.intrinsicContentSize`) makes AppKit auto-resize the window to fit
@@ -231,36 +240,78 @@ if args.contains("--run") {
     // exactly at the size this code sets (and whatever the user drags it
     // to via `.resizable`), matching the intent of every other explicit
     // `setContentSize` call in this file.
+    //
+    // This task's aspect-ratio/fullscreen additions below coexist with
+    // that fix rather than fighting it: `sizingOptions = []` only stops
+    // AppKit from auto-resizing the window to chase SwiftUI's *ideal*
+    // content size; `window.contentAspectRatio` (set below) is a completely
+    // separate AppKit mechanism that only constrains *user-initiated*
+    // resize drags to a fixed ratio, and fullscreen (`.fullScreenPrimary`)
+    // is a third, independent mechanism (a window-collection-behavior flag
+    // enabling the standard green-button/Control+Cmd+F fullscreen
+    // transition). None of the three fight each other: `sizingOptions`
+    // governs "does content size drive window size" (no), the aspect
+    // ratio governs "what shapes can the user drag the window into" (16:9
+    // only), and `.fullScreenPrimary` is orthogonal to both.
     hostingController.sizingOptions = []
     let window = NSWindow(contentViewController: hostingController)
     window.title = "GogglesView"
-    window.setContentSize(NSSize(width: 640, height: 460))
+    let defaultContentSize = NSSize(width: 640, height: 360) // exactly 16:9
+    window.setContentSize(defaultContentSize)
     window.styleMask = [.titled, .closable, .resizable, .miniaturizable]
+    // Task 3.6: preserve the video's 16:9 (1920x1080) aspect ratio when the
+    // user resizes the window by dragging. `contentAspectRatio` takes a
+    // ratio in the content view's own coordinate space (not literal
+    // 1920x1080 pixels -- any 16:9-ratio `NSSize` works identically), so a
+    // small, exact 16:9 pair is used rather than the full frame resolution.
+    window.contentAspectRatio = NSSize(width: 16, height: 9)
+    // Task 3.6: standard macOS fullscreen (green button / Control+Cmd+F).
+    // `.fullScreenPrimary` is the idiomatic AppKit collection-behavior flag
+    // for "this window is a first-class fullscreen destination" -- the
+    // window-based equivalent of SwiftUI's `.toggleFullScreen` (which only
+    // exists as a `Scene`-level command for the SwiftUI `App` lifecycle
+    // this app deliberately isn't using -- see `MenuBarController.swift`'s
+    // doc comment for why). No extra plumbing needed beyond this one flag;
+    // AppKit supplies the actual fullscreen transition, title-bar button,
+    // and menu/keyboard shortcut for free once it's set.
+    window.collectionBehavior.insert(.fullScreenPrimary)
     window.center()
+    // Task 3.6: closing the window (red titlebar button) hides it instead
+    // of destroying it -- the real "show/hide window" affordance this
+    // task's menu bar item exposes, and the reason this app is no longer a
+    // last-window-closed-quits app (see `RealAppDelegate` below). Actually
+    // quitting only ever happens via the menu bar's "Quit" (or the real
+    // app-menu's Cmd+Q, standard on `.regular`-activation-policy apps).
+    let hideOnCloseDelegate = HideOnCloseWindowDelegate()
+    window.delegate = hideOnCloseDelegate
     window.makeKeyAndOrderFront(nil)
 
-    // Temporary "Goggles > Reconnect" menu item (task brief: "a menu item
-    // is a fine temporary home for this -- Task 3.6 will build the real
-    // menu bar and can relocate it"). Reachable at any time regardless of
-    // `uiState`, per design §8.1.
-    let reconnectTarget = MenuActionTarget { coordinator.reconnect() }
+    // Task 3.6: the real menu bar presence -- state glyph, "Reconnect"
+    // (relocated here, its proper home, from the temporary "Goggles" main-
+    // menu item Task 3.5 added), show/hide window, "Quit". See
+    // `MenuBarController.swift` for the `NSStatusItem`-vs-`MenuBarExtra`
+    // decision and full behavior.
+    let menuBarController = MenuBarController(coordinator: coordinator, window: window)
+
+    // Standard app menu (Quit + Cmd+Q) -- the one main-menu item this app
+    // keeps; the "Goggles > Reconnect" main-menu item Task 3.5 added as a
+    // temporary home is gone now that `MenuBarController` is Reconnect's
+    // real, permanent home.
     let mainMenu = NSMenu()
     let appMenuItem = NSMenuItem()
     mainMenu.addItem(appMenuItem)
     let appMenu = NSMenu()
     appMenu.addItem(withTitle: "Quit GogglesView", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
     appMenuItem.submenu = appMenu
-
-    let gogglesMenuItem = NSMenuItem()
-    mainMenu.addItem(gogglesMenuItem)
-    let gogglesMenu = NSMenu(title: "Goggles")
-    let reconnectItem = NSMenuItem(title: "Reconnect", action: #selector(MenuActionTarget.invoke), keyEquivalent: "r")
-    reconnectItem.target = reconnectTarget
-    gogglesMenu.addItem(reconnectItem)
-    gogglesMenuItem.submenu = gogglesMenu
     app.mainMenu = mainMenu
 
-    let delegate = LiveViewAppDelegate()
+    // `applicationShouldTerminateAfterLastWindowClosed` is `false` here
+    // (unlike `LiveViewAppDelegate`, used by the `--live-view`/
+    // `--force-state` dev harnesses, where closing the one window IS "done,
+    // exit"): this is the real app shell now, and closing/hiding the main
+    // window (via the titlebar button, or the menu bar's show/hide item)
+    // must not quit a daily-driver menu-bar app out from under the user.
+    let delegate = RealAppDelegate()
     app.delegate = delegate
 
     client.connect()
@@ -271,7 +322,12 @@ if args.contains("--run") {
     }
 
     app.activate(ignoringOtherApps: true)
-    app.run()
+    // Keep strong references to objects `app.run()` will otherwise have no
+    // other owner for, for the lifetime of the run loop (mirrors why
+    // `delegate`/`hideOnCloseDelegate` are `let`-bound above, not inlined).
+    withExtendedLifetime((menuBarController, hideOnCloseDelegate)) {
+        app.run()
+    }
     exit(0)
 }
 if args.contains("--force-state") {
@@ -403,15 +459,21 @@ if args.contains("--test-client") {
     exit(0)
 }
 
-print("GogglesView stub (Task 2.3/2.4/3.1/3.3/3.4). Recognized flags:")
+// Reached only for an unrecognized `--something` flag -- a plain launch
+// with no arguments (the normal case for a double-clicked .app bundle) no
+// longer reaches here as of Task 3.6: it now falls into the same real-app
+// path `--run` uses (see that `if` above), which is v1's actual default
+// launch behavior, not something gated behind a flag.
+print("GogglesView: unrecognized argument(s): \(args.dropFirst().joined(separator: " "))")
+print("Recognized dev/debug flags (a plain launch with no flags runs the real app, same as --run):")
 print("  --check-daemon-status   print SMAppService.daemon status and exit")
 print("  --register              register() the helper daemon as a Login Item")
 print("  --unregister            unregister() the helper daemon")
 print("  --test-client [secs]    connect via HelperClient, startStreaming, log fps, exit (default 10s)")
 print("  --live-view             open a minimal AVSampleBufferDisplayLayer window and stream decoded video")
 print("  --force-state <name>    open GogglesConnectionView with uiState forced to <name> (Task 3.4 manual verification)")
-print("  --run                   real end-to-end: connect, startStreaming, show GogglesConnectionView + Goggles>Reconnect menu (Task 3.5 hardware verification)")
-exit(0)
+print("  --run                   real end-to-end app: connect, startStreaming, menu bar item, aspect-ratio+fullscreen window")
+exit(1)
 
 #if canImport(AppKit)
 /// Terminates `--live-view`'s `NSApplication.run()` loop when its one
@@ -419,6 +481,28 @@ exit(0)
 /// windowless background app.
 final class LiveViewAppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+}
+
+/// Task 3.6: the real app shell's delegate -- unlike `LiveViewAppDelegate`
+/// (used by the `--live-view`/`--force-state` dev harnesses, where the one
+/// window closing means the harness is done and should exit), this is a
+/// persistent, menu-bar-resident app: closing or hiding the main window must
+/// never quit it out from under the user. Quitting only happens via the
+/// menu bar's "Quit" item or the standard app-menu Cmd+Q.
+final class RealAppDelegate: NSObject, NSApplicationDelegate {
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
+}
+
+/// Task 3.6: makes the main window's titlebar close button hide the window
+/// (`orderOut(nil)`) instead of destroying it -- the "show/hide window"
+/// affordance the menu bar's toggle item also exposes, via the same
+/// underlying window. `windowShouldClose` returning `false` cancels the
+/// real close/destroy; this delegate does the hide itself instead.
+final class HideOnCloseWindowDelegate: NSObject, NSWindowDelegate {
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        sender.orderOut(nil)
+        return false
+    }
 }
 
 /// Task 3.5: `NSMenuItem.action` needs an `@objc` selector on some target

@@ -344,3 +344,88 @@ struct GogglesConnectionCoordinatorTests {
         }
     }
 }
+
+// ─────────────────────────────────────────────────────────────────────────
+// Task 3.6: the menu bar's three-way glyph category. Pure/AppKit-free (see
+// `GogglesStatusGlyphCategory`'s doc comment) -- exercises the brief's own
+// minimum bar directly: "should visually distinguish at minimum:
+// disconnected/error states, connecting/waiting states, and live."
+// ─────────────────────────────────────────────────────────────────────────
+@Suite("GogglesUIStateKind.statusGlyphCategory (Task 3.6 menu bar glyph)")
+struct StatusGlyphCategoryTests {
+
+    @Test("every kind maps to exactly one of the three categories, all three are used")
+    func everyKindMapsToACategory() {
+        let categories = Set(GogglesUIStateKind.allCases.map(\.statusGlyphCategory))
+        #expect(categories == Set<GogglesStatusGlyphCategory>([.error, .waiting, .live]))
+    }
+
+    @Test("disconnected/hard-failure states map to .error")
+    func errorStates() {
+        for kind: GogglesUIStateKind in [.noHelper, .noDevice, .claimFailed] {
+            #expect(kind.statusGlyphCategory == .error)
+        }
+    }
+
+    @Test("connecting/degraded states map to .waiting")
+    func waitingStates() {
+        for kind: GogglesUIStateKind in [.claiming, .resolving, .handshaking, .waitingForKeyframe, .stalled] {
+            #expect(kind.statusGlyphCategory == .waiting)
+        }
+    }
+
+    @Test(".live maps to .live")
+    func liveState() {
+        #expect(GogglesUIStateKind.live.statusGlyphCategory == .live)
+    }
+}
+
+#if canImport(AppKit)
+import AppKit
+
+// ─────────────────────────────────────────────────────────────────────────
+// Task 3.6: `MenuBarController`'s two static, side-effect-free helpers --
+// display text and glyph image selection -- are exercised directly here
+// without constructing a real `NSStatusItem`/menu (which needs a running
+// `NSApplication`/main run loop this test target doesn't provide). This
+// covers the actual per-state content, leaving "does a real NSStatusItem
+// show up and update live" to the manual `--force-state`/default-launch
+// verification described in the task report.
+// ─────────────────────────────────────────────────────────────────────────
+@Suite("MenuBarController static helpers (Task 3.6)")
+struct MenuBarControllerTests {
+
+    @Test("displayText is non-empty and state-specific for every kind")
+    func displayTextIsPopulated() {
+        let samples: [GogglesUIState] = [
+            .noHelper(reason: nil), .noDevice, .claiming,
+            .claimFailed(reason: GogglesDiagnostics.interfaceClaimFailed),
+            .resolving, .handshaking(elapsedSeconds: 4),
+            .waitingForKeyframe, .live, .stalled
+        ]
+        var seen = Set<String>()
+        for sample in samples {
+            let text = MenuBarController.displayText(for: sample)
+            #expect(!text.isEmpty)
+            seen.insert(text)
+        }
+        // Every sampled state produces distinct copy (handshaking's elapsed
+        // seconds is baked into its own text, so this also confirms that's
+        // not a static string).
+        #expect(seen.count == samples.count)
+    }
+
+    @Test("noHelper with a version-mismatch reason surfaces that reason verbatim, not a generic string")
+    func noHelperReasonSurfaced() {
+        let reason = "helper protocol version 2 does not match app's 3 -- reinstall/update the helper or the app"
+        #expect(MenuBarController.displayText(for: .noHelper(reason: reason)) == reason)
+    }
+
+    @Test("glyphImage returns a non-nil image for every kind")
+    func glyphImageAlwaysProducesAnImage() {
+        for kind in GogglesUIStateKind.allCases {
+            #expect(MenuBarController.glyphImage(for: kind) != nil)
+        }
+    }
+}
+#endif

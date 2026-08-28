@@ -122,6 +122,40 @@ public extension GogglesUIStateKind {
     }
 }
 
+/// Task 3.6: the menu-bar state glyph's three-way visual bucket -- the
+/// brief's own minimum bar ("doesn't need 9 distinct icons, but should
+/// visually distinguish at minimum: disconnected/error states,
+/// connecting/waiting states, and live"). Deliberately AppKit-free (no
+/// `NSImage`/`NSColor` here) so this categorization is unit-testable from
+/// `GogglesViewTests` without linking AppKit into the test's assertions --
+/// `MenuBarController` (AppKit-only, `#if canImport(AppKit)`) is the only
+/// place that turns a category into an actual SF Symbol + tint.
+public enum GogglesStatusGlyphCategory: Equatable {
+    /// Can't use the helper/device right now, or a hard failure.
+    case error
+    /// A real connection is in progress or degraded, but not a dead end.
+    case waiting
+    /// Video is live.
+    case live
+}
+
+public extension GogglesUIStateKind {
+    var statusGlyphCategory: GogglesStatusGlyphCategory {
+        switch self {
+        case .noHelper, .noDevice, .claimFailed:
+            return .error
+        case .claiming, .resolving, .handshaking, .waitingForKeyframe, .stalled:
+            // `.stalled` was live a moment ago and may recover on its own
+            // (design's own 2s/5s watchdog) -- categorized as "waiting", not
+            // "error", so the glyph doesn't cry wolf on every brief signal
+            // hiccup the way a hard claimFailed/noDevice should.
+            return .waiting
+        case .live:
+            return .live
+        }
+    }
+}
+
 /// design §7/§8.3's required diagnostic strings, kept as named constants so
 /// both the state-mapping logic and the tests that check for them
 /// verbatim reference the exact same literal.
