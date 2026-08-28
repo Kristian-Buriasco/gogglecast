@@ -52,6 +52,19 @@ final class HelperService: NSObject, GogglesHelperProtocol, PipelineDelegate {
     private var pipelineTask: Task<Void, Never>?
     private var lingerTimer: DispatchSourceTimer?
 
+    /// Task 3.7, design §9.3 scenarios 2/3: while a subscriber is still
+    /// streaming but no goggles are on the USB bus (`.noDevice`), retries
+    /// claiming on a short cadence so a replug (scenario 2) or a goggles
+    /// reboot (scenario 3, which briefly looks identical to a replug at
+    /// this layer -- the device drops off and re-enumerates with a new
+    /// RNDIS MAC, re-resolved fresh by `ARPResolver`/`RNDISTransport.init`
+    /// on the very next successful claim, per §8.2) reconnects the way the
+    /// helper is a long-lived daemon for in the first place: no manual
+    /// "Retry" click, no app restart. Guarded so at most one is ever
+    /// pending, same pattern as `lingerTimer`.
+    private var deviceRetryTimer: DispatchSourceTimer?
+    private static let deviceRetryInterval: TimeInterval = 1.0
+
     /// The concrete transport `beginStreaming` constructed, kept alongside
     /// (not instead of) `GogglesPipeline.currentTransport`. See
     /// `RNDISTransport.close()`'s doc comment: the running pipeline
@@ -118,6 +131,9 @@ final class HelperService: NSObject, GogglesHelperProtocol, PipelineDelegate {
             Logging.xpc.info("subscriber disconnected (\(self.connections.count) remaining, wasStreaming=\(wasStreaming))")
             if wasStreaming {
                 self.scheduleTeardownIfNoSubscribers()
+                if self.streamingSubscriberIDs.isEmpty {
+                    self.cancelDeviceRetry()
+                }
             }
         }
     }
@@ -168,6 +184,7 @@ final class HelperService: NSObject, GogglesHelperProtocol, PipelineDelegate {
             self.streamingSubscriberIDs.insert(id)
             Logging.xpc.info("startStreaming from subscriber (now \(self.streamingSubscriberIDs.count) streaming)")
             if wasEmpty, self.pipelineTask == nil {
+                self.cancelDeviceRetry()
                 self.beginStreaming(reply: reply)
             } else {
                 // Hardware already up (or in the middle of coming up) for
@@ -188,6 +205,9 @@ final class HelperService: NSObject, GogglesHelperProtocol, PipelineDelegate {
             self.streamingSubscriberIDs.remove(id)
             Logging.xpc.info("stopStreaming from subscriber (\(self.streamingSubscriberIDs.count) streaming remain)")
             self.scheduleTeardownIfNoSubscribers()
+            if self.streamingSubscriberIDs.isEmpty {
+                self.cancelDeviceRetry()
+            }
             reply()
         }
     }
@@ -218,6 +238,7 @@ final class HelperService: NSObject, GogglesHelperProtocol, PipelineDelegate {
             Logging.usb.info("reconnect requested: full teardown + design §5.1 rerun")
             self.lingerTimer?.cancel()
             self.lingerTimer = nil
+            self.cancelDeviceRetry()
             self.teardownHardware()
             if self.streamingSubscriberIDs.isEmpty {
                 self.setState(.noDevice)
@@ -291,6 +312,17 @@ final class HelperService: NSObject, GogglesHelperProtocol, PipelineDelegate {
                             self.activeTransport = nil
                             self.currentDeviceInfoValue = nil
                             self.setState(.noDevice)
+                            // Task 3.7, design §9.3 scenario 1/2: the
+                            // pipeline just ended because the transport
+                            // went away (unplug -- see
+                            // `RNDISTransport.writeEthernetFrame`'s doc
+                            // comment for why the OUT path, not the pooled
+                            // bulk-IN reads, is what actually detects this
+                            // on this hardware). If a subscriber is still
+                            // streaming, it still wants video; poll for the
+                            // replug the same way a `deviceNotFound` claim
+                            // failure does.
+                            self.scheduleDeviceRetry()
                         }
                     }
                 }
@@ -303,12 +335,64 @@ final class HelperService: NSObject, GogglesHelperProtocol, PipelineDelegate {
                 Logging.usb.error("claim/RNDIS bring-up failed: \(String(describing: error))")
                 self.stateQueue.async {
                     guard self.pipelineGeneration == myGeneration else { return }
-                    self.setState(.claimFailed, detail: nsError.localizedDescription)
                     self.pipelineTask = nil
-                    reply(false, nsError)
+                    if case RNDISTransportError.deviceNotFound = error {
+                        // Task 3.7, design §9.3 scenarios 2/3: this isn't a
+                        // genuine claim failure (§6's `claimFailed` is for
+                        // root-claim/RNDIS-init errors) -- there's just no
+                        // `2CA3:0020` on the bus right now, which is
+                        // `.noDevice`'s exact documented meaning ("Connect
+                        // your Goggles 3 with USB-C"). Reply success (this
+                        // subscriber's request wasn't wrong, the hardware
+                        // just isn't there yet) and keep polling on
+                        // `deviceRetryInterval` for as long as it's still
+                        // wanted, so a replug or a post-reboot
+                        // re-enumeration (new MAC, resolved fresh by
+                        // `RNDISTransport.init` on whichever retry actually
+                        // claims it) reconnects with no manual step and no
+                        // app restart.
+                        self.setState(.noDevice)
+                        reply(true, nil)
+                        self.scheduleDeviceRetry()
+                    } else {
+                        self.setState(.claimFailed, detail: nsError.localizedDescription)
+                        reply(false, nsError)
+                    }
                 }
             }
         }
+    }
+
+    /// Schedules a `beginStreaming()` retry after `deviceRetryInterval`
+    /// (task 3.7, design §9.3 scenarios 2/3 -- see the two call sites'
+    /// doc comments). A no-op if one's already pending, or if nothing is
+    /// actually streaming (nothing to reconnect for). Each firing
+    /// re-checks both conditions before actually retrying, since a lot can
+    /// change in a second: a subscriber may have called `stopStreaming`,
+    /// or a *different* path (a fresh `startStreaming`, `reconnect()`)
+    /// might already have gotten `pipelineTask` going again in the
+    /// meantime.
+    private func scheduleDeviceRetry() {
+        guard deviceRetryTimer == nil, !streamingSubscriberIDs.isEmpty else { return }
+        let timer = DispatchSource.makeTimerSource(queue: stateQueue)
+        timer.schedule(deadline: .now() + Self.deviceRetryInterval)
+        timer.setEventHandler { [weak self] in
+            guard let self else { return }
+            self.deviceRetryTimer = nil
+            guard !self.streamingSubscriberIDs.isEmpty, self.pipelineTask == nil else { return }
+            Logging.usb.info("device retry: polling for goggles on USB again")
+            self.beginStreaming(reply: { _, _ in })
+        }
+        timer.resume()
+        deviceRetryTimer = timer
+    }
+
+    /// Cancels any pending device-retry poll -- called wherever streaming
+    /// is stopped or superseded by a different reconnect path, so a stale
+    /// timer doesn't fire a redundant `beginStreaming()` later.
+    private func cancelDeviceRetry() {
+        deviceRetryTimer?.cancel()
+        deviceRetryTimer = nil
     }
 
     /// Starts the 5s linger (design §5.5) once the streaming-subscriber set

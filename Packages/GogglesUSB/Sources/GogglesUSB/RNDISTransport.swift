@@ -144,6 +144,29 @@ public final class RNDISTransport: GogglesTransport {
 
     /// Raw bulk-OUT write shared by `send(_:)`, the connect-time ARP
     /// resolution, and the inbound-ARP-request auto-responder.
+    ///
+    /// Task 3.7, design §9.3 scenario 1: on this hardware/macOS combo, a
+    /// real physical unplug was observed to NOT reliably deliver
+    /// `LIBUSB_TRANSFER_NO_DEVICE` to the pending pooled bulk-IN reads
+    /// (`handleBulkInCompletion`'s own such handling, added earlier in this
+    /// task, never fired against real hardware) -- the outstanding reads
+    /// just went silent with no completion callback at all, while
+    /// `Pipeline.swift`'s periodic ~2s handshake-resend timer kept calling
+    /// this method and swallowing whatever it threw (`send()`'s `catch`
+    /// there only logs to stderr), so the helper was observed wedged
+    /// oscillating `.handshaking`/`.stalled` forever with the interfaces
+    /// still claimed against a now-dead handle, never reaching `.noDevice`,
+    /// even after the goggles were physically replugged and re-enumerated
+    /// as a new USB device the old handle has no relationship to.
+    ///
+    /// This OUT path, by contrast, DOES reliably surface the failure
+    /// synchronously via `libusb_bulk_transfer`'s return code -- so this is
+    /// the actual disconnect-detection path for this hardware. Any error
+    /// here is treated as fatal: `close()` (idempotent, safe to call from
+    /// any thread/re-entrantly) tears the transport down the same way an
+    /// explicit `reconnect()`/unplug-via-bulk-IN would, finishing `inbound`
+    /// so `runPipeline` ends and the existing pipelineTask-completion path
+    /// in `HelperService` drives `.noDevice`.
     private func writeEthernetFrame(_ frame: Data) throws {
         guard let handle else {
             throw RNDISTransportError.libusbCall("send (no device handle)", 0)
@@ -156,6 +179,9 @@ public final class RNDISTransport: GogglesTransport {
             return libusb_bulk_transfer(handle, Self.epBulkOut, base, Int32(wrappedCount), &transferred, 500)
         }
         guard rc == 0 else {
+            let name = libusb_error_name(rc).map { String(cString: $0) } ?? "?"
+            FileHandle.standardError.write(Data(("[RNDISTransport] bulk-OUT write failed (\(name)/\(rc)) -- treating as device gone, closing transport\n").utf8))
+            close()
             throw RNDISTransportError.libusbCall("libusb_bulk_transfer(OUT)", rc)
         }
     }
