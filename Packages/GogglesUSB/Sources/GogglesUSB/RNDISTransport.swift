@@ -334,12 +334,40 @@ public final class RNDISTransport: GogglesTransport {
 
     // MARK: - Shutdown
 
+    /// Task 2.2: releases IF0/IF1 and finishes `inbound` *without* waiting
+    /// for every strong reference to this instance to drop first.
+    ///
+    /// Phase 1's assumption ("drop the last strong ref, `deinit` runs, the
+    /// interfaces get released") holds for `gvcli` because its
+    /// SIGINT/process-exit path nils `currentTransport` and calls `exit(0)`
+    /// in the same breath -- whether `deinit` actually finishes before the
+    /// OS reclaims the device doesn't matter. It does *not* hold for a
+    /// long-lived daemon: `GogglesHelper --xpc`'s running pipeline `Task`
+    /// (`GogglesPipeline.runPipeline`) holds its own strong reference to
+    /// this transport for the entire span of that `async` call (as a
+    /// function parameter), so nil-ing the *global* `currentTransport`
+    /// elsewhere never drops the reference that's actually keeping this
+    /// instance alive -- the pipeline `Task` would otherwise spin forever
+    /// on a hardware connection nothing is reading from anymore (found via
+    /// this task's own `--xpc` hardware verification: fan-out's 5s-linger
+    /// teardown left the previous pipeline `Task` running indefinitely).
+    ///
+    /// Calling `close()` explicitly breaks that deadlock: it runs
+    /// `shutdown()` (idempotent, same as `deinit`'s own call) immediately,
+    /// which finishes `inbound`'s `AsyncStream` -- ending
+    /// `runPipeline`'s inbound-consumer loop and letting that `Task`
+    /// actually complete on its own, at which point its held reference
+    /// drops and `deinit` (now a no-op `shutdown()` re-entry) runs too.
+    public func close() {
+        shutdown()
+    }
+
     /// Cancels every pooled transfer, waits (bounded) for the event thread
     /// to drain them, then releases the claimed interfaces and tears down
-    /// the libusb device handle/context. Idempotent-safe to call from
-    /// `deinit`; a live `RNDISTransport` has no other call site for it in
-    /// this task (no explicit `close()` in the `GogglesTransport`
-    /// protocol), so `deinit` is the only trigger.
+    /// the libusb device handle/context. Idempotent-safe to call multiple
+    /// times (from both `close()` and `deinit`) -- `isRunning`/`poolLock`
+    /// guard the transfer-cancellation body, and `continuation.finish()` is
+    /// itself documented safe to call more than once.
     private func shutdown() {
         poolLock.lock()
         let wasRunning = isRunning

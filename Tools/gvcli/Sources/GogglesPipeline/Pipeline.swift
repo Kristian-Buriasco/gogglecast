@@ -14,18 +14,30 @@ import Darwin
 // together and adds the ack-tracking / started-gate / stats bookkeeping
 // that lives directly in `stream.py`'s `main()` rather than in any of the
 // ported modules.
+//
+// Task 2.2: extracted out of the `gvcli` executable into the
+// `GogglesPipeline` library (see Package.swift) so `Helper/GogglesHelper`
+// can drive the exact same loop for both its `--stdout` mode (a straight
+// `OutputSink.standardOutput()` sink, no delegate) and its `--xpc` mode (no
+// sink, a `PipelineDelegate` that fans NAL/state/stats events out to every
+// connected subscriber) -- see `PipelineDelegate.swift`. `gvcli` itself is
+// unaffected: `runPipeline(transport:outPath:stats:)`'s signature/behavior
+// is unchanged, `delegate` simply defaults to `nil`.
 // ─────────────────────────────────────────────────────────────────────────
 
-/// Global handle to the live transport/sink, so `SIGINT` (see
-/// `installSigintHandler`) can release them from outside the running async
-/// task. Deliberately the *only* long-lived strong reference `runPipeline`
-/// keeps to either: dropping it (`= nil`) is what triggers
-/// `RNDISTransport`/`MockTransport`'s `deinit` (closing libusb/interfaces
-/// or finishing the replay stream) synchronously and deterministically,
-/// which is exactly the "clean release of IF0/IF1" behavior the task-1.7
-/// brief requires `gvcli stream` to exhibit on exit.
-var currentTransport: GogglesTransport?
-var currentSink: OutputSink?
+/// Global handle to the live transport/sink, so `SIGINT`/`SIGTERM` (see
+/// `installSigintHandler` and `GogglesHelper`'s own `SIGTERM` handler) can
+/// release them from outside the running async task. Deliberately the
+/// *only* long-lived strong reference `runPipeline` keeps to either:
+/// dropping it (`= nil`) is what triggers `RNDISTransport`/`MockTransport`'s
+/// `deinit` (closing libusb/interfaces or finishing the replay stream)
+/// synchronously and deterministically, which is exactly the "clean
+/// release of IF0/IF1" behavior the task-1.7 brief requires `gvcli stream`
+/// (and, as of task 2.2, `GogglesHelper`) to exhibit on exit. `public` so
+/// `GogglesHelper` can install its own `SIGTERM` handler mirroring
+/// `installSigintHandler`'s pattern without a second copy of this state.
+public var currentTransport: GogglesTransport?
+public var currentSink: OutputSink?
 private var sigintSource: DispatchSourceSignal?
 
 /// Installs a `SIGINT` handler for `gvcli stream`: on Ctrl-C, closes the
@@ -34,7 +46,7 @@ private var sigintSource: DispatchSourceSignal?
 /// exiting, rather than leaving the interfaces claimed for the process to
 /// be killed uncleanly. This is what lets a subsequent `stream.py` run
 /// claim IF0/IF1 again (task-1.7 brief's exit criterion).
-func installSigintHandler() {
+public func installSigintHandler() {
     signal(SIGINT, SIG_IGN)
     let source = DispatchSource.makeSignalSource(signal: SIGINT, queue: .main)
     source.setEventHandler {
@@ -68,21 +80,45 @@ private struct FrameGateState {
 /// Returns when `transport.inbound` finishes (a `MockTransport` replay
 /// reaching EOF) or the process is interrupted (`installSigintHandler`,
 /// for a live `RNDISTransport`).
-func runPipeline(transport: GogglesTransport, outPath: String?, stats: Bool) async throws {
-    currentTransport = transport
-    defer { currentTransport = nil }
-
+///
+/// This overload keeps `gvcli`'s exact original behavior (path-based sink,
+/// `[gvcli]`-prefixed stderr banners around opening it). `delegate`
+/// defaults to `nil` and is unused by `gvcli` itself; see the
+/// `sink:`-based overload below for `GogglesHelper`'s entry point.
+public func runPipeline(
+    transport: GogglesTransport,
+    outPath: String?,
+    stats: Bool,
+    delegate: PipelineDelegate? = nil
+) async throws {
     let sink: OutputSink?
     if let outPath {
         FileHandle.standardError.write(Data(
             "[gvcli] Opening \(outPath) for writing (if it's a FIFO, this blocks until a reader attaches -- start ffplay on it now)...\n".utf8
         ))
         sink = try OutputSink(path: outPath)
-        currentSink = sink
         FileHandle.standardError.write(Data("[gvcli] Output sink ready.\n".utf8))
     } else {
         sink = nil
     }
+    try await runPipeline(transport: transport, sink: sink, stats: stats, delegate: delegate)
+}
+
+/// Task 2.2: `GogglesHelper`'s entry point -- takes an already-constructed
+/// `OutputSink?` (or none at all, for pure `--xpc` fan-out with no file
+/// output) instead of a path, and drives `delegate`'s hooks alongside
+/// whatever the sink does. Everything below this point is the actual
+/// pipeline logic, shared verbatim by both overloads and both
+/// `gvcli`/`GogglesHelper`.
+public func runPipeline(
+    transport: GogglesTransport,
+    sink: OutputSink?,
+    stats: Bool,
+    delegate: PipelineDelegate? = nil
+) async throws {
+    currentTransport = transport
+    defer { currentTransport = nil }
+    currentSink = sink
     defer {
         sink?.close()
         currentSink = nil
@@ -115,6 +151,7 @@ func runPipeline(transport: GogglesTransport, outPath: String?, stats: Bool) asy
     FileHandle.standardError.write(Data("[gvcli] Requested fresh I-frame (DUML 02:B3).\n".utf8))
 
     var gate = FrameGateState()
+    var sawFirstVideoPacket = false
 
     // Reproduces stream.py's ack-on-every-frame-boundary behavior
     // (`FrameBoundaryAckTracker.swift`), independent of whatever
@@ -134,6 +171,11 @@ func runPipeline(transport: GogglesTransport, outPath: String?, stats: Bool) asy
                     continue
                 }
                 guard outer.body.count >= 12 else { continue }
+
+                if !sawFirstVideoPacket {
+                    sawFirstVideoPacket = true
+                    delegate?.pipelineDidBeginReceivingVideo()
+                }
 
                 let base = outer.body.startIndex
                 let frameNum = outer.body[base + 8]
@@ -180,12 +222,19 @@ func runPipeline(transport: GogglesTransport, outPath: String?, stats: Bool) asy
                         sink?.write(sps)
                         sink?.write(nal)
                         await state.recordEmittedFrame(bytes: sps.count + nal.count)
+                        let spsType: UInt8 = sps.count > headerOffset ? (sps[sps.startIndex + headerOffset] & 0x1F) : 0xFF
+                        let hostTime = DispatchTime.now().uptimeNanoseconds
+                        delegate?.pipeline(didEmitNAL: sps, nalType: spsType, isParameterSet: true, hostTime: hostTime)
+                        delegate?.pipeline(didEmitNAL: nal, nalType: nalType, isParameterSet: false, hostTime: hostTime)
+                        delegate?.pipelineDidStart()
                     }
                     // else: still waiting for a parameter set or an IDR;
                     // this NAL is dropped, matching Python's flush_frame.
                 } else {
                     sink?.write(nal)
                     await state.recordEmittedFrame(bytes: nal.count)
+                    let isParamSet = (nalType == 7 || nalType == 8)
+                    delegate?.pipeline(didEmitNAL: nal, nalType: nalType, isParameterSet: isParamSet, hostTime: DispatchTime.now().uptimeNanoseconds)
                 }
             }
         }
@@ -202,6 +251,7 @@ func runPipeline(transport: GogglesTransport, outPath: String?, stats: Bool) asy
                     send(WireProtocol.buildHandshake(seq: seq, sessionId: sessionId))
                     FileHandle.standardError.write(Data("[gvcli] No data for 2s, resending handshake.\n".utf8))
                     await state.markRx()
+                    delegate?.pipelineWentSilent()
                 }
                 if !timers.started, now.timeIntervalSince(timers.lastIframe) > 1.5 {
                     let seq = await state.nextSeq()
@@ -211,8 +261,12 @@ func runPipeline(transport: GogglesTransport, outPath: String?, stats: Bool) asy
             }
         }
 
-        // MARK: per-second stats reporting (--stats only)
-        if stats {
+        // MARK: per-second stats reporting (`--stats`'s stderr line, and/or
+        // `delegate.pipelineDidUpdateStats` -- the latter fires whenever a
+        // delegate is present, independent of `stats`, since GogglesHelper's
+        // `--xpc` mode wants per-second `StreamStats` fan-out regardless of
+        // whether gvcli's own `--stats` text flag was ever a factor here)
+        if stats || delegate != nil {
             group.addTask {
                 var second = 0
                 while !Task.isCancelled {
@@ -222,11 +276,21 @@ func runPipeline(transport: GogglesTransport, outPath: String?, stats: Bool) asy
                     let (fps, bytes, drops) = await state.snapshotAndResetPerSecond()
                     let (cumFrames, cumBytes, cumDrops) = await state.cumulativeSnapshot()
                     let kbps = Double(bytes) * 8.0 / 1000.0
-                    FileHandle.standardError.write(Data(
-                        String(
-                            format: "[stats] t=%4ds fps=%3d bitrate=%9.1fkbps drops=%d cum_frames=%d cum_bytes=%d cum_drops=%d\n",
-                            second, fps, kbps, drops, cumFrames, cumBytes, cumDrops
-                        ).utf8
+                    if stats {
+                        FileHandle.standardError.write(Data(
+                            String(
+                                format: "[stats] t=%4ds fps=%3d bitrate=%9.1fkbps drops=%d cum_frames=%d cum_bytes=%d cum_drops=%d\n",
+                                second, fps, kbps, drops, cumFrames, cumBytes, cumDrops
+                            ).utf8
+                        ))
+                    }
+                    delegate?.pipelineDidUpdateStats(PipelineStats(
+                        fps: fps,
+                        bitrateKbps: kbps,
+                        drops: drops,
+                        cumulativeFrames: cumFrames,
+                        cumulativeBytes: cumBytes,
+                        cumulativeDrops: cumDrops
                     ))
                 }
             }

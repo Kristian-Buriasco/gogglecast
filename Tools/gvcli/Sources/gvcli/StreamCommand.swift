@@ -1,4 +1,5 @@
 import Foundation
+import GogglesPipeline
 import GogglesUSB
 
 /// `gvcli stream --out <path> [--stats]`: brings up the real pipeline

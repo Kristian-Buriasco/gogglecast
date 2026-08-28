@@ -8,7 +8,7 @@
 // to demonstrate the fixed behavior.
 
 import Testing
-@testable import gvcli
+@testable import GogglesPipeline
 
 @Test func boundaryAcksIncompleteFrameWhenSupersededByNextFrameNum() {
     // Frame 5 arrives with only 2 of (say) 5 expected fragments -- never

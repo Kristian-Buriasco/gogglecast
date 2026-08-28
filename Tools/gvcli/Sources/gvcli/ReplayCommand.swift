@@ -1,4 +1,5 @@
 import Foundation
+import GogglesPipeline
 import GogglesProtocol
 
 /// `gvcli replay <capture-file> [--out <path>] [--stats]`: the offline

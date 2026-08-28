@@ -28,13 +28,14 @@ import Darwin
 ///      the fd with `write(2)` and checking `errno` lets this type match
 ///      that same graceful-degrade behavior instead of taking the process
 ///      down.
-final class OutputSink {
+public final class OutputSink {
     private let fd: Int32
-    private(set) var broken = false
+    private let ownsFd: Bool
+    public private(set) var broken = false
 
     /// Opens (creating/truncating a regular file, or blocking until a
     /// reader attaches for a FIFO) `path` for writing.
-    init(path: String) throws {
+    public init(path: String) throws {
         let opened = path.withCString { cpath in
             open(cpath, O_WRONLY | O_CREAT | O_TRUNC, 0o644)
         }
@@ -42,12 +43,33 @@ final class OutputSink {
             throw GVCLIError.message("Failed to open \(path) for writing: \(String(cString: strerror(errno)))")
         }
         self.fd = opened
+        self.ownsFd = true
+    }
+
+    /// Wraps an already-open fd (see `standardOutput()`) without `open()`-
+    /// ing anything -- `close()`/`deinit` leave it open, since the caller
+    /// (not this sink) owns its lifecycle.
+    private init(wrapping fd: Int32) {
+        self.fd = fd
+        self.ownsFd = false
+    }
+
+    /// Task 2.2: `GogglesHelper --stdout` mode's equivalent of `gvcli
+    /// stream --out -`, which `gvcli` itself doesn't support (its `--out`
+    /// always names a real path/FIFO, matching `stream.py`). Writing
+    /// straight to `STDOUT_FILENO` via this initializer -- rather than
+    /// `open("/dev/stdout", ...)` through the regular `init(path:)` --
+    /// sidesteps `O_TRUNC`/`O_CREAT` semantics that don't make sense for
+    /// an fd that isn't a path (and would be actively wrong if stdout is a
+    /// pipe/FIFO already opened by the parent process).
+    public static func standardOutput() -> OutputSink {
+        OutputSink(wrapping: STDOUT_FILENO)
     }
 
     /// Writes every byte of `data`, looping past short writes and EINTR.
     /// If the peer has gone away (`EPIPE`) or the sink is already marked
     /// `broken`, this silently no-ops -- matching `stream.py`'s `emit()`.
-    func write(_ data: Data) {
+    public func write(_ data: Data) {
         guard !broken, !data.isEmpty else { return }
         data.withUnsafeBytes { (raw: UnsafeRawBufferPointer) in
             var offset = 0
@@ -67,8 +89,8 @@ final class OutputSink {
         }
     }
 
-    func close() {
-        guard fd >= 0 else { return }
+    public func close() {
+        guard ownsFd, fd >= 0 else { return }
         Darwin.close(fd)
     }
 
@@ -77,9 +99,9 @@ final class OutputSink {
     }
 }
 
-enum GVCLIError: Error, CustomStringConvertible {
+public enum GVCLIError: Error, CustomStringConvertible {
     case message(String)
-    var description: String {
+    public var description: String {
         switch self {
         case .message(let s): return s
         }
