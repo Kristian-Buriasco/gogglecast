@@ -489,6 +489,27 @@ final class HelperService: NSObject, GogglesHelperProtocol, PipelineDelegate {
 
     func pipeline(didEmitNAL data: Data, nalType: UInt8, isParameterSet: Bool, hostTime: UInt64) {
         stateQueue.async {
+            // Task 3.7, design §9.3 scenario 4: `pipelineDidStart()` only
+            // fires once, the very first time a genuine SPS+IDR pair
+            // arrives -- it's the one-time `waitingForKeyframe` -> `live`
+            // transition. A later brief silence (design table: "no packets
+            // for > 2s" -> `.stalled`) that resolves on its own -- e.g. the
+            // goggles' liveview toggle, or any transient link hiccup that
+            // doesn't require a fresh keyframe because the decoder already
+            // has a format description and just keeps decoding P-frames
+            // (§8.1's "once live, the app never leaves it for a missing
+            // keyframe alone") -- was never routed back to `.live`: real
+            // NAL data was confirmed still arriving and being decoded, but
+            // `currentStateValue` (and every subscriber's UI) stayed
+            // wedged on `.stalled`'s "Signal lost -- reconnecting" overlay
+            // forever, verified against real hardware while working this
+            // scenario. Any NAL arriving while `.stalled` is exactly the
+            // "packets resumed" signal design's `stalled` row implies, so
+            // recover here, the same way `pipelineDidBeginReceivingVideo`
+            // recovers `waitingForKeyframe` from earlier states.
+            if self.currentStateValue == .stalled {
+                self.setState(.live)
+            }
             self.fanOut { $0.nalUnit(data, nalType: nalType, isParameterSet: isParameterSet, hostTime: hostTime) }
         }
     }
