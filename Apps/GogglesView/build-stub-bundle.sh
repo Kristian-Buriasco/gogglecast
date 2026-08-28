@@ -2,11 +2,18 @@
 # Task 2.3: assemble GogglesView.app as a real, discoverable app bundle for
 # SMAppService.daemon(plistName:) testing.
 #
-# This is a stub-app build: Contents/MacOS/GogglesView is a trivial CLI stub
-# (Apps/GogglesView/StubApp/main.swift), not the real SwiftUI app (Task 3.x).
+# Contents/MacOS/GogglesView is built from the real `GogglesView` SPM
+# executable package (`Apps/GogglesView/Package.swift`, Task 3.1) -- a
+# proper `swift build`, no longer a bare `swiftc` invocation of a standalone
+# `StubApp/main.swift` (that file's contents moved into
+# `Sources/GogglesView/main.swift` as part of Task 3.1's restructuring; see
+# `Package.swift`'s doc comment for why). It's still not the real SwiftUI
+# app (Task 3.4+), but as of Task 3.1 it links `GogglesXPC` and includes a
+# real `HelperClient` exercised via `--test-client`, not just the
+# registration-harness stub Task 2.3/2.4 left it as.
 # Contents/MacOS/GogglesHelper is the REAL helper daemon built in Task 2.2.
 #
-# Reusable: Task 3.x's real SwiftUI app build should extend this script
+# Reusable: Task 3.4+'s real SwiftUI app build should extend this script
 # (or the layout it produces) rather than reinventing bundle assembly.
 #
 # Usage:
@@ -52,10 +59,13 @@ if [[ ! -x "$HELPER_BIN" ]]; then
     exit 1
 fi
 
-echo "==> Building GogglesView stub app binary"
-STUB_BIN="$OUT_DIR/GogglesView-stub-bin"
-mkdir -p "$OUT_DIR"
-swiftc "$SCRIPT_DIR/StubApp/main.swift" -o "$STUB_BIN" -framework ServiceManagement -framework Foundation -framework AppKit
+echo "==> Building GogglesView app binary (swift build)"
+( cd "$SCRIPT_DIR" && swift build -c release )
+APP_BIN="$SCRIPT_DIR/.build/release/GogglesView"
+if [[ ! -x "$APP_BIN" ]]; then
+    echo "error: expected app binary not found at $APP_BIN" >&2
+    exit 1
+fi
 
 echo "==> Assembling bundle at $APP_BUNDLE"
 rm -rf "$APP_BUNDLE"
@@ -66,9 +76,8 @@ cp "$SCRIPT_DIR/BundleResources/Info.plist" "$APP_BUNDLE/Contents/Info.plist"
 cp "$SCRIPT_DIR/BundleResources/com.kburiasco.gogglesview.helper.plist" \
    "$APP_BUNDLE/Contents/Library/LaunchDaemons/com.kburiasco.gogglesview.helper.plist"
 
-cp "$STUB_BIN" "$APP_BUNDLE/Contents/MacOS/GogglesView"
+cp "$APP_BIN" "$APP_BUNDLE/Contents/MacOS/GogglesView"
 cp "$HELPER_BIN" "$APP_BUNDLE/Contents/MacOS/GogglesHelper"
-rm -f "$STUB_BIN"
 
 echo "==> Code-signing GogglesHelper (hardened runtime)"
 codesign --force --options runtime --sign "$SIGN_IDENTITY" "$APP_BUNDLE/Contents/MacOS/GogglesHelper"
