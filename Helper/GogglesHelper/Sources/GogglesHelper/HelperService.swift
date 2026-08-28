@@ -72,6 +72,18 @@ final class HelperService: NSObject, GogglesHelperProtocol, PipelineDelegate {
     /// *new* `pipelineTask`/`activeTransport` out from under it.
     private var pipelineGeneration = 0
 
+    /// Set by `teardownHardware()` when it hands `activeTransport.close()`
+    /// off to a detached `Task` (see that method's doc comment for why this
+    /// must not block `stateQueue`). `beginStreaming()` awaits this (off
+    /// `stateQueue`, inside its own detached `Task`) before calling
+    /// `RNDISTransport()` again, so a `reconnect()`-style
+    /// teardown-immediately-followed-by-bring-up still claims the device
+    /// only after the old one has actually finished releasing it -- the
+    /// same ordering the old fully-synchronous `.close()` call used to give
+    /// for free, just no longer at the cost of blocking every other
+    /// subscriber's `stateQueue` calls for up to ~4s.
+    private var pendingClose: Task<Void, Never>?
+
     private var currentDeviceInfoValue: GogglesXPC.DeviceInfo?
     private var currentStateValue: GogglesState = .noDevice
     private var everReachedLive = false
@@ -231,9 +243,16 @@ final class HelperService: NSObject, GogglesHelperProtocol, PipelineDelegate {
         setState(.claiming)
         pipelineGeneration += 1
         let myGeneration = pipelineGeneration
+        // If a teardown just handed its .close() off to a detached Task
+        // (e.g. reconnect()'s teardownHardware() immediately followed by
+        // this call), wait for it below -- off stateQueue -- before
+        // claiming again, so we don't race the still-in-progress release.
+        let priorClose = pendingClose
+        pendingClose = nil
         Logging.usb.info("claiming IF0/IF1 and bringing up RNDIS...")
         Task.detached { [weak self] in
             guard let self else { return }
+            await priorClose?.value
             do {
                 let transport = try RNDISTransport()
                 let raw = transport.deviceInfo
@@ -330,17 +349,55 @@ final class HelperService: NSObject, GogglesHelperProtocol, PipelineDelegate {
     /// never triggers `RNDISTransport.deinit`, and the pipeline `Task`
     /// would spin forever with nothing reading from it (verified while
     /// hardware-testing the 5s linger -- see `RNDISTransport.close()`'s
-    /// doc comment for the full story). Calling `.close()` directly on
+    /// doc comment for the full story). Calling `.close()` on
     /// `activeTransport` breaks that: it finishes `inbound` immediately,
     /// which ends the pipeline `Task`'s inbound-consumer loop and lets it
-    /// complete on its own (its completion handler above then clears
-    /// `activeTransport`/`pipelineTask` once `currentTransport == nil`).
+    /// complete on its own.
+    ///
+    /// Two things this method does *synchronously* on `stateQueue`, and one
+    /// it deliberately does not:
+    ///
+    /// - `pipelineTask`/`activeTransport` (and the sink/global-transport
+    ///   bookkeeping) are cleared **synchronously here**, not left for the
+    ///   superseded pipeline `Task`'s own completion closure to clear
+    ///   asynchronously later. This closes a race where a `startStreaming`
+    ///   serialized onto `stateQueue` shortly after this method returns
+    ///   would otherwise still see a stale non-nil `pipelineTask` and
+    ///   wrongly conclude the hardware is already up, replying `true`
+    ///   without ever re-claiming it. The completion closure in
+    ///   `beginStreaming` still runs later and still clears the same
+    ///   fields, guarded by `pipelineGeneration`; by the time it fires
+    ///   those fields are either already nil (safe no-op) or -- if a fresh
+    ///   `beginStreaming` happened in between -- belong to a newer
+    ///   generation, so the guard makes it a no-op there too.
+    /// - `pipelineTask?.cancel()` is also synchronous -- cheap, cooperative,
+    ///   and helps the pipeline `Task` unwind promptly alongside the
+    ///   transport close finishing `inbound`.
+    /// - The actual `activeTransport.close()` I/O is *not* synchronous: it
+    ///   can block for up to ~4s in the worst case (bounded
+    ///   `libusb_handle_events_timeout` + `allTransfersDone.wait` loops
+    ///   inside `RNDISTransport.shutdown()`), and this method runs on
+    ///   `stateQueue` -- the single serial queue every exported
+    ///   `GogglesHelperProtocol` method and every fan-out delivery goes
+    ///   through. Blocking it here would stall every other subscriber for
+    ///   that whole window. So the close is handed to a detached `Task`
+    ///   (mirroring `beginStreaming`'s own reason for using one) and
+    ///   recorded in `pendingClose`, which `beginStreaming` awaits before
+    ///   claiming again -- see `pendingClose`'s doc comment.
     private func teardownHardware() {
         currentSink?.close()
         currentSink = nil
         currentTransport = nil
-        activeTransport?.close()
         pipelineTask?.cancel()
+        pipelineTask = nil
+        let transport = activeTransport
+        activeTransport = nil
+        if let transport {
+            Logging.usb.info("releasing USB interfaces off stateQueue...")
+            pendingClose = Task.detached {
+                transport.close()
+            }
+        }
     }
 
     // MARK: - PipelineDelegate (called from the running pipeline Task's
