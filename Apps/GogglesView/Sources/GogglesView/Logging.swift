@@ -21,4 +21,7 @@ enum Logging {
     /// criterion: "app receives NAL callbacks and logs fps matching
     /// gvcli").
     static let stats = Logger(subsystem: subsystem, category: "Stats")
+    /// Task 3.3: `DecodeSession`'s Annex-B->AVCC conversion, `CMSampleBuffer`
+    /// construction, and §7 error-policy (drop/teardown) logging.
+    static let decode = Logger(subsystem: subsystem, category: "Decode")
 }

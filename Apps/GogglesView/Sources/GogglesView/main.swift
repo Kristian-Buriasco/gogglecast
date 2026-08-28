@@ -32,6 +32,7 @@ import ServiceManagement
 import GogglesXPC
 #if canImport(AppKit)
 import AppKit
+import SwiftUI
 #endif
 
 let plistName = "com.kburiasco.gogglesview.helper.plist"
@@ -120,6 +121,62 @@ if args.contains("--unregister") {
     exit(0)
 }
 
+#if canImport(AppKit)
+if args.contains("--live-view") {
+    // Task 3.3's hardware-verification harness: not the real SwiftUI app
+    // shell (Task 3.4/3.6's job -- see GogglesVideoView.swift's doc
+    // comment), just enough AppKit scaffolding to put a live
+    // AVSampleBufferDisplayLayer-backed window on screen so decoded video
+    // can be visually confirmed against real goggles hardware. Exits when
+    // the window is closed.
+    print("--live-view: connecting to \(helperMachServiceName) and opening a video window...")
+
+    let client = HelperClient()
+    let session = DecodeSession()
+    session.onDroppedSample = { error in
+        print("[live-view] dropped sample: \(error)")
+    }
+    session.onTeardown = {
+        print("[live-view] decode session torn down after \(DecodeSession.maxConsecutiveFailures) consecutive failures -- waiting for next parameter set")
+    }
+    client.onNALUnit = { data, nalType, isParameterSet, hostTime in
+        session.handle(nalData: data, nalType: nalType, isParameterSet: isParameterSet, hostTime: hostTime)
+    }
+    client.onConnectionStateChange = { state in
+        print("[live-view] connectionState -> \(state)")
+    }
+    client.onHelperStateChanged = { state, detail in
+        let name = GogglesState(rawValue: state).map { String(describing: $0) } ?? "unknown(\(state))"
+        print("[live-view] helper stateChanged -> \(name)\(detail.map { " [\($0)]" } ?? "")")
+    }
+
+    let app = NSApplication.shared
+    app.setActivationPolicy(.regular)
+
+    let hostingController = NSHostingController(rootView: GogglesVideoView(session: session))
+    let window = NSWindow(contentViewController: hostingController)
+    window.title = "GogglesView -- live-view (Task 3.3 hardware verification)"
+    window.setContentSize(NSSize(width: 960, height: 540))
+    window.styleMask = [.titled, .closable, .resizable, .miniaturizable]
+    window.center()
+    window.makeKeyAndOrderFront(nil)
+
+    let delegate = LiveViewAppDelegate()
+    app.delegate = delegate
+
+    client.connect()
+    DispatchQueue.global().asyncAfter(deadline: .now() + 1.0) {
+        client.startStreaming { ok, error in
+            print("[live-view] startStreaming -> ok=\(ok) error=\(error.map { String(describing: $0) } ?? "nil")")
+        }
+    }
+
+    app.activate(ignoringOtherApps: true)
+    app.run()
+    exit(0)
+}
+#endif
+
 if args.contains("--test-client") {
     // Task 3.1's hardware-verification harness (brief point 3): connect via
     // `HelperClient`, call `startStreaming`, log fps for a few seconds, exit.
@@ -194,9 +251,19 @@ if args.contains("--test-client") {
     exit(0)
 }
 
-print("GogglesView stub (Task 2.3/2.4/3.1). Recognized flags:")
+print("GogglesView stub (Task 2.3/2.4/3.1/3.3). Recognized flags:")
 print("  --check-daemon-status   print SMAppService.daemon status and exit")
 print("  --register              register() the helper daemon as a Login Item")
 print("  --unregister            unregister() the helper daemon")
 print("  --test-client [secs]    connect via HelperClient, startStreaming, log fps, exit (default 10s)")
+print("  --live-view             open a minimal AVSampleBufferDisplayLayer window and stream decoded video")
 exit(0)
+
+#if canImport(AppKit)
+/// Terminates `--live-view`'s `NSApplication.run()` loop when its one
+/// window is closed, so the harness process exits instead of hanging as a
+/// windowless background app.
+final class LiveViewAppDelegate: NSObject, NSApplicationDelegate {
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+}
+#endif

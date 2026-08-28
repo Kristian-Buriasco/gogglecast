@@ -195,4 +195,26 @@ final class ParameterSetFormatDescriptionCache {
         rebuildCount += 1
         return newFormatDescription
     }
+
+    /// Clears cached state entirely -- forces the next
+    /// `update(withBundledBlob:)` call to rebuild unconditionally, even if
+    /// the blob that then arrives is byte-identical to the last one this
+    /// cache saw before the reset.
+    ///
+    /// Task 3.3, design.md §7's 30-consecutive-failure teardown row: "tear
+    /// down the decode session (drop the cached format description...) and
+    /// wait for the next parameter set." Clearing `formatDescription` alone
+    /// would satisfy "drop the cached format description," but leaving
+    /// `lastBlob` in place would mean a stream that keeps re-announcing the
+    /// same bundled SPS+PPS blob (rather than a genuinely fresh one from a
+    /// goggles-side Liveview toggle) could never trigger the rebuild the
+    /// teardown path is waiting for -- `update`'s memoization guard would
+    /// keep returning "unchanged, skip" against a `formatDescription` that
+    /// no longer exists. Clearing both together is what makes "wait for the
+    /// next parameter set" actually resume decoding on the very next
+    /// parameter-set NAL, identical bytes or not.
+    func reset() {
+        formatDescription = nil
+        lastBlob = nil
+    }
 }

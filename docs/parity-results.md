@@ -77,3 +77,68 @@ measurement — the *relative* parity (Swift vs. Python, side by side, same cond
 is what actually matters and it holds cleanly. `RNDISTransport`/`gvcli` are a faithful,
 slightly-more-throughput-honest port of the Python prototype. Phase 2 (privileged
 helper + XPC) may begin.
+
+## Task 3.3 — decode and display, hardware verification (2026-08-28)
+
+Recorded against the same real DJI Goggles 3 unit, this time through the full path:
+goggles -> `GogglesHelper` (privileged daemon, already running) -> XPC `nalUnit`
+callback -> `HelperClient` -> `DecodeSession` (Annex-B->AVCC, `CMSampleBuffer`
+construction, §5.4 timestamping) -> `AVSampleBufferDisplayLayer` in
+`DisplayImmediately` mode, hosted in the `GogglesView --live-view` minimal AppKit/
+SwiftUI window built for this task.
+
+### Rendering result: PASS
+
+- Daemon was already running (`launchctl print system/com.kburiasco.gogglesview.helper`
+  showed `state = running` before any of this session's work started).
+- `GogglesView --live-view` connected, `deviceChanged -> Goggles3-753XM8A7028XG1`,
+  helper state reached `handshaking`, then sat at `fps=0` (expected: no NAL delivery
+  without a fresh SPS+IDR, and none had been emitted yet this goggles session).
+- User physically toggled "Share Liveview to Mobile Device via Wi-Fi" off/on on the
+  goggles' own menu (this session's operator did not have hardware access — every
+  hardware-touching step in this task was coordinated live with the user, consistent
+  with every prior hardware task).
+- ~15s after the toggle, `nalUnit` callbacks started arriving and the app window
+  rendered live decoded video — user visually confirmed it. Steady state settled at:
+  - client-side NAL-callback fps: 31-36 (`NALFPSCounter`, counting individual XPC
+    `nalUnit` deliveries)
+  - helper-reported fps: 33-40 (`StreamStats`, the helper's own count)
+  - bitrate: ~5.0-5.9 Mbps
+  - `drops: 0` throughout (both counters)
+  - cumulative frames over the observed run: 8500+ NALs delivered and decoded with
+    **zero** entries logged under the app's `Decode` `os_log` category (i.e. zero
+    dropped samples, zero §7 30-consecutive-failure teardowns) — confirmed via
+    `log show --predicate 'subsystem == "com.kburiasco.gogglesview.app" AND category
+    == "Decode"'` returning no lines for the full session.
+- These fps/bitrate numbers land in the same range as the Phase 1 `gvcli`/`stream.py`
+  parity measurement above (~56 fps ceiling; this run's goggles-side Wi-Fi/RF
+  conditions this time yielded low-30s-to-40s rather than the mid-50s seen in the
+  Phase 1 run, which is a link/RF variable, not a regression in this task's own code —
+  no drops or reassembly gaps were logged either).
+
+### Glass-to-glass latency: NOT MEASURED (honest limitation, not a fabricated number)
+
+The task brief allows a rough measurement (stopwatch/phone-camera comparison, or an
+improvised timestamp-overlay technique) and explicitly asks for honesty about
+methodology and margin of error over a precise-looking but unfounded number. In this
+session, the actual physical comparison this needs — watching the goggles' own display
+and the Mac app window side by side while something (a moving hand, a phone stopwatch)
+is in the goggles' camera view — requires a second pair of hands the user did not have
+free during this verification window ("i cant do anything as i dont have an option for
+now"). Rather than invent a number, this is recorded as an open item:
+
+- **What IS true by construction, not measurement:** the software path from XPC
+  `nalUnit` receipt to `AVSampleBufferDisplayLayer.enqueue(_:)` is architected for
+  minimal added latency — one NAL per XPC call (no batching/reordering buffer), local
+  Mach IPC (no network hop), immediate per-NAL AVCC conversion and `CMSampleBuffer`
+  construction (no lookahead), and `kCMSampleAttachmentKey_DisplayImmediately = true`
+  (design §5.4: no presentation-clock scheduling delay). This is a design property, not
+  a stopwatch number, and says nothing about the goggles' own encode latency or the
+  air-link latency upstream of the helper.
+- **What's still open:** an actual glass-to-glass number (goggles' own display vs. this
+  app's window, encode+transmit+decode+display all included) needs a follow-up
+  measurement — recommended method: point a phone camera at both displays
+  simultaneously (or record a phone stopwatch app placed in the goggles' camera view,
+  then play the recording back frame-by-frame afterward) rather than relying on
+  real-time human reaction-time comparison, since that removes the "two free hands
+  needed at the same moment" constraint that blocked it this session.

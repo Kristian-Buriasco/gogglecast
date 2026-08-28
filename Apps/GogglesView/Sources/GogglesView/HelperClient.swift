@@ -86,6 +86,16 @@ public final class HelperClient: NSObject {
     public var onDeviceChanged: ((DeviceInfo?) -> Void)?
     public var onHelperStateChanged: ((Int, String?) -> Void)?
     public var onStats: ((StreamStats) -> Void)?
+    /// Task 3.3: the raw per-NAL callback, verbatim from `GogglesClientProtocol.nalUnit`
+    /// (one complete Annex-B start-code-prefixed NAL per call -- confirmed
+    /// against `HelperService.pipeline(didEmitNAL:...)` /
+    /// `GogglesPipeline/Pipeline.swift`, which emits exactly one NAL per
+    /// `delegate?.pipeline(didEmitNAL:...)` call, not a multi-NAL blob).
+    /// `DecodeSession` is the intended consumer. Kept separate from
+    /// `NALFPSCounter`'s bookkeeping (`handleNALUnit` below still drives
+    /// that unconditionally) so a client with no interest in decoding
+    /// (e.g. a future stats-only observer) isn't forced to pay for it.
+    public var onNALUnit: ((Data, UInt8, Bool, UInt64) -> Void)?
 
     public private(set) var connectionState: HelperClientConnectionState = .disconnected {
         didSet {
@@ -394,6 +404,8 @@ public final class HelperClient: NSObject {
 
     fileprivate func handleNALUnit(_ data: Data, nalType: UInt8, isParameterSet: Bool, hostTime: UInt64) {
         fpsCounter.recordFrame()
+        let handler = onNALUnit
+        DispatchQueue.main.async { handler?(data, nalType, isParameterSet, hostTime) }
     }
 
     fileprivate func handleStats(_ stats: StreamStats) {

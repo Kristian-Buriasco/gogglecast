@@ -1,0 +1,265 @@
+import Foundation
+import CoreMedia
+import VideoToolbox
+
+// ─────────────────────────────────────────────────────────────────────────
+// Task 3.3: decode and display. Turns the raw per-NAL callbacks from
+// `HelperClient.onNALUnit` into `CMSampleBuffer`s enqueued on a
+// `SampleBufferRendering` (in practice an `AVSampleBufferDisplayLayer`,
+// design §5.4), and implements design.md §7's error policy for this task's
+// two relevant rows:
+//
+//   | Corrupt/undecodable NAL | VideoToolbox OSStatus error | drop the
+//     sample, keep the session; on 30 consecutive errors, tear down the
+//     decode session and wait for the next parameter set |
+//   | Packets flowing, no SPS+IDR (8s) | gating state | ... this task's
+//     decode session must cleanly do nothing / not crash while waiting for
+//     a first parameter set ... |
+//
+// Threading: not internally synchronized (like `NALFPSCounter`/
+// `HelperClient`'s own state, callers are expected to serialize access on
+// one queue). In practice that queue is `DispatchQueue.main`, because
+// `HelperClient.onNALUnit` -- like every other `HelperClient` public
+// closure -- is always delivered there.
+// ─────────────────────────────────────────────────────────────────────────
+
+enum DecodeSessionError: Error, Equatable {
+    /// No SPS+PPS-derived format description yet (design §7's second row).
+    /// Not a "corrupt NAL" failure -- deliberately excluded from the
+    /// consecutive-failure counter (see `handle(nalData:...)`).
+    case noFormatDescriptionYet
+    case blockBufferCreationFailed(OSStatus)
+    case sampleBufferCreationFailed(OSStatus)
+    case attachmentsUnavailable
+}
+
+/// Owns the parameter-set cache (Task 3.2) and the running
+/// consecutive-decode-failure count (design §7), and builds/enqueues
+/// `CMSampleBuffer`s for slice NALs against a `SampleBufferRendering`.
+final class DecodeSession {
+
+    /// design.md §7: "on 30 consecutive errors, tear down the decode
+    /// session."
+    static let maxConsecutiveFailures = 30
+
+    private let formatCache = ParameterSetFormatDescriptionCache()
+    private weak var renderer: SampleBufferRendering?
+    private(set) var consecutiveFailures = 0
+    private(set) var teardownCount = 0
+
+    /// Fired (on whatever queue `handle`/`recordExternalFailure` is called
+    /// on) whenever a sample is dropped -- parameter-set parse failure,
+    /// AVCC conversion failure, `CMSampleBuffer` construction failure, or an
+    /// externally-reported async VideoToolbox decode failure. Not fired for
+    /// the "no format description yet" no-op case (that's expected steady
+    /// -state while waiting for the first/next parameter set, not an
+    /// error).
+    var onDroppedSample: ((Error) -> Void)?
+    /// Fired once per teardown (the 30th consecutive failure).
+    var onTeardown: (() -> Void)?
+
+    init() {}
+
+    /// Attaches (or replaces) the render target. Safe to call before any
+    /// NAL has been seen, and again later (e.g. `GogglesVideoView` handing
+    /// over a freshly-created `AVSampleBufferDisplayLayer` once its host
+    /// `NSView` exists).
+    func attach(renderer: SampleBufferRendering) {
+        self.renderer = renderer
+    }
+
+    /// `true` once a parameter set has been decoded and cached -- i.e.
+    /// slice NALs will actually be converted/enqueued rather than silently
+    /// dropped. Exposed for tests/observability, not required for the
+    /// decode path itself.
+    var hasFormatDescription: Bool { formatCache.formatDescription != nil }
+
+    /// Entry point: call once per `HelperClient.onNALUnit` callback,
+    /// verbatim arguments.
+    func handle(nalData: Data, nalType: UInt8, isParameterSet: Bool, hostTime: UInt64) {
+        if isParameterSet {
+            handleParameterSet(nalData)
+            return
+        }
+        do {
+            try handleSlice(nalData, hostTime: hostTime)
+            recordSuccess()
+        } catch DecodeSessionError.noFormatDescriptionYet {
+            // Expected while waiting for the first/next parameter set --
+            // cleanly do nothing (design §7's second row), not a failure.
+        } catch {
+            recordFailure(error)
+        }
+    }
+
+    /// Lets an external observer (the host view's
+    /// `AVSampleBufferDisplayLayerFailedToDecode` notification handler --
+    /// VideoToolbox's own async decode errors don't surface synchronously
+    /// from `enqueue(_:)`) feed into the same §7 counting/teardown policy
+    /// as a synchronously-detected failure.
+    func recordExternalFailure(_ error: Error) {
+        recordFailure(error)
+    }
+
+    // MARK: - Parameter sets
+
+    private func handleParameterSet(_ data: Data) {
+        do {
+            try formatCache.update(withBundledBlob: [UInt8](data))
+            // A parameter set that parses fine is itself a "things are
+            // healthy" signal -- reset the streak so a run of unrelated
+            // slice-NAL failures before this point doesn't carry over and
+            // trip teardown against a session that just got a good
+            // parameter set.
+            consecutiveFailures = 0
+        } catch {
+            // A malformed parameter-set blob doesn't get the slice-NAL
+            // teardown treatment -- there's nothing decodable to tear down
+            // yet if this was the first one, and if it wasn't, the
+            // previously-cached format description (if any) is left alone
+            // rather than discarded over one bad blob.
+            onDroppedSample?(error)
+            Logging.decode.error("parameter-set update failed: \(String(describing: error), privacy: .public)")
+        }
+    }
+
+    // MARK: - Slice NALs
+
+    private func handleSlice(_ data: Data, hostTime: UInt64) throws {
+        guard let formatDescription = formatCache.formatDescription else {
+            throw DecodeSessionError.noFormatDescriptionYet
+        }
+        let avccData = try NALAnnexBToAVCC.convert(data)
+        let sampleBuffer = try DecodeSession.makeSampleBuffer(
+            avccData: avccData,
+            formatDescription: formatDescription,
+            hostTime: hostTime
+        )
+        try DecodeSession.markDisplayImmediately(sampleBuffer)
+        renderer?.enqueue(sampleBuffer)
+    }
+
+    // MARK: - CMSampleBuffer construction
+
+    /// Wraps AVCC-converted bytes in a `CMBlockBuffer`, then a
+    /// `CMSampleBuffer`, timestamped from the helper's `hostTime`
+    /// (`mach_absolute_time()` ticks, converted to a `CMTime` via
+    /// `mach_timebase_info` -- design §5.4: "stamps each emitted NAL with
+    /// `mach_absolute_time()`... forwards that").
+    static func makeSampleBuffer(
+        avccData: Data,
+        formatDescription: CMVideoFormatDescription,
+        hostTime: UInt64
+    ) throws -> CMSampleBuffer {
+        let blockBuffer = try makeBlockBuffer(from: avccData)
+
+        // design §5.4: "does not attempt a presentation clock" -- the PTS
+        // below exists because `CMSampleBufferCreateReady` requires valid
+        // timing info, not because anything downstream schedules against
+        // it; `DisplayImmediately` (set below) is what actually governs
+        // when the layer shows the frame.
+        var timingInfo = CMSampleTimingInfo(
+            duration: .invalid,
+            presentationTimeStamp: presentationTime(forHostTime: hostTime),
+            decodeTimeStamp: .invalid
+        )
+        var sampleBuffer: CMSampleBuffer?
+        let sampleSizes = [avccData.count]
+        let status = CMSampleBufferCreateReady(
+            allocator: kCFAllocatorDefault,
+            dataBuffer: blockBuffer,
+            formatDescription: formatDescription,
+            sampleCount: 1,
+            sampleTimingEntryCount: 1,
+            sampleTimingArray: &timingInfo,
+            sampleSizeEntryCount: 1,
+            sampleSizeArray: sampleSizes,
+            sampleBufferOut: &sampleBuffer
+        )
+        guard status == noErr, let sampleBuffer else {
+            throw DecodeSessionError.sampleBufferCreationFailed(status)
+        }
+        return sampleBuffer
+    }
+
+    private static func makeBlockBuffer(from avccData: Data) throws -> CMBlockBuffer {
+        var blockBuffer: CMBlockBuffer?
+        let createStatus = CMBlockBufferCreateWithMemoryBlock(
+            allocator: kCFAllocatorDefault,
+            memoryBlock: nil,
+            blockLength: avccData.count,
+            blockAllocator: kCFAllocatorDefault,
+            customBlockSource: nil,
+            offsetToData: 0,
+            dataLength: avccData.count,
+            flags: 0,
+            blockBufferOut: &blockBuffer
+        )
+        guard createStatus == kCMBlockBufferNoErr, let blockBuffer else {
+            throw DecodeSessionError.blockBufferCreationFailed(createStatus)
+        }
+        let copyStatus = avccData.withUnsafeBytes { raw -> OSStatus in
+            guard let base = raw.baseAddress else { return kCMBlockBufferStructureAllocationFailedErr }
+            return CMBlockBufferReplaceDataBytes(
+                with: base,
+                blockBuffer: blockBuffer,
+                offsetIntoDestination: 0,
+                dataLength: avccData.count
+            )
+        }
+        guard copyStatus == kCMBlockBufferNoErr else {
+            throw DecodeSessionError.blockBufferCreationFailed(copyStatus)
+        }
+        return blockBuffer
+    }
+
+    /// design §5.4's `kCMSampleAttachmentKey_DisplayImmediately = true`,
+    /// set on the (sole) sample's attachments dictionary.
+    private static func markDisplayImmediately(_ sampleBuffer: CMSampleBuffer) throws {
+        guard let attachmentsArray = CMSampleBufferGetSampleAttachmentsArray(sampleBuffer, createIfNecessary: true) as? [CFMutableDictionary],
+              let attachments = attachmentsArray.first else {
+            throw DecodeSessionError.attachmentsUnavailable
+        }
+        CFDictionarySetValue(
+            attachments,
+            Unmanaged.passUnretained(kCMSampleAttachmentKey_DisplayImmediately).toOpaque(),
+            Unmanaged.passUnretained(kCFBooleanTrue).toOpaque()
+        )
+    }
+
+    /// Converts a `mach_absolute_time()` tick count to a `CMTime` in
+    /// nanoseconds via `mach_timebase_info` -- not a no-op on every Mac
+    /// (Intel's numer/denom is commonly 125/3, not 1/1).
+    private static func presentationTime(forHostTime hostTime: UInt64) -> CMTime {
+        var timebase = mach_timebase_info(numer: 0, denom: 0)
+        mach_timebase_info(&timebase)
+        let numer = UInt64(timebase.numer)
+        let denom = UInt64(timebase.denom)
+        let nanos = denom > 0 ? (hostTime.multipliedReportingOverflow(by: numer).partialValue / denom) : hostTime
+        return CMTime(value: Int64(clamping: nanos), timescale: 1_000_000_000)
+    }
+
+    // MARK: - §7 error-policy bookkeeping
+
+    private func recordSuccess() {
+        consecutiveFailures = 0
+    }
+
+    private func recordFailure(_ error: Error) {
+        consecutiveFailures += 1
+        Logging.decode.error("dropped sample (\(self.consecutiveFailures, privacy: .public)/\(DecodeSession.maxConsecutiveFailures, privacy: .public) consecutive): \(String(describing: error), privacy: .public)")
+        onDroppedSample?(error)
+        if consecutiveFailures >= DecodeSession.maxConsecutiveFailures {
+            tearDown()
+        }
+    }
+
+    private func tearDown() {
+        Logging.decode.fault("\(DecodeSession.maxConsecutiveFailures, privacy: .public) consecutive decode failures -- tearing down decode session, waiting for next parameter set")
+        formatCache.reset()
+        renderer?.flush()
+        consecutiveFailures = 0
+        teardownCount += 1
+        onTeardown?()
+    }
+}
