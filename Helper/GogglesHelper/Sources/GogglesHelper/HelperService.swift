@@ -507,7 +507,20 @@ final class HelperService: NSObject, GogglesHelperProtocol, PipelineDelegate {
             // "packets resumed" signal design's `stalled` row implies, so
             // recover here, the same way `pipelineDidBeginReceivingVideo`
             // recovers `waitingForKeyframe` from earlier states.
-            if self.currentStateValue == .stalled {
+            //
+            // A *second* consecutive silence escalates `.stalled` further,
+            // to `.handshaking` (see `pipelineWentSilent()`'s own
+            // `currentStateValue == .live` check below -- once no longer
+            // `.live`, further silence takes the `.handshaking` branch).
+            // Verified against real hardware that data can resume from
+            // *that* state too without a fresh keyframe, for the exact
+            // same §8.1 reason -- so this must recover from `.handshaking`
+            // as well, not just `.stalled`, guarded by `everReachedLive` so
+            // a genuine first-time connect (which legitimately needs to
+            // pass through `.waitingForKeyframe` before `.live`, driven by
+            // `pipelineDidBeginReceivingVideo`/`pipelineDidStart` instead)
+            // is never short-circuited here.
+            if self.everReachedLive, self.currentStateValue == .stalled || self.currentStateValue == .handshaking {
                 self.setState(.live)
             }
             self.fanOut { $0.nalUnit(data, nalType: nalType, isParameterSet: isParameterSet, hostTime: hostTime) }
