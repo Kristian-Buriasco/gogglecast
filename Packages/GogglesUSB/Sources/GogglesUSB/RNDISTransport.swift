@@ -490,6 +490,38 @@ public final class RNDISTransport: GogglesTransport {
                     handleInboundEthernetFrame(frame)
                 }
             }
+        } else if transfer.pointee.status == LIBUSB_TRANSFER_NO_DEVICE {
+            // Task 3.7, design §9.3 scenario 1: physical USB unplug. libusb
+            // reports every in-flight bulk-IN transfer as
+            // LIBUSB_TRANSFER_NO_DEVICE once it notices the device is gone.
+            // The old code fell straight through to the unconditional
+            // resubmit below regardless of status -- `libusb_submit_transfer`
+            // on a vanished device fails immediately with no further
+            // callback, so every one of the 16 pooled transfers silently
+            // went dead without ever finishing `inbound`. That left
+            // `runPipeline`'s inbound-consumer loop parked forever awaiting
+            // a `Data` that would never come, so the pipeline `Task` never
+            // completed, `currentTransport` never went nil, and
+            // `HelperService` never saw its pipelineTask-completion path
+            // fire -- the helper stayed wedged in `.live`/`.stalled`
+            // indefinitely, with no reconnect on replug (verified against
+            // real hardware while implementing this task).
+            //
+            // Fix: flip `isRunning` false and finish `inbound` right here,
+            // the same two things `shutdown()` does, so this transfer (and
+            // the ~15 siblings independently hitting this same branch within
+            // the same unplug event) fall into the "not stillRunning" path
+            // below instead of resubmitting -- ending `runPipeline` on its
+            // own and letting the existing pipelineTask-completion/
+            // `.noDevice` logic in `HelperService` run exactly as it does
+            // for any other transport-driven end of the pipeline. A later
+            // `shutdown()` call (from `close()`/`deinit`) sees
+            // `isRunning` already false and skips its cancel-and-wait loop
+            // entirely, since there is nothing left in flight to cancel.
+            poolLock.lock()
+            isRunning = false
+            poolLock.unlock()
+            continuation.finish()
         }
 
         poolLock.lock()
