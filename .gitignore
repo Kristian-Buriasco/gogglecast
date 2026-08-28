@@ -16,5 +16,9 @@ xcuserdata/
 # macOS
 .DS_Store
 
+# Task 2.3: assembled app bundle build output (regenerate via
+# Apps/GogglesView/build-stub-bundle.sh; not a source artifact)
+Apps/GogglesView/build/
+
 # This project's SDD scratch directory (not part of the deliverable)
 .superpowers/
