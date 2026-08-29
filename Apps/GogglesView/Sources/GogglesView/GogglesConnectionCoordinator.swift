@@ -133,10 +133,14 @@ public final class GogglesConnectionCoordinator: ObservableObject {
     }
 
     /// The `noHelper` state's "Set up" action (design §6:
-    /// `"Set up" button -> SMAppService.register()`).
+    /// `"Set up" button -> SMAppService.register()`). Routed through
+    /// `HelperRegistration` (task-gui-v2) rather than constructing its own
+    /// `SMAppService.daemon(plistName:)` with a re-typed literal -- see that
+    /// type's doc comment for why this used to be a second (of what became
+    /// three) independent copies of the same registration call.
     public func setUpHelper() throws {
         #if canImport(ServiceManagement)
-        try SMAppService.daemon(plistName: "com.kburiasco.gogglesview.helper.plist").register()
+        try HelperRegistration.register()
         #endif
     }
 

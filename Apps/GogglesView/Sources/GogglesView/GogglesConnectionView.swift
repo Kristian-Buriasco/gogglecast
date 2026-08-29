@@ -16,13 +16,20 @@ import SwiftUI
 struct GogglesConnectionView: View {
     @ObservedObject var coordinator: GogglesConnectionCoordinator
     let session: DecodeSession
+    /// task-gui-v2: opens the real Settings window (`SettingsWindowController`,
+    /// owned by `main.swift`) -- `nil` only for callers that don't have a
+    /// Settings window to open (none currently; kept optional rather than
+    /// forcing every future harness/test host of this view to supply one).
+    var onOpenSettings: (() -> Void)?
 
     // ── GUI restyle task: CosmoViewer-Direct-inspired chrome ──
-    // (.superpowers/sdd/plan/task-gui-restyle-brief.md). The dark
-    // background + top/bottom `AppGlowStrip`s + `statusRow` + `footerBar`
+    // (.superpowers/sdd/plan/task-gui-restyle-brief.md, later revised by
+    // task-gui-v2-brief.md). The dark background + `statusRow` + `footerBar`
     // are new; `mainContent` below is exactly Task 3.4/3.5's original
     // device-card + state-content body, unchanged, just relocated into the
-    // new outer chrome layout.
+    // new outer chrome layout. The original pass also had a top/bottom
+    // `AppGlowStrip` ambient-glow overlay here -- removed in the v2 pass per
+    // live user feedback (see `AppChrome.swift`'s file doc comment).
     var body: some View {
         ZStack {
             AppChrome.backgroundColor
@@ -31,7 +38,14 @@ struct GogglesConnectionView: View {
             VStack(spacing: 0) {
                 statusRow
                     .padding(.horizontal, 14)
-                    .padding(.top, 12)
+                    // task-gui-v2: a bit more top clearance than the
+                    // original 12pt now that `applyCustomTitleBarChrome`
+                    // (main.swift) removed the native titlebar and the
+                    // traffic-light buttons sit directly over this content's
+                    // top-left corner -- keeps the status pill's row
+                    // roughly vertically centered with them instead of
+                    // crowding the window's very top edge.
+                    .padding(.top, 20)
                     .padding(.bottom, 4)
 
                 mainContent
@@ -42,8 +56,6 @@ struct GogglesConnectionView: View {
                     .padding(.bottom, 10)
             }
         }
-        .overlay(alignment: .top) { AppGlowStrip(edge: .top) }
-        .overlay(alignment: .bottom) { AppGlowStrip(edge: .bottom) }
     }
 
     /// Task 3.4/3.5's original body, unchanged (device-info card from
@@ -77,22 +89,23 @@ struct GogglesConnectionView: View {
     }
 
     /// Task brief point 3: a small footer with a bottom-left "Settings"
-    /// affordance and a bottom-right name/version string. The Settings
-    /// button is disabled rather than a silent no-op -- see
-    /// task-gui-restyle-report.md for why that reads as more honest than a
-    /// button that appears to do something but doesn't.
+    /// affordance and a bottom-right name/version string. Originally
+    /// shipped `.disabled(true)` (task-gui-restyle-report.md: a disabled
+    /// button reads as more honest than a silent no-op) -- task-gui-v2 now
+    /// wires it to the real `SettingsWindowController` via `onOpenSettings`,
+    /// so it's enabled whenever a real handler is actually available.
     private var footerBar: some View {
         HStack(alignment: .center) {
             Button {
-                // Intentionally disabled -- see doc comment above.
+                onOpenSettings?()
             } label: {
                 Label("Settings", systemImage: "gearshape")
                     .font(.caption)
             }
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
-            .disabled(true)
-            .help("Settings isn't available yet in this build.")
+            .disabled(onOpenSettings == nil)
+            .help(onOpenSettings == nil ? "Settings isn't available in this build." : "Open Settings")
             .accessibilityIdentifier("settingsButton")
 
             Spacer()

@@ -1,21 +1,30 @@
 import Foundation
 
+#if canImport(AppKit)
+import AppKit
+#endif
+
 #if canImport(SwiftUI)
 import SwiftUI
 
 // ─────────────────────────────────────────────────────────────────────────
 // GUI restyle task (post-Phase-3 v1 skin pass, bounded/approved in chat --
 // see .superpowers/sdd/plan/task-gui-restyle-brief.md): shared presentational
-// pieces for the CosmoViewer-Direct-inspired chrome -- the accent
-// top/bottom edge glow (light blue/blue, per a live user course-correction
-// away from the reference's literal warm red/orange), the in-window status
-// pill (reusing Task 3.6's
-// `GogglesStatusGlyphCategory`), and the version-footer text. Deliberately
-// small and dumb: no state, no XPC, nothing here changes app behavior.
+// pieces for the CosmoViewer-Direct-inspired chrome -- the in-window status
+// pill (reusing Task 3.6's `GogglesStatusGlyphCategory`) and the
+// version-footer text. Deliberately small and dumb: no state, no XPC,
+// nothing here changes app behavior.
 //
 // This is a pure skin pass -- nothing in this file touches
 // `GogglesConnectionCoordinator`/`DecodeSession`/`HelperClient` or anything
 // under `Helper/GogglesHelper/`/`Packages/`.
+//
+// task-gui-v2 follow-up (this task): the original pass also had a top/bottom
+// ambient edge-glow strip (`AppGlowStrip`, gradient accent bar). Removed
+// outright per live user feedback after seeing it on screen ("drop the glow
+// strip entirely ... don't try to tone it down, remove it") -- not toned
+// down, not made subtler, gone. See `GogglesConnectionView.swift`'s `body`,
+// which no longer overlays it.
 // ─────────────────────────────────────────────────────────────────────────
 
 enum AppChrome {
@@ -27,19 +36,17 @@ enum AppChrome {
     /// switch to a light theme.
     static let backgroundColor = Color(red: 0.06, green: 0.06, blue: 0.07)
 
-    /// The accent gradient stops used by both edge glow strips
-    /// (`AppGlowStrip`) -- named here once so the top and bottom strips
-    /// can't drift out of sync. Light blue/blue, per a live user
-    /// course-correction during this task away from the reference
-    /// screenshot's literal warm red/orange -- the brief's "use your
-    /// judgment on exact colors" always left the palette itself flexible;
-    /// only the "subtle ambient edge glow, not a loud banner" shape/feel is
-    /// the actual reference-matched part.
-    static let glowColors: [Color] = [
-        Color(red: 0.10, green: 0.45, blue: 0.95),
-        Color(red: 0.45, green: 0.78, blue: 1.00),
-        Color(red: 0.10, green: 0.45, blue: 0.95),
-    ]
+    #if canImport(AppKit)
+    /// The exact same near-black as `backgroundColor` above, as an
+    /// `NSColor` -- task-gui-v2's custom title bar (`main.swift`,
+    /// `applyCustomTitleBarChrome(to:)`) sets `NSWindow.backgroundColor` to
+    /// this so the now-transparent titlebar region (behind the traffic-light
+    /// buttons, `titlebarAppearsTransparent = true`) reads as the same
+    /// continuous dark surface as the SwiftUI content below it, rather than
+    /// flashing the default light `NSWindow` background color for a frame
+    /// before the hosted SwiftUI view's own background paints.
+    static let windowBackgroundColor = NSColor(srgbRed: 0.06, green: 0.06, blue: 0.07, alpha: 1.0)
+    #endif
 
     /// "GogglesView, ver. X.Y (build)" -- sourced from the running bundle's
     /// own `Info.plist` (`CFBundleName`/`CFBundleShortVersionString`/
@@ -78,39 +85,6 @@ enum AppChrome {
         case .waiting: return .yellow
         case .live: return .green
         }
-    }
-}
-
-/// The warm red/orange ambient-glow edge strip (task brief point 1): "a
-/// warm red-to-orange horizontal gradient glow strip along the very top
-/// edge ... and a matching one along the very bottom edge ... like a soft
-/// accent light, not a solid color bar." (Palette since swapped to light
-/// blue/blue per a live user course-correction -- see `AppChrome.glowColors`
-/// -- the "soft ambient edge glow" shape is the part that's reference-driven,
-/// not the specific hue.) Implemented as a fixed-height gradient band whose
-/// opacity fades from solid at the window's outer edge to fully transparent
-/// toward the content -- the "soft glow, not a loud banner" effect -- via an
-/// alpha mask rather than `.blur`, so it never bleeds an unpredictable
-/// amount into the content below/above it.
-/// Non-interactive (`allowsHitTesting(false)`) so it never steals clicks
-/// from the traffic-light buttons, the status pill, or the footer.
-struct AppGlowStrip: View {
-    enum Edge { case top, bottom }
-    let edge: Edge
-
-    var body: some View {
-        LinearGradient(colors: AppChrome.glowColors, startPoint: .leading, endPoint: .trailing)
-            .frame(height: 28)
-            .mask(
-                LinearGradient(
-                    colors: [.black, .clear],
-                    startPoint: edge == .top ? .top : .bottom,
-                    endPoint: edge == .top ? .bottom : .top
-                )
-            )
-            .opacity(0.85)
-            .allowsHitTesting(false)
-            .accessibilityHidden(true)
     }
 }
 

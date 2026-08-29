@@ -42,17 +42,15 @@ import AppKit
 import SwiftUI
 #endif
 
-let plistName = "com.kburiasco.gogglesview.helper.plist"
-
-func describe(_ status: SMAppService.Status) -> String {
-    switch status {
-    case .notRegistered: return "notRegistered"
-    case .enabled: return "enabled"
-    case .requiresApproval: return "requiresApproval"
-    case .notFound: return "notFound"
-    @unknown default: return "unknown(\(status.rawValue))"
-    }
-}
+// task-gui-v2: `plistName`/`describe(_:)` used to live here as this file's
+// own top-level declarations (Task 2.4). Both now come from
+// `HelperRegistration` (see that file's doc comment) so the CLI harness
+// below and the Settings screen's Launch-at-login toggle/Re-register button
+// share one real implementation instead of three copies of the same
+// `SMAppService.daemon(plistName:)` logic. `plistName` kept as a local alias
+// so every line below this point (and its printed output) is unchanged.
+let plistName = HelperRegistration.plistName
+let describe = HelperRegistration.describe
 
 func printStatus(_ label: String, _ status: SMAppService.Status) {
     print("\(label): \(describe(status)) (rawValue=\(status.rawValue))")
@@ -80,7 +78,7 @@ func openLoginItemsSettings() {
 }
 
 let args = CommandLine.arguments
-let service = SMAppService.daemon(plistName: plistName)
+let service = HelperRegistration.service
 
 print("plistName: \(plistName)")
 
@@ -224,7 +222,18 @@ if args.contains("--run") || !args.dropFirst().contains(where: { $0.hasPrefix("-
     let app = NSApplication.shared
     app.setActivationPolicy(.regular)
 
-    let hostingController = NSHostingController(rootView: GogglesConnectionView(coordinator: coordinator, session: session))
+    // task-gui-v2 point 5: the real Settings window, built before the main
+    // window's `GogglesConnectionView` so the footer's Settings button can
+    // be wired to `settingsWindowController.show()` directly -- `reconnect`
+    // is the exact same `coordinator.reconnect()` the menu bar's
+    // "Reconnect" item calls (`MenuBarController.swift`).
+    let settingsWindowController = SettingsWindowController(onReconnect: { coordinator.reconnect() })
+
+    let hostingController = NSHostingController(rootView: GogglesConnectionView(
+        coordinator: coordinator,
+        session: session,
+        onOpenSettings: { settingsWindowController.show() }
+    ))
     // Real bug found during Task 3.5's window-sizing complaint while
     // verifying the decode fix live: `NSHostingController`'s default
     // `sizingOptions` (`.standardBounds`, which includes
@@ -259,6 +268,16 @@ if args.contains("--run") || !args.dropFirst().contains(where: { $0.hasPrefix("-
     let defaultContentSize = NSSize(width: 640, height: 360) // exactly 16:9
     window.setContentSize(defaultContentSize)
     window.styleMask = [.titled, .closable, .resizable, .miniaturizable]
+    // task-gui-v2: custom in-app title bar (see the function's own doc
+    // comment) -- replaces the native gray gradient titlebar with the app's
+    // own dark chrome while keeping the real traffic-light buttons. Applied
+    // to `styleMask` before the aspect-ratio/fullscreen setup just below so
+    // there's no ordering dependency between the two (verified: `.titled`
+    // stays set the whole time, `.fullSizeContentView` just changes how its
+    // titlebar draws, and `contentAspectRatio`/`.fullScreenPrimary` are
+    // independent AppKit mechanisms per the doc comment on
+    // `sizingOptions = []` a few lines below).
+    applyCustomTitleBarChrome(to: window)
     // Task 3.6: preserve the video's 16:9 (1920x1080) aspect ratio when the
     // user resizes the window by dragging. `contentAspectRatio` takes a
     // ratio in the content view's own coordinate space (not literal
@@ -325,7 +344,12 @@ if args.contains("--run") || !args.dropFirst().contains(where: { $0.hasPrefix("-
     // Keep strong references to objects `app.run()` will otherwise have no
     // other owner for, for the lifetime of the run loop (mirrors why
     // `delegate`/`hideOnCloseDelegate` are `let`-bound above, not inlined).
-    withExtendedLifetime((menuBarController, hideOnCloseDelegate)) {
+    // `settingsWindowController` is technically also kept alive already (the
+    // `onOpenSettings` closure captured by the still-live `hostingController`
+    // holds a strong reference to it), but listed explicitly here too for
+    // the same "don't rely on an indirect capture chain to keep this alive"
+    // clarity the other two get.
+    withExtendedLifetime((menuBarController, hideOnCloseDelegate, settingsWindowController)) {
         app.run()
     }
     exit(0)
@@ -373,6 +397,11 @@ if args.contains("--force-state") {
     window.title = "GogglesView -- --force-state \(name) (Task 3.4 manual verification)"
     window.setContentSize(NSSize(width: 480, height: 360))
     window.styleMask = [.titled, .closable, .resizable, .miniaturizable]
+    // task-gui-v2: same custom title bar as the real `--run` window, so
+    // `--force-state` spot-checks (this task's own visual verification path
+    // -- no hardware needed) actually show the real chrome, not the old
+    // native titlebar.
+    applyCustomTitleBarChrome(to: window)
     window.center()
     window.makeKeyAndOrderFront(nil)
 
@@ -518,6 +547,66 @@ final class MenuActionTarget: NSObject {
         action()
     }
 }
+
+/// task-gui-v2 point 4: replaces the native macOS gray-gradient title bar
+/// with the app's own dark chrome, while keeping the real, standard
+/// traffic-light window buttons (close/miniaturize/zoom) -- they're just
+/// drawn over the app's own content now instead of a separate system bar.
+///
+/// The three AppKit knobs the brief calls out, and why each one alone isn't
+/// the whole story:
+///   - `.fullSizeContentView` (added to `styleMask`) extends the content
+///     view up underneath where the titlebar used to be, so
+///     `GogglesConnectionView`'s own `AppChrome.backgroundColor` fill (and
+///     `statusRow`) reaches all the way to the window's top edge.
+///   - `titlebarAppearsTransparent = true` makes the (now zero-height,
+///     visually) titlebar area not paint the system gray gradient over that
+///     extended content.
+///   - `titleVisibility = .hidden` hides the window title text that would
+///     otherwise still render centered in that transparent strip.
+/// None of these three remove `.titled` from `styleMask` -- the traffic
+/// lights are a `.titled`-window feature, not a separate opt-in, so they
+/// stay exactly where the user expects them (top-left) with zero extra
+/// code, just now sitting directly on the dark content instead of a gray
+/// bar.
+///
+/// Two more things this needs to actually read as "one consistent dark
+/// surface" rather than "dark content with a flash of the wrong color
+/// behind the buttons":
+///   - `window.backgroundColor = AppChrome.windowBackgroundColor` -- without
+///     this, `NSWindow`'s own default (light) background shows through
+///     during the transparent-titlebar region's very first paint, before
+///     the hosted SwiftUI view's background has drawn over it, and can
+///     briefly show at the window's edges during a live-resize drag.
+///   - `isMovableByWindowBackground = true` -- with the titlebar gone as a
+///     distinct draggable strip, this is what lets the user still drag the
+///     window by clicking any part of its background that isn't itself an
+///     interactive SwiftUI control (the status pill/footer button areas
+///     still get first claim on their own clicks; everything else in
+///     `AppChrome.backgroundColor`'s fill becomes a drag handle, matching
+///     how every other borderless-chrome Mac app -- Xcode's floating
+///     panels, Slack, etc. -- handles this).
+///
+/// Does not touch `contentAspectRatio`/`.fullScreenPrimary`/
+/// `hostingController.sizingOptions` -- verified independent of all three
+/// (see the call site's doc comment in both `--run` and `--force-state`):
+/// `.fullSizeContentView` only changes how the *existing* titlebar draws,
+/// it doesn't add or remove `.resizable`/`.miniaturizable`, so
+/// user-initiated resize drags are still exactly as aspect-ratio-constrained
+/// as before, and the green-button/Control+Cmd+F fullscreen transition
+/// (`.fullScreenPrimary`) still works unmodified -- AppKit fullscreen
+/// already expects (and handles) a full-size-content-view window, that's
+/// the same configuration `.fullSizeContentView` document apps have used
+/// for fullscreen for years.
+#if canImport(AppKit)
+func applyCustomTitleBarChrome(to window: NSWindow) {
+    window.styleMask.insert(.fullSizeContentView)
+    window.titlebarAppearsTransparent = true
+    window.titleVisibility = .hidden
+    window.backgroundColor = AppChrome.windowBackgroundColor
+    window.isMovableByWindowBackground = true
+}
+#endif
 
 /// Maps `--force-state`'s string argument to a `GogglesUIState`, using
 /// representative sample associated data (a real interfaceClaimFailed
