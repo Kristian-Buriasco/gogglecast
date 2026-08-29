@@ -45,6 +45,17 @@ public final class GogglesConnectionCoordinator: ObservableObject {
     @Published public private(set) var waitingForKeyframeEnteredAt: Date?
 
     private let client: HelperClient
+    /// Multi-device picker design item 7: which device this coordinator
+    /// drives. One coordinator == one device's connection lifecycle, for
+    /// this coordinator's entire lifetime -- a device-selection step
+    /// (`DevicePickerCoordinator`) picks the `deviceId` *before* one of
+    /// these is even constructed; this type never re-targets itself to a
+    /// different device. Matches the design's own explicit framing: "per-
+    /// window bundles are already plain locals injected into a
+    /// coordinator, not singletons" -- a future multi-window follow-up
+    /// would just construct one `GogglesConnectionCoordinator` per window,
+    /// each with its own `deviceId`.
+    public let deviceId: String
     /// Injectable clock -- tests pass a controllable one so the 2s/5s
     /// watchdog thresholds can be exercised deterministically via `tick(at:)`
     /// rather than actually sleeping.
@@ -73,8 +84,9 @@ public final class GogglesConnectionCoordinator: ObservableObject {
     ///   - now: clock override for tests. Defaults to the real wall clock.
     ///   - startWatchdog: `false` in tests that drive `tick(at:)` manually
     ///     and don't want a real `Timer` also running concurrently.
-    public init(client: HelperClient, now: @escaping () -> Date = Date.init, startWatchdog: Bool = true) {
+    public init(client: HelperClient, deviceId: String, now: @escaping () -> Date = Date.init, startWatchdog: Bool = true) {
         self.client = client
+        self.deviceId = deviceId
         self.now = now
         self.lastActivityAt = now()
         wireCallbacks()
@@ -95,7 +107,7 @@ public final class GogglesConnectionCoordinator: ObservableObject {
     /// `GogglesHelperProtocol.reconnect` (full USB detach/claim/RNDIS rerun,
     /// Task 3.1/2.2).
     public func retry() {
-        client.reconnectHelper()
+        client.reconnectHelper(deviceId: deviceId)
     }
 
     /// Task 3.5: the "Reconnect" command's action -- design §8.1: "reachable
@@ -117,7 +129,7 @@ public final class GogglesConnectionCoordinator: ObservableObject {
     /// `.waitingForKeyframe` from the helper's own real `stateChanged`
     /// callbacks as it does so.
     public func reconnect() {
-        client.reconnectHelper()
+        client.reconnectHelper(deviceId: deviceId)
     }
 
     /// Task 3.5: the waitingForKeyframe card's secondary, explicitly
@@ -129,7 +141,7 @@ public final class GogglesConnectionCoordinator: ObservableObject {
     /// state transition remains the real one -- a fresh keyframe actually
     /// arriving, mapped by `mapHelperState` like any other.
     public func requestKeyframe() {
-        client.requestIFrame()
+        client.requestIFrame(deviceId: deviceId)
     }
 
     /// The `noHelper` state's "Set up" action (design §6:
@@ -200,7 +212,7 @@ public final class GogglesConnectionCoordinator: ObservableObject {
             // already-streaming subscriber just re-registers into the same
             // fan-out set), so this is unconditional and has no special
             // case to get wrong.
-            client.startStreaming(reply: { _, _ in })
+            client.startStreaming(deviceId: deviceId, reply: { _, _ in })
         }
     }
 

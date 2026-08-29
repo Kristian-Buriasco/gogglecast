@@ -127,6 +127,28 @@ public final class HelperClient: NSObject {
     /// the caller asked to tear down.
     private var wantsConnected = false
 
+    /// Multi-device picker design item 5/7: the `deviceId` this client last
+    /// called `startStreaming(deviceId:)` for, if any. Every incoming
+    /// `GogglesClientProtocol` callback carries its own `deviceId` now
+    /// (design item 6) -- the helper's fan-out is already scoped so a
+    /// callback for a different device should never arrive here, but this
+    /// is checked defensively (a stale callback racing a device switch is
+    /// the one scenario where it could) so `on*` closures never receive a
+    /// value for a device this client didn't ask about. `nil` before the
+    /// first `startStreaming(deviceId:)` call, or after `disconnect()`.
+    ///
+    /// Guarded by its own lock (not `stateQueue`): written from
+    /// `stateQueue` in `startStreaming`/`disconnect`, read from whatever
+    /// thread each `GogglesClientProtocol` callback arrives on (including
+    /// the per-NAL hot path) -- a `stateQueue.sync` per NAL would add
+    /// unnecessary latency there for a single-word read.
+    private let streamingDeviceIdLock = NSLock()
+    private var _streamingDeviceId: String?
+    private var streamingDeviceId: String? {
+        get { streamingDeviceIdLock.lock(); defer { streamingDeviceIdLock.unlock() }; return _streamingDeviceId }
+        set { streamingDeviceIdLock.lock(); _streamingDeviceId = newValue; streamingDeviceIdLock.unlock() }
+    }
+
     private let fpsCounter = NALFPSCounter()
 
     /// - Parameters:
@@ -187,15 +209,35 @@ public final class HelperClient: NSObject {
             self.connection = nil
             self.exportedClient = nil
             self.connectionState = .disconnected
+            self.streamingDeviceId = nil
         }
     }
 
-    /// Forwards to `GogglesHelperProtocol.startStreaming(reply:)`. Refuses
-    /// (with a synthetic error, no XPC round trip) while
+    /// Multi-device picker design item 5/7: lists every currently-connected
+    /// device (no claim) -- the app calls this to decide whether to go
+    /// straight to the single-device path or show a picker. Forwards
+    /// straight to `GogglesHelperProtocol.enumerateDevices(reply:)`;
+    /// replies `[]` (no XPC round trip) if not currently connected, same
+    /// "fail toward the least presumptuous answer" pattern as every other
+    /// call here.
+    public func enumerateDevices(reply: @escaping ([DeviceInfo]) -> Void) {
+        stateQueue.async {
+            guard let proxy = self.remoteHelperProxy() else {
+                DispatchQueue.main.async { reply([]) }
+                return
+            }
+            proxy.enumerateDevices { infos in
+                DispatchQueue.main.async { reply(infos) }
+            }
+        }
+    }
+
+    /// Forwards to `GogglesHelperProtocol.startStreaming(deviceId:reply:)`.
+    /// Refuses (with a synthetic error, no XPC round trip) while
     /// `connectionState` is `.versionMismatch` or not yet `.connected` --
     /// see `HelperClientConnectionState.versionMismatch`'s doc comment for
     /// why streaming specifically is the thing gated here.
-    public func startStreaming(reply: @escaping (Bool, NSError?) -> Void) {
+    public func startStreaming(deviceId: String, reply: @escaping (Bool, NSError?) -> Void) {
         stateQueue.async {
             guard self.connectionState == .connected, let proxy = self.remoteHelperProxy() else {
                 let detail: String
@@ -214,43 +256,44 @@ public final class HelperClient: NSObject {
                 DispatchQueue.main.async { reply(false, error) }
                 return
             }
+            self.streamingDeviceId = deviceId
             self.fpsCounter.start()
-            proxy.startStreaming { ok, error in
+            proxy.startStreaming(deviceId: deviceId) { ok, error in
                 DispatchQueue.main.async { reply(ok, error) }
             }
         }
     }
 
-    public func stopStreaming(reply: @escaping () -> Void = {}) {
+    public func stopStreaming(deviceId: String, reply: @escaping () -> Void = {}) {
         stateQueue.async {
             self.fpsCounter.stop()
             guard let proxy = self.remoteHelperProxy() else {
                 DispatchQueue.main.async { reply() }
                 return
             }
-            proxy.stopStreaming {
+            proxy.stopStreaming(deviceId: deviceId) {
                 DispatchQueue.main.async { reply() }
             }
         }
     }
 
-    public func requestIFrame(reply: @escaping () -> Void = {}) {
+    public func requestIFrame(deviceId: String, reply: @escaping () -> Void = {}) {
         stateQueue.async {
             guard let proxy = self.remoteHelperProxy() else {
                 DispatchQueue.main.async { reply() }
                 return
             }
-            proxy.requestIFrame { DispatchQueue.main.async { reply() } }
+            proxy.requestIFrame(deviceId: deviceId) { DispatchQueue.main.async { reply() } }
         }
     }
 
-    public func reconnectHelper(reply: @escaping () -> Void = {}) {
+    public func reconnectHelper(deviceId: String, reply: @escaping () -> Void = {}) {
         stateQueue.async {
             guard let proxy = self.remoteHelperProxy() else {
                 DispatchQueue.main.async { reply() }
                 return
             }
-            proxy.reconnect { DispatchQueue.main.async { reply() } }
+            proxy.reconnect(deviceId: deviceId) { DispatchQueue.main.async { reply() } }
         }
     }
 
@@ -403,26 +446,38 @@ public final class HelperClient: NSObject {
     // onto the main queue for the public closures -- mirrors
     // `HelperService`'s PipelineDelegate methods' identical pattern)
 
-    fileprivate func handleDeviceChanged(_ info: DeviceInfo?) {
+    /// Multi-device picker design item 6: drops a callback whose
+    /// `deviceId` doesn't match this client's `streamingDeviceId` -- see
+    /// that property's doc comment for why this is a defensive check, not
+    /// the primary scoping mechanism (the helper's own fan-out already is).
+    private func isForCurrentDevice(_ deviceId: String) -> Bool {
+        deviceId == streamingDeviceId
+    }
+
+    fileprivate func handleDeviceChanged(_ deviceId: String, _ info: DeviceInfo?) {
+        guard isForCurrentDevice(deviceId) else { return }
         Logging.client.info("deviceChanged: \(info?.product ?? "nil", privacy: .public)")
         let handler = onDeviceChanged
         DispatchQueue.main.async { handler?(info) }
     }
 
-    fileprivate func handleStateChanged(_ state: Int, detail: String?) {
+    fileprivate func handleStateChanged(_ deviceId: String, _ state: Int, detail: String?) {
+        guard isForCurrentDevice(deviceId) else { return }
         let name = GogglesState(rawValue: state).map { String(describing: $0) } ?? "unknown(\(state))"
         Logging.client.info("stateChanged: \(name, privacy: .public)\(detail.map { " [\($0)]" } ?? "", privacy: .public)")
         let handler = onHelperStateChanged
         DispatchQueue.main.async { handler?(state, detail) }
     }
 
-    fileprivate func handleNALUnit(_ data: Data, nalType: UInt8, isParameterSet: Bool, hostTime: UInt64) {
+    fileprivate func handleNALUnit(_ deviceId: String, _ data: Data, nalType: UInt8, isParameterSet: Bool, hostTime: UInt64) {
+        guard isForCurrentDevice(deviceId) else { return }
         fpsCounter.recordFrame()
         let handler = onNALUnit
         DispatchQueue.main.async { handler?(data, nalType, isParameterSet, hostTime) }
     }
 
-    fileprivate func handleStats(_ stats: StreamStats) {
+    fileprivate func handleStats(_ deviceId: String, _ stats: StreamStats) {
+        guard isForCurrentDevice(deviceId) else { return }
         // Logged alongside (not instead of) the independent client-side
         // `NALFPSCounter` -- see that type's doc comment for why both
         // numbers matter. This is the helper's own self-reported fps.
@@ -443,19 +498,19 @@ public final class HelperClient: NSObject {
 private final class ExportedClient: NSObject, GogglesClientProtocol {
     weak var owner: HelperClient?
 
-    func deviceChanged(_ info: DeviceInfo?) {
-        owner?.handleDeviceChanged(info)
+    func deviceChanged(_ deviceId: String, _ info: DeviceInfo?) {
+        owner?.handleDeviceChanged(deviceId, info)
     }
 
-    func stateChanged(_ state: Int, detail: String?) {
-        owner?.handleStateChanged(state, detail: detail)
+    func stateChanged(_ deviceId: String, _ state: Int, detail: String?) {
+        owner?.handleStateChanged(deviceId, state, detail: detail)
     }
 
-    func nalUnit(_ data: Data, nalType: UInt8, isParameterSet: Bool, hostTime: UInt64) {
-        owner?.handleNALUnit(data, nalType: nalType, isParameterSet: isParameterSet, hostTime: hostTime)
+    func nalUnit(_ deviceId: String, _ data: Data, nalType: UInt8, isParameterSet: Bool, hostTime: UInt64) {
+        owner?.handleNALUnit(deviceId, data, nalType: nalType, isParameterSet: isParameterSet, hostTime: hostTime)
     }
 
-    func stats(_ stats: StreamStats) {
-        owner?.handleStats(stats)
+    func stats(_ deviceId: String, _ stats: StreamStats) {
+        owner?.handleStats(deviceId, stats)
     }
 }

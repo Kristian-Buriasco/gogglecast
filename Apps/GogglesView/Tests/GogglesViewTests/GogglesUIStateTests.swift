@@ -135,7 +135,7 @@ struct GogglesConnectionCoordinatorTests {
     private func makeCoordinator() -> (HelperClient, GogglesConnectionCoordinator, TestClock) {
         let client = HelperClient() // never connect()ed -- no real XPC involved
         let clock = TestClock()
-        let coordinator = GogglesConnectionCoordinator(client: client, now: clock.now, startWatchdog: false)
+        let coordinator = GogglesConnectionCoordinator(client: client, deviceId: "test-device", now: clock.now, startWatchdog: false)
         return (client, coordinator, clock)
     }
 

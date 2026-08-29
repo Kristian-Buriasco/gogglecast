@@ -44,6 +44,7 @@ import GogglesXPC
 #if canImport(AppKit)
 import AppKit
 import SwiftUI
+import Combine
 #endif
 
 // task-gui-v2: `plistName`/`describe(_:)` used to live here as this file's
@@ -149,6 +150,55 @@ if args.contains("--install-camera-extension") {
 }
 
 #if canImport(AppKit)
+
+/// Top-level retain point for the real app shell's objects
+/// (`launchMainWindow`), since `--run`'s original
+/// `withExtendedLifetime(...) { app.run() }` pattern no longer applies --
+/// see that function's doc comment.
+var mainWindowRetainedObjects: [Any] = []
+
+/// Bridges `DevicePickerCoordinator.$state`'s Combine publisher to a plain
+/// closure fired exactly once, the first time `state` becomes `.selected`.
+/// A small dedicated type (not an inline `Combine.sink` at the call site)
+/// so it has a stable identity `withExtendedLifetime`/a retained array can
+/// hold onto for the picker phase's duration.
+/// Dev/debug-harness-only helper (`--live-view`, `--test-client`): polls
+/// `enumerateDevices` on a 0.5s cadence until a candidate appears (or
+/// `timeout` elapses), then calls `completion` with the first one's
+/// `deviceId` -- `nil` on timeout. Not used by the real `--run` app shell,
+/// which uses the real picker (`DevicePickerCoordinator`) instead; this is
+/// the minimum needed to keep these two pre-existing hardware-verification
+/// harnesses working against the multi-device-picker protocol change.
+func pollFirstAvailableDeviceId(client: HelperClient, timeout: TimeInterval = 15, completion: @escaping (String?) -> Void) {
+    let deadline = Date().addingTimeInterval(timeout)
+    func attempt() {
+        client.enumerateDevices { infos in
+            if let first = infos.first {
+                completion(first.deviceId)
+            } else if Date() < deadline {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: attempt)
+            } else {
+                completion(nil)
+            }
+        }
+    }
+    attempt()
+}
+
+final class PickerSelectionObserver {
+    private var cancellable: AnyObject?
+
+    init(picker: DevicePickerCoordinator, onSelected: @escaping (String) -> Void) {
+        var fired = false
+        let sink = picker.$state.sink { state in
+            guard !fired, case .selected(let deviceId) = state else { return }
+            fired = true
+            onSelected(deviceId)
+        }
+        cancellable = sink
+    }
+}
+
 if args.contains("--live-view") {
     // Task 3.3's hardware-verification harness: not the real SwiftUI app
     // shell (Task 3.4/3.6's job -- see GogglesVideoView.swift's doc
@@ -192,8 +242,17 @@ if args.contains("--live-view") {
     app.delegate = delegate
 
     client.connect()
-    DispatchQueue.global().asyncAfter(deadline: .now() + 1.0) {
-        client.startStreaming { ok, error in
+    // Multi-device picker design item 5: `startStreaming` now needs a
+    // `deviceId` -- this dev/debug harness (unlike the real app's
+    // `DevicePickerCoordinator`) just polls for the first available
+    // candidate and streams it, since it predates and isn't the picker UX
+    // itself (design item 7's picker only lives in the `--run` path).
+    pollFirstAvailableDeviceId(client: client) { deviceId in
+        guard let deviceId else {
+            print("[live-view] no device found after polling; giving up on startStreaming")
+            return
+        }
+        client.startStreaming(deviceId: deviceId) { ok, error in
             print("[live-view] startStreaming -> ok=\(ok) error=\(error.map { String(describing: $0) } ?? "nil")")
         }
     }
@@ -224,7 +283,69 @@ if args.contains("--run") || !args.dropFirst().contains(where: { $0.hasPrefix("-
     print("GogglesView: connecting to \(helperMachServiceName) and opening the real connection view...")
 
     let client = HelperClient()
-    let coordinator = GogglesConnectionCoordinator(client: client)
+
+    // Multi-device picker design item 7: a device-selection step precedes
+    // the existing state machine. `launchMainWindow(deviceId:)` below is
+    // everything this branch used to do unconditionally (Task 3.6) --
+    // untouched, just now parameterized by the deviceId the picker
+    // resolved, and called once instead of unconditionally at startup.
+    let app = NSApplication.shared
+    app.setActivationPolicy(.regular)
+
+    let picker = DevicePickerCoordinator(client: client)
+    let pickerHostingController = NSHostingController(rootView: DevicePickerView(picker: picker))
+    pickerHostingController.sizingOptions = []
+    let pickerWindow = NSWindow(contentViewController: pickerHostingController)
+    pickerWindow.title = "GogglesView"
+    pickerWindow.setContentSize(NSSize(width: 640, height: 360))
+    pickerWindow.styleMask = [.titled, .closable, .resizable, .miniaturizable]
+    applyCustomTitleBarChrome(to: pickerWindow)
+    pickerWindow.center()
+    pickerWindow.makeKeyAndOrderFront(nil)
+
+    let pickerDelegate = LiveViewAppDelegate()
+    app.delegate = pickerDelegate
+
+    var didLaunchMain = false
+    var pickerCancellable: AnyObject?
+    let observer = PickerSelectionObserver(picker: picker) { deviceId in
+        guard !didLaunchMain else { return }
+        didLaunchMain = true
+        pickerWindow.close()
+        launchMainWindow(deviceId: deviceId, client: client, app: app)
+    }
+    pickerCancellable = observer
+
+    client.connect()
+    app.activate(ignoringOtherApps: true)
+    // `app.run()` is called exactly once for this whole process (both the
+    // picker phase above and `launchMainWindow`'s real app shell below run
+    // inside this same call -- `launchMainWindow` reconfigures windows/menu
+    // bar from a main-queue callback fired while this loop is already
+    // spinning, it never calls `app.run()` itself). `observer` is kept
+    // alive via `withExtendedLifetime` for the same reason every other
+    // menu-bar/delegate object in this file needs an explicit owner.
+    withExtendedLifetime((observer, pickerCancellable, pickerDelegate)) {
+        app.run()
+    }
+    exit(0)
+}
+
+/// Multi-device picker design item 7: everything Task 3.6's `--run` branch
+/// used to do unconditionally at startup -- the real app shell (menu bar,
+/// aspect-ratio+fullscreen window, main menu) -- now deferred until
+/// `DevicePickerCoordinator` has resolved a `deviceId` (immediately, with
+/// no user action, for the 0/1-device regression case; after a picker tap
+/// for 2+). Unchanged from the original `--run` body except: `coordinator`
+/// is now constructed with the resolved `deviceId`, the old 1s-delayed
+/// `client.connect()`/`startStreaming` bootstrap is replaced by an
+/// immediate `startStreaming(deviceId:)` call (the client is already
+/// connected by this point -- reaching here required a successful
+/// `enumerateDevices` round trip), and this function does not call
+/// `app.run()`/`exit(0)` itself (the caller's single `app.run()` call,
+/// already in progress, covers this too).
+func launchMainWindow(deviceId: String, client: HelperClient, app: NSApplication) {
+    let coordinator = GogglesConnectionCoordinator(client: client, deviceId: deviceId)
     let session = DecodeSession()
     session.onDroppedSample = { error in
         print("[run] dropped sample: \(error)")
@@ -240,9 +361,6 @@ if args.contains("--run") || !args.dropFirst().contains(where: { $0.hasPrefix("-
     coordinator.onNALUnit = { data, nalType, isParameterSet, hostTime in
         session.handle(nalData: data, nalType: nalType, isParameterSet: isParameterSet, hostTime: hostTime)
     }
-
-    let app = NSApplication.shared
-    app.setActivationPolicy(.regular)
 
     // task-gui-v2 point 5: the real Settings window, built before the main
     // window's `GogglesConnectionView` so the footer's Settings button can
@@ -420,32 +538,38 @@ if args.contains("--run") || !args.dropFirst().contains(where: { $0.hasPrefix("-
     let delegate = RealAppDelegate()
     app.delegate = delegate
 
-    client.connect()
-    DispatchQueue.global().asyncAfter(deadline: .now() + 1.0) {
-        client.startStreaming { ok, error in
-            print("[run] startStreaming -> ok=\(ok) error=\(error.map { String(describing: $0) } ?? "nil")")
-        }
+    // The client is already connected by this point -- reaching
+    // `launchMainWindow` required a successful `enumerateDevices` round
+    // trip (`DevicePickerCoordinator.poll`) over the same `client`, which
+    // only ever happens after `onConnectionStateChange` observed
+    // `.connected`. `coordinator`'s own `init` already rewired that
+    // closure for its own purposes (see `wireCallbacks`), so unlike the
+    // pre-multi-device code this doesn't need a delayed retry -- kick
+    // `startStreaming(deviceId:)` immediately.
+    client.startStreaming(deviceId: deviceId) { ok, error in
+        print("[run] startStreaming -> ok=\(ok) error=\(error.map { String(describing: $0) } ?? "nil")")
     }
 
     app.activate(ignoringOtherApps: true)
-    // Keep strong references to objects `app.run()` will otherwise have no
-    // other owner for, for the lifetime of the run loop (mirrors why
-    // `delegate`/`hideOnCloseDelegate` are `let`-bound above, not inlined).
-    // `settingsWindowController` is technically also kept alive already (the
-    // `onOpenSettings` closure captured by the still-live `hostingController`
-    // holds a strong reference to it), but listed explicitly here too for
-    // the same "don't rely on an indirect capture chain to keep this alive"
-    // clarity the other two get.
+    // Keep strong references to objects nothing else in this process owns,
+    // for the remainder of the (already-running, caller-owned) run loop --
+    // mirrors why `delegate`/`hideOnCloseDelegate` are `let`-bound above,
+    // not inlined. `settingsWindowController` is technically also kept
+    // alive already (the `onOpenSettings` closure captured by the
+    // still-live `hostingController` holds a strong reference to it), but
+    // listed explicitly here too for the same "don't rely on an indirect
+    // capture chain to keep this alive" clarity the other two get.
     // task-gui-v3: `settingsMenuTarget`/`reconnectMenuTarget` added to this
     // tuple for the same reason as the three that were already here --
     // `NSMenuItem.target` doesn't retain, so the app-menu's Settings/
     // Reconnect items need a living owner for the app's whole run, same as
     // `MenuBarController`'s equivalent targets are kept alive by that
-    // class's own stored properties.
-    withExtendedLifetime((menuBarController, hideOnCloseDelegate, settingsWindowController, settingsMenuTarget, reconnectMenuTarget)) {
-        app.run()
-    }
-    exit(0)
+    // class's own stored properties. Unlike Task 3.6's original code, this
+    // can't use `withExtendedLifetime(...) { app.run() }` any more -- the
+    // caller's `app.run()` is already in progress by the time this function
+    // runs -- so these are retained in a top-level array instead (see
+    // `mainWindowRetainedObjects`'s doc comment).
+    mainWindowRetainedObjects = [menuBarController, hideOnCloseDelegate, settingsWindowController, settingsMenuTarget, reconnectMenuTarget, delegate]
 }
 if args.contains("--force-state") {
     // Task 3.4 exit criterion ("verified by forcing each one"): opens a
@@ -471,7 +595,10 @@ if args.contains("--force-state") {
     print("--force-state \(name): opening a window with uiState forced to \(forced)...")
 
     let client = HelperClient()
-    let coordinator = GogglesConnectionCoordinator(client: client, startWatchdog: false)
+    // `--force-state` never opens a real XPC connection (`client.connect()`
+    // is deliberately never called below), so no real `deviceId` is ever
+    // resolved -- this placeholder is never sent over the wire.
+    let coordinator = GogglesConnectionCoordinator(client: client, deviceId: "force-state-placeholder", startWatchdog: false)
     let session = DecodeSession()
     // Sample device info so the card has something to show for every
     // state that displays it (`.claiming` onward) -- a real connection
@@ -556,14 +683,25 @@ if args.contains("--test-client") {
     // blocking CLI `main.swift`.
     var finished = false
     DispatchQueue.global().asyncAfter(deadline: .now() + 1.0) {
-        client.startStreaming { ok, error in
-            print("[test-client] startStreaming -> ok=\(ok) error=\(error.map { String(describing: $0) } ?? "nil")")
-        }
-        DispatchQueue.global().asyncAfter(deadline: .now() + seconds) {
-            client.stopStreaming {
-                print("[test-client] stopStreaming complete")
-                client.disconnect()
+        // Multi-device picker design item 5: `startStreaming` now needs a
+        // `deviceId` -- poll for the first available candidate, same as
+        // `--live-view` (this harness predates and isn't the real picker
+        // UX, design item 7's picker only lives in the `--run` path).
+        pollFirstAvailableDeviceId(client: client) { deviceId in
+            guard let deviceId else {
+                print("[test-client] no device found after polling; giving up on startStreaming")
                 finished = true
+                return
+            }
+            client.startStreaming(deviceId: deviceId) { ok, error in
+                print("[test-client] startStreaming -> ok=\(ok) error=\(error.map { String(describing: $0) } ?? "nil")")
+            }
+            DispatchQueue.global().asyncAfter(deadline: .now() + seconds) {
+                client.stopStreaming(deviceId: deviceId) {
+                    print("[test-client] stopStreaming complete")
+                    client.disconnect()
+                    finished = true
+                }
             }
         }
     }
