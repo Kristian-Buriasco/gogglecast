@@ -22,3 +22,7 @@ Apps/GogglesView/build/
 
 # This project's SDD scratch directory (not part of the deliverable)
 .superpowers/
+
+# Hardware capture corpus (Fixtures/README.md): kept local-only, too large
+# for GitHub (fragment-loss.gvcap alone is ~183MB, over the 100MB hard limit).
+Fixtures/*.gvcap
