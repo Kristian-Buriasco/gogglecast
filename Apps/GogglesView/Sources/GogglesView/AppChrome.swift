@@ -74,6 +74,39 @@ enum AppChrome {
         return "\(name), ver. \(shortVersion)"
     }
 
+    /// task-gui-v3: the height of the band the real traffic-light window
+    /// buttons occupy, used to vertically center the in-window status pill
+    /// (`GogglesConnectionView`'s `statusRow` overlay) against them.
+    ///
+    /// NOT the commonly-quoted "28pt" figure (that's an older/approximate
+    /// number that does not match current macOS) -- per the task brief's
+    /// instruction to check real traffic-light geometry rather than guess,
+    /// this was measured directly on this machine (macOS 26 / this app's
+    /// deployment target) with a throwaway `swift` script:
+    /// ```
+    /// let w = NSWindow(contentRect: NSRect(x:0,y:0,width:400,height:300),
+    ///                   styleMask: [.titled,.closable,.resizable,.miniaturizable],
+    ///                   backing: .buffered, defer: false)
+    /// w.styleMask.insert(.fullSizeContentView)
+    /// w.standardWindowButton(.closeButton)?.frame   // (9.0, 9.0, 14.0, 14.0)
+    /// w.frame.height - w.contentLayoutRect.height   // 32.0
+    /// ```
+    /// The three traffic-light buttons live in a title-bar container view
+    /// whose height is exactly `window.frame.height -
+    /// window.contentLayoutRect.height`; that measured out to 32pt (not
+    /// 28pt), with the close button's frame (y=9, height=14, so vertical
+    /// center 16pt from the container's bottom == 16pt from its top of a
+    /// 32pt-tall container) confirming AppKit centers the buttons in that
+    /// exact 32pt band. `applyCustomTitleBarChrome` (`main.swift`) only ever
+    /// changes how that existing band is *painted*
+    /// (`titlebarAppearsTransparent`/`.fullSizeContentView`), never its
+    /// height or the traffic lights' position within it, so this measured
+    /// 32pt is still exactly where AppKit centers the three buttons in the
+    /// real running app. Kept here (not hardcoded at the SwiftUI call site)
+    /// so the one number the pill-alignment math depends on has one
+    /// definition, next to the other window-chrome constants in this file.
+    static let titleBarHeight: CGFloat = 32
+
     /// Status-dot color per `GogglesStatusGlyphCategory` -- the same
     /// three-bucket mapping `MenuBarController.glyphImage(for:)` uses for
     /// the real `NSStatusItem` (red/yellow/green), reused here so the

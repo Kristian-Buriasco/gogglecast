@@ -312,17 +312,82 @@ if args.contains("--run") || !args.dropFirst().contains(where: { $0.hasPrefix("-
     // decision and full behavior.
     let menuBarController = MenuBarController(coordinator: coordinator, window: window)
 
-    // Standard app menu (Quit + Cmd+Q) -- the one main-menu item this app
-    // keeps; the "Goggles > Reconnect" main-menu item Task 3.5 added as a
-    // temporary home is gone now that `MenuBarController` is Reconnect's
-    // real, permanent home.
+    // task-gui-v3 point 2: the real top-of-screen macOS app menu bar. Task
+    // 3.6's `MenuBarController` above is a *different* surface (an
+    // `NSStatusItem` menu-bar-extra, a persistent status-bar icon) and stays
+    // exactly as-is -- this is the actual `NSApplication.shared.mainMenu`,
+    // which this app never had before (it isn't built on the SwiftUI
+    // `App`/`Scene` lifecycle -- see `MenuBarController.swift`'s doc comment
+    // for why -- so nothing was ever auto-supplying one the way a `@main
+    // App` would). `Settings`/`Reconnect` below call the exact same
+    // `settingsWindowController.show()`/`coordinator.reconnect()` the
+    // footer button and the status-item menu already call -- no duplicated
+    // logic, same objects, same methods.
+    //
+    // `MenuActionTarget` (defined at the bottom of this file, already used
+    // by `MenuBarController`) adapts a plain closure to the `@objc`
+    // selector `NSMenuItem.action` needs. `NSMenuItem.target` is a
+    // weak-ish reference (see `MenuBarController`'s own doc comment on the
+    // same pattern), so `settingsMenuTarget`/`reconnectMenuTarget` are
+    // `let`-bound here and kept alive for the app's lifetime via the
+    // `withExtendedLifetime` call below, same as `menuBarController`/
+    // `hideOnCloseDelegate`/`settingsWindowController` already are.
     let mainMenu = NSMenu()
+
+    // App menu: "About GogglesView" / "Quit GogglesView" -- the standard
+    // macOS app-menu pattern. `Cmd+Q` stays wired through the same
+    // `NSApplication.terminate(_:)` selector Task 3.5/3.6 already used here.
     let appMenuItem = NSMenuItem()
     mainMenu.addItem(appMenuItem)
     let appMenu = NSMenu()
+    // `action`'s target is left `nil` (the default) so it dispatches via the
+    // standard AppKit responder chain -- `NSApplication` itself implements
+    // `orderFrontStandardAboutPanel(_:)`, so a `nil`-targeted menu item
+    // reaches it with no extra plumbing, same as any other standard
+    // first-responder-chain menu action.
+    appMenu.addItem(withTitle: "About GogglesView", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
+    appMenu.addItem(.separator())
     appMenu.addItem(withTitle: "Quit GogglesView", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
     appMenuItem.submenu = appMenu
+
+    // File menu: Settings (reuses `settingsWindowController.show()`, the
+    // exact same controller/method the footer's Settings button opens) and
+    // Reconnect (reuses `coordinator.reconnect()`, the exact same call the
+    // status-item menu's "Reconnect" item makes). "File" per the task
+    // brief's own reasoning: the safe, conventional macOS top-level menu
+    // name even for an app with no real documents.
+    let fileMenuItem = NSMenuItem()
+    mainMenu.addItem(fileMenuItem)
+    let fileMenu = NSMenu(title: "File")
+    let settingsMenuTarget = MenuActionTarget { settingsWindowController.show() }
+    let settingsMenuItem = NSMenuItem(title: "Settings…", action: #selector(MenuActionTarget.invoke), keyEquivalent: ",")
+    settingsMenuItem.target = settingsMenuTarget
+    fileMenu.addItem(settingsMenuItem)
+    let reconnectMenuTarget = MenuActionTarget { coordinator.reconnect() }
+    // No conventional macOS keyboard shortcut exists for "Reconnect" (per
+    // the task brief) -- left with no `keyEquivalent`, same as the
+    // status-item menu's own "Reconnect" item does NOT do (that one uses
+    // "r" as a status-item-local convenience); a blank shortcut here avoids
+    // colliding with that unrelated surface's binding.
+    let reconnectMenuItem = NSMenuItem(title: "Reconnect", action: #selector(MenuActionTarget.invoke), keyEquivalent: "")
+    reconnectMenuItem.target = reconnectMenuTarget
+    fileMenu.addItem(reconnectMenuItem)
+    fileMenuItem.submenu = fileMenu
+
+    // Window menu: standard macOS Minimize/Zoom/Bring-All-to-Front
+    // boilerplate, wired through `NSApp.windowsMenu` so AppKit maintains the
+    // usual "list of open windows" section at the bottom automatically.
+    let windowMenuItem = NSMenuItem()
+    mainMenu.addItem(windowMenuItem)
+    let windowMenu = NSMenu(title: "Window")
+    windowMenu.addItem(withTitle: "Minimize", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
+    windowMenu.addItem(withTitle: "Zoom", action: #selector(NSWindow.performZoom(_:)), keyEquivalent: "")
+    windowMenu.addItem(.separator())
+    windowMenu.addItem(withTitle: "Bring All to Front", action: #selector(NSApplication.arrangeInFront(_:)), keyEquivalent: "")
+    windowMenuItem.submenu = windowMenu
+
     app.mainMenu = mainMenu
+    app.windowsMenu = windowMenu
 
     // `applicationShouldTerminateAfterLastWindowClosed` is `false` here
     // (unlike `LiveViewAppDelegate`, used by the `--live-view`/
@@ -349,7 +414,13 @@ if args.contains("--run") || !args.dropFirst().contains(where: { $0.hasPrefix("-
     // holds a strong reference to it), but listed explicitly here too for
     // the same "don't rely on an indirect capture chain to keep this alive"
     // clarity the other two get.
-    withExtendedLifetime((menuBarController, hideOnCloseDelegate, settingsWindowController)) {
+    // task-gui-v3: `settingsMenuTarget`/`reconnectMenuTarget` added to this
+    // tuple for the same reason as the three that were already here --
+    // `NSMenuItem.target` doesn't retain, so the app-menu's Settings/
+    // Reconnect items need a living owner for the app's whole run, same as
+    // `MenuBarController`'s equivalent targets are kept alive by that
+    // class's own stored properties.
+    withExtendedLifetime((menuBarController, hideOnCloseDelegate, settingsWindowController, settingsMenuTarget, reconnectMenuTarget)) {
         app.run()
     }
     exit(0)

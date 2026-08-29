@@ -31,22 +31,21 @@ struct GogglesConnectionView: View {
     // `AppGlowStrip` ambient-glow overlay here -- removed in the v2 pass per
     // live user feedback (see `AppChrome.swift`'s file doc comment).
     var body: some View {
-        ZStack {
+        ZStack(alignment: .top) {
             AppChrome.backgroundColor
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
-                statusRow
-                    .padding(.horizontal, 14)
-                    // task-gui-v2: a bit more top clearance than the
-                    // original 12pt now that `applyCustomTitleBarChrome`
-                    // (main.swift) removed the native titlebar and the
-                    // traffic-light buttons sit directly over this content's
-                    // top-left corner -- keeps the status pill's row
-                    // roughly vertically centered with them instead of
-                    // crowding the window's very top edge.
-                    .padding(.top, 20)
-                    .padding(.bottom, 4)
+                // task-gui-v3: this used to be `statusRow` itself (see git
+                // history) -- the pill now lives in the overlay just below,
+                // vertically centered on the traffic lights instead of
+                // flowing in-line here. This `Color.clear` spacer keeps
+                // `mainContent` starting below that same band (rather than
+                // sliding up under the traffic lights now that the pill row
+                // no longer occupies layout space), so nothing else in this
+                // VStack's layout had to change.
+                Color.clear
+                    .frame(height: AppChrome.titleBarHeight)
 
                 mainContent
 
@@ -55,6 +54,28 @@ struct GogglesConnectionView: View {
                     .padding(.top, 4)
                     .padding(.bottom, 10)
             }
+
+            // task-gui-v3 point 1: user feedback after seeing v2 live --
+            // "move the status pill up to the same vertical level as the
+            // traffic-light window buttons" (they were previously in their
+            // own row below the titlebar band, not aligned with them). Drawn
+            // as a ZStack(alignment: .top) overlay rather than left in the
+            // VStack's normal flow specifically so it can be pinned to the
+            // window's very top edge and vertically centered against
+            // `AppChrome.titleBarHeight` -- the same band the real
+            // traffic-light buttons occupy (`applyCustomTitleBarChrome` in
+            // main.swift extends this view's content up under them via
+            // `.fullSizeContentView`, so this view's top edge IS the
+            // window's top edge, not offset by a real titlebar). `HStack`'s
+            // default vertical alignment is `.center`, so pinning this row's
+            // height to `AppChrome.titleBarHeight` centers the pill in
+            // exactly the same band AppKit centers the traffic lights in,
+            // without hand-tuning a top-padding number to eyeball the same
+            // result (see `AppChrome.titleBarHeight`'s doc comment for where
+            // that 28pt figure comes from).
+            statusRow
+                .padding(.horizontal, 14)
+                .frame(height: AppChrome.titleBarHeight)
         }
     }
 
