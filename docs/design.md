@@ -595,18 +595,46 @@ Stated plainly, since the brief asked for a straight answer on what is achievabl
   `com.apple.developer.system-extension.install`, the extension bundled at
   `Contents/Library/SystemExtensions/`, an app group shared by app / helper / extension,
   hardened runtime everywhere, and installation via `OSSystemExtensionRequest`.
-- **Good news:** `com.apple.developer.system-extension.install` is available to any
-  Apple Developer Program member. Unlike DriverKit entitlements, it does **not** require a
-  case-by-case Apple approval. CMIOExtension is a supported public API with no special
-  gate.
-- **The real gate is signing, not approval.** A system extension installs on a normal Mac
-  only if the app is signed with a **Developer ID** certificate and notarized. Developer
-  ID requires a paid Apple Developer Program membership ($99/yr); a free personal team
-  cannot issue one and cannot notarize.
-- **Therefore, for a personal/local-only build with no paid membership:** the app,
-  helper and virtual camera all still work, but the extension installs only with
-  `systemextensionsctl developer on` (and the machine must be rebooted into that mode
-  once). That is an acceptable personal-use path and is what v2 targets by default.
+- **Correction found during Task 4.1 — this section's original claim was wrong on one
+  specific point.** It said `com.apple.developer.system-extension.install` is "available
+  to any Apple Developer Program member" and implied a free/personal team could at least
+  provision it, with only notarization/distribution gated on paid membership. **That is
+  not true.** Apple's own current capability-support matrix
+  (`https://developer.apple.com/help/account/reference/supported-capabilities-macos/`,
+  fetched and verified against the raw HTML table during Task 4.1, not just an AI summary
+  of it) lists three membership columns — **ADP** (paid Apple Developer Program), **Developer
+  ID** (a cert that itself requires paid ADP), and **Apple Developer** (a free account that
+  "can't distribute apps") — and the **System Extension** row has ADP and Developer ID
+  checked, **Apple Developer unchecked**. Compare **App groups** and **App Sandbox**, both
+  checked in all three columns on the same table — so this isn't a blanket "free tier can't
+  provision anything advanced" situation, it's specific to System Extension (and to
+  several other rows on that table, e.g. Push notifications, Network extensions). What
+  *is* still true from the original claim: unlike DriverKit, there's no case-by-case Apple
+  review of the capability itself — the gate is purely "does your membership tier appear
+  in that table's checked columns for this row," which for a free/personal team it does
+  not. Confirmed empirically the same day: attempting to launch the signed app (valid
+  `Apple Development` cert, `com.apple.developer.system-extension.install` entitlement
+  manually applied via `codesign --entitlements`, no provisioning profile) failed at
+  launch with `amfid: ... AppleMobileFileIntegrityError Code=-413 "No matching profile
+  found"` — AMFI rejects the binary before `OSSystemExtensionRequest` is ever reached,
+  because no provisioning profile covering this entitlement can exist for a free/personal
+  team, `systemextensionsctl developer on` notwithstanding. See
+  `.superpowers/sdd/plan/task-4.1-report.md` for the full trace.
+- **The real gate is provisioning first, signing/notarization second.** Even before the
+  Developer-ID-cert-and-notarization gate described below, the app binary can't even pass
+  AMFI validation and launch with this entitlement attached unless a real provisioning
+  profile for it exists — and no such profile can be generated for a free/personal team at
+  all, for any purpose, dev-mode or not. A system extension additionally installs on a
+  normal (non-dev-mode) Mac only if the app is signed with a **Developer ID** certificate
+  and notarized. Developer ID requires a paid Apple Developer Program membership ($99/yr);
+  a free personal team cannot issue one and cannot notarize.
+- **Therefore, for a personal/local-only build with no paid membership: this is a hard
+  blocker, not a degraded-but-working path.** The original text here claimed the app,
+  helper and virtual camera would "all still work" via `systemextensionsctl developer on`
+  plus one reboot. That is false as stated — developer mode relaxes the *notarization*
+  requirement, not the *provisioning-profile* requirement, and the app can't even launch
+  with this entitlement attached until a paid membership exists. See
+  `docs/dev-setup.md`'s Phase 4 prerequisite note for the current, corrected status.
 - **Distribution to anyone else is blocked on the paid membership plus notarization.**
   This is a hard dependency, not something that can be engineered around. It is the
   reason the virtual camera is v2: v1 must be useful without it.
@@ -707,40 +735,37 @@ Each must leave the app in a correct state with no crash and no leaked USB claim
 ## 10. Open questions
 
 1. Does a CMIO system extension's sandbox permit Mach lookup of the helper's
-   app-group-prefixed service? **Task 4.1 spike built and staged, but NOT YET
-   RUN — genuinely unresolved as of this writing, not a guess either way.**
-   Everything needed to answer the question is in place: a minimal
-   `CMIOExtensionProvider`/`Device`/`Stream` skeleton
-   (`Extension/GogglesCamera`) whose only real behavior is one
-   `NSXPCConnection` attempt to the helper's Mach service and one logged
-   `stats` callback (`HelperSpikeConnector.swift`); the helper's Mach
-   service was renamed to the Team-ID-prefixed form
-   `U8LK2QA3FL.com.kburiasco.gogglesview.helper` across all three call sites
-   (helper, app, extension) and the LaunchDaemon plist; the extension bundle
-   is assembled at `Contents/Library/SystemExtensions/` by
-   `build-stub-bundle.sh` and signed with hardened runtime + entitlements
-   (`com.apple.security.app-sandbox`, `com.apple.security.application-groups`)
-   using this machine's real, valid `Apple Development` cert (Team ID
-   `U8LK2QA3FL`); the host app carries
-   `com.apple.developer.system-extension.install` and a matching
-   `OSSystemExtensionRequest` installer (`--install-camera-extension`).
-   **What is not yet done, and why:** `systemextensionsctl list` confirms
-   developer mode is currently OFF on this machine, and actually installing
-   this unsigned-for-distribution (Apple-Development-cert-only, not
-   Developer-ID/notarized) extension requires `systemextensionsctl developer
-   on` plus one machine reboot — a real, disruptive, system-level change the
-   task brief explicitly requires asking the user before performing. That
-   ask has been made (see `task-4.1-report.md`) and not yet answered/acted
-   on. One correction to this section's premise, worth recording regardless
-   of the eventual pass/fail result: the mechanism this decision actually
-   rests on is the sandbox's Team-ID-prefix mach-lookup exception (a
-   sandboxed process may look up any global Mach service name prefixed with
-   its own code-signing Team ID), not the app-group entitlement — the app
-   group is still declared (for possible future shared-container use) but
-   is not what is expected to gate the lookup. Fallback (app pushes frames
-   to the extension instead of the extension pulling from the helper)
-   remains documented in §4.1 and is adopted automatically if the eventual
-   test shows the lookup fails.
+   app-group-prefixed service? **BLOCKED — not answerable on this machine until a paid
+   Apple Developer Program membership exists. This is a hard blocker discovered by Task
+   4.1, not the original question's answer.** The spike itself (`Extension/GogglesCamera`)
+   is fully built and staged: a minimal `CMIOExtensionProvider`/`Device`/`Stream` skeleton,
+   one `NSXPCConnection` attempt to the helper's Team-ID-prefixed Mach service
+   (`U8LK2QA3FL.com.kburiasco.gogglesview.helper`, renamed across all three call sites),
+   and one logged `stats` callback (`HelperSpikeConnector.swift`) — see
+   `.superpowers/sdd/plan/task-4.1-report.md` for the full build/sign trace. But the app
+   can't even reach the point of attempting the Mach lookup: with
+   `systemextensionsctl developer on` confirmed live (`systemextensionsctl developer` →
+   "Developer mode is on"), launching the app still fails at the OS level —
+   `amfid: ... AppleMobileFileIntegrityError Code=-413 "No matching profile found"` — because
+   `com.apple.developer.system-extension.install` requires a real provisioning profile,
+   and Apple's current capability matrix
+   (`developer.apple.com/help/account/reference/supported-capabilities-macos/`) confirms
+   the System Extension capability is **not available to free/personal-team accounts at
+   all** (only ADP-paid or Developer-ID-cert tiers), unlike App groups/App Sandbox which
+   *are* available free. See §8.5's corrected text above for the full citation. Developer
+   mode relaxes the *notarization* requirement for an already-provisioned extension; it
+   does not create a provisioning profile that doesn't exist. **Until the paid membership
+   from docs/dev-setup.md's Phase 4 prerequisite note arrives, this question cannot be
+   tested, and Task 4.2 cannot start.** One correction to the original premise, worth
+   keeping regardless of the eventual pass/fail result once testing is possible: the
+   mechanism the Mach-lookup decision itself rests on is the sandbox's Team-ID-prefix
+   mach-lookup exception (a sandboxed process may look up any global Mach service name
+   prefixed with its own code-signing Team ID), not the app-group entitlement — the app
+   group is still declared (for possible future shared-container use) but is not what is
+   expected to gate the lookup. Fallback (app pushes frames to the extension instead of
+   the extension pulling from the helper) remains documented in §4.1 and is adopted
+   automatically once real evidence exists that the lookup fails — that evidence just
+   can't be produced yet.
 2. Are bytes 8..15 and 19 of the video sub-header meaningful (timestamp? stream id?)? Not
    needed for v1; worth a look at the capture corpus, since a real PTS would improve the
    CMIO clock.

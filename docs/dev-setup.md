@@ -7,18 +7,53 @@ As of 2026-08-29: **no paid Apple Developer Program membership** on this account
 §8.5, this means Phase 4 (CMIOExtension virtual camera) targets
 `systemextensionsctl developer on` (personal-use-only, unsigned/dev-mode system
 extension install) rather than a properly notarized, App-Store/notarization-eligible
-system extension. Revisit this note and upgrade the install path once a paid membership
-is active — the CMIOExtension code itself shouldn't need to change, only the
-installation/signing/notarization flow.
+system extension.
 
-**Task 4.1 update:** this machine *does* now have one valid (non-expired) codesigning
-identity (`security find-identity -v -p codesigning` → 1 valid identity, "Apple
-Development: kburiasco@gmail.com (S222VMFC76)", Team ID `U8LK2QA3FL`) and Xcode-beta.app
-is installed — so `build-stub-bundle.sh` no longer falls back to ad-hoc signing on this
-machine (see that script's own updated comments). `systemextensionsctl developer` reports
-developer mode **off** as of this task. Turning it on plus the required reboot is exactly
-the disruptive step Task 4.1's brief requires asking the user about first — see
-`.superpowers/sdd/plan/task-4.1-report.md`.
+**Task 4.1 update — HARD BLOCKER, corrects the paragraph above:** `systemextensionsctl
+developer on` alone is not sufficient, even for personal-use-only. Confirmed both by a
+real failed launch and by Apple's own documentation:
+
+- **Empirical:** with developer mode confirmed live (`systemextensionsctl developer` →
+  "Developer mode is on") and the app correctly signed (real, valid `Apple Development`
+  cert, Team ID `U8LK2QA3FL`, `com.apple.developer.system-extension.install` entitlement
+  applied via `codesign --entitlements`), launching the app fails with
+  `amfid: ... AppleMobileFileIntegrityError Code=-413 "No matching profile found"`. AMFI
+  rejects the binary before it ever gets to call `OSSystemExtensionRequest` — this
+  entitlement needs a real **provisioning profile**, not just a correctly-applied
+  entitlements plist.
+- **Documented:** Apple's current capability-support matrix
+  (`https://developer.apple.com/help/account/reference/supported-capabilities-macos/`,
+  fetched and checked against the raw HTML table, not just a summary) lists three
+  membership tiers for macOS provisioning — **ADP** (paid Program), **Developer ID** (a
+  cert that itself requires paid ADP), and **Apple Developer** (free account, "can't
+  distribute apps"). The **System Extension** row has ADP and Developer ID checked,
+  **Apple Developer unchecked**. For comparison, **App groups** and **App Sandbox** are
+  checked in all three columns on that same table — so this is a targeted restriction on
+  System Extension specifically (shared with a handful of other rows, e.g. Push
+  notifications, Network extensions), not a blanket "free tier gets nothing advanced"
+  rule. No provisioning profile containing this entitlement can be generated for a
+  free/personal team, through Xcode or otherwise, dev-mode or not.
+- **What this means concretely:** `systemextensionsctl developer on` relaxes the
+  *notarization* requirement for an extension that already has a valid profile. It does
+  not — and cannot — manufacture a provisioning profile that doesn't exist. Since a free
+  team cannot obtain one for this entitlement at all, **Task 4.2 (and any further testing
+  of Task 4.1's spike) is blocked until the paid Apple Developer Program membership
+  ($99/yr) referenced at the top of this section is actually active.** This is a genuine,
+  correct, evidence-based stopping point for this phase of the project, not a workaround
+  to hunt for — see `.superpowers/sdd/plan/task-4.1-report.md` for the full trace and
+  `docs/design.md` §8.5/§10 question 1 for the corrected design-doc text (the original
+  §8.5 wording, "available to any Apple Developer Program member," was wrong on this
+  point).
+
+Revisit this whole section and upgrade the install path once the paid membership is
+active — the CMIOExtension code itself shouldn't need to change, only the
+provisioning/signing/notarization flow.
+
+This machine *does* have one valid (non-expired) codesigning identity
+(`security find-identity -v -p codesigning` → 1 valid identity, "Apple Development:
+kburiasco@gmail.com (S222VMFC76)", Team ID `U8LK2QA3FL`) and Xcode-beta.app is installed
+— so `build-stub-bundle.sh` no longer falls back to ad-hoc signing on this machine (see
+that script's own updated comments). That's necessary but not sufficient, per the above.
 
 
 Task 2.4. Covers how to register/unregister the privileged root helper
