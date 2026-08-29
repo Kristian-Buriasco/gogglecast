@@ -17,7 +17,39 @@ struct GogglesConnectionView: View {
     @ObservedObject var coordinator: GogglesConnectionCoordinator
     let session: DecodeSession
 
+    // ── GUI restyle task: CosmoViewer-Direct-inspired chrome ──
+    // (.superpowers/sdd/plan/task-gui-restyle-brief.md). The dark
+    // background + top/bottom `AppGlowStrip`s + `statusRow` + `footerBar`
+    // are new; `mainContent` below is exactly Task 3.4/3.5's original
+    // device-card + state-content body, unchanged, just relocated into the
+    // new outer chrome layout.
     var body: some View {
+        ZStack {
+            AppChrome.backgroundColor
+                .ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                statusRow
+                    .padding(.horizontal, 14)
+                    .padding(.top, 12)
+                    .padding(.bottom, 4)
+
+                mainContent
+
+                footerBar
+                    .padding(.horizontal, 14)
+                    .padding(.top, 4)
+                    .padding(.bottom, 10)
+            }
+        }
+        .overlay(alignment: .top) { AppGlowStrip(edge: .top) }
+        .overlay(alignment: .bottom) { AppGlowStrip(edge: .bottom) }
+    }
+
+    /// Task 3.4/3.5's original body, unchanged (device-info card from
+    /// `.claiming` onward, then state-appropriate content) -- this skin
+    /// pass only relocates it inside the new chrome, it does not alter it.
+    private var mainContent: some View {
         VStack(alignment: .leading, spacing: 16) {
             if coordinator.uiState.kind.showsDeviceCard {
                 DeviceInfoCard(info: coordinator.deviceInfo)
@@ -27,6 +59,49 @@ struct GogglesConnectionView: View {
         }
         .padding()
         .accessibilityIdentifier("state-\(coordinator.uiState.kind.rawValue)")
+    }
+
+    /// Task brief point 2's in-window equivalent of the reference's
+    /// right-aligned grouped title-bar status items -- see `StatusPill`'s
+    /// doc comment for why this is one honest pill, not a fabricated
+    /// "Goggles"/"Video" pair. Reuses `MenuBarController.displayText(for:)`
+    /// verbatim rather than re-deriving status copy a second time.
+    private var statusRow: some View {
+        HStack {
+            Spacer()
+            StatusPill(
+                category: coordinator.uiState.kind.statusGlyphCategory,
+                text: MenuBarController.displayText(for: coordinator.uiState)
+            )
+        }
+    }
+
+    /// Task brief point 3: a small footer with a bottom-left "Settings"
+    /// affordance and a bottom-right name/version string. The Settings
+    /// button is disabled rather than a silent no-op -- see
+    /// task-gui-restyle-report.md for why that reads as more honest than a
+    /// button that appears to do something but doesn't.
+    private var footerBar: some View {
+        HStack(alignment: .center) {
+            Button {
+                // Intentionally disabled -- see doc comment above.
+            } label: {
+                Label("Settings", systemImage: "gearshape")
+                    .font(.caption)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
+            .disabled(true)
+            .help("Settings isn't available yet in this build.")
+            .accessibilityIdentifier("settingsButton")
+
+            Spacer()
+
+            Text(AppChrome.versionFooterText)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .accessibilityIdentifier("versionFooterText")
+        }
     }
 
     // Fix (Task 3.5 hardware bug, post-9c31c00): `GogglesVideoView` --
