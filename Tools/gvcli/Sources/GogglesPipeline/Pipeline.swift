@@ -25,23 +25,83 @@ import Darwin
 // is unchanged, `delegate` simply defaults to `nil`.
 // ─────────────────────────────────────────────────────────────────────────
 
-/// Global handle to the live transport/sink, so `SIGINT`/`SIGTERM` (see
-/// `installSigintHandler` and `GogglesHelper`'s own `SIGTERM` handler) can
-/// release them from outside the running async task. Deliberately the
-/// *only* long-lived strong reference `runPipeline` keeps to either:
-/// dropping it (`= nil`) is what triggers `RNDISTransport`/`MockTransport`'s
-/// `deinit` (closing libusb/interfaces or finishing the replay stream)
-/// synchronously and deterministically, which is exactly the "clean
-/// release of IF0/IF1" behavior the task-1.7 brief requires `gvcli stream`
-/// (and, as of task 2.2, `GogglesHelper`) to exhibit on exit. `public` so
-/// `GogglesHelper` can install its own `SIGTERM` handler mirroring
-/// `installSigintHandler`'s pattern without a second copy of this state.
-public var currentTransport: GogglesTransport?
-public var currentSink: OutputSink?
+/// Task multidevice-picker item 3: per-pipeline handle to the live
+/// transport/sink, replacing the old process-wide `currentTransport`/
+/// `currentSink` globals. `HelperService` used to read those globals for
+/// real control flow (deciding whether to declare `.noDevice`, where to
+/// send `requestIFrame`) -- harmless with exactly one device claimable at a
+/// time, but a real correctness bug the moment multi-claim exists (device
+/// A unplugging could read/act on device B's transport, since both would
+/// share the same pair of globals). Each `runPipeline` call now owns its
+/// own `PipelineHandle` instance (one per device, for `HelperService`'s
+/// per-device pipelines; one for the process, for `gvcli`), and a caller
+/// that needs to read/release "the transport for pipeline X" holds onto
+/// that specific handle instead of a shared global.
+///
+/// `transport`/`sink` are `fileprivate(set)`: only `runPipeline` itself
+/// (in this file) ever assigns them; every other reader (a caller wanting
+/// to inspect whether the transport is still alive, or to force a release)
+/// only ever reads.
+public final class PipelineHandle {
+    public fileprivate(set) var transport: GogglesTransport?
+    public fileprivate(set) var sink: OutputSink?
+
+    public init() {}
+
+    /// Synchronously releases this handle's transport/sink (closes the
+    /// sink, drops the transport -- triggering `RNDISTransport`/
+    /// `MockTransport`'s `deinit` teardown deterministically, same as the
+    /// old global-nilling did). Safe to call multiple times.
+    public func releaseSynchronously() {
+        sink?.close()
+        sink = nil
+        transport = nil
+    }
+}
+
+/// Process-wide registry of currently-running pipelines' handles, used
+/// ONLY for process-exit cleanup (`installSigintHandler`/`GogglesHelper`'s
+/// `SIGTERM` handler both need to release *whatever* is currently claimed
+/// before the process dies, regardless of which device it belongs to --
+/// that is a legitimately process-wide concern, unlike the per-device
+/// control-flow reads `HelperService` used to do against the old globals).
+/// Never read for control-flow decisions -- only ever iterated wholesale on
+/// the way out.
+private let handleRegistryLock = NSLock()
+private var handleRegistry: [ObjectIdentifier: PipelineHandle] = [:]
+
+private func registerHandle(_ handle: PipelineHandle) {
+    handleRegistryLock.lock()
+    handleRegistry[ObjectIdentifier(handle)] = handle
+    handleRegistryLock.unlock()
+}
+
+private func unregisterHandle(_ handle: PipelineHandle) {
+    handleRegistryLock.lock()
+    handleRegistry.removeValue(forKey: ObjectIdentifier(handle))
+    handleRegistryLock.unlock()
+}
+
+/// Releases every currently-registered pipeline's transport/sink
+/// synchronously. Called by `installSigintHandler` (`gvcli`) and
+/// `GogglesHelper`'s own `SIGTERM` handler on the way to `exit(0)`, so
+/// every claimed device (there is normally exactly one for `gvcli`, and
+/// potentially several for the `--xpc` helper under multi-claim) gets its
+/// USB interfaces released cleanly before the process dies, rather than
+/// left claimed for the OS to reclaim uncleanly.
+public func releaseAllActivePipelines() {
+    handleRegistryLock.lock()
+    let handles = Array(handleRegistry.values)
+    handleRegistryLock.unlock()
+    for handle in handles {
+        handle.releaseSynchronously()
+    }
+}
+
 private var sigintSource: DispatchSourceSignal?
 
-/// Installs a `SIGINT` handler for `gvcli stream`: on Ctrl-C, closes the
-/// output sink and releases `currentTransport` (synchronously running
+/// Installs a `SIGINT` handler for `gvcli stream`: on Ctrl-C, releases
+/// every currently-active pipeline (synchronously running
 /// `RNDISTransport.deinit`'s interface-release/libusb-teardown) before
 /// exiting, rather than leaving the interfaces claimed for the process to
 /// be killed uncleanly. This is what lets a subsequent `stream.py` run
@@ -51,9 +111,7 @@ public func installSigintHandler() {
     let source = DispatchSource.makeSignalSource(signal: SIGINT, queue: .main)
     source.setEventHandler {
         FileHandle.standardError.write(Data("\n[gvcli] Interrupted -- releasing USB interfaces and exiting...\n".utf8))
-        currentSink?.close()
-        currentSink = nil
-        currentTransport = nil
+        releaseAllActivePipelines()
         exit(0)
     }
     source.resume()
@@ -89,7 +147,8 @@ public func runPipeline(
     transport: GogglesTransport,
     outPath: String?,
     stats: Bool,
-    delegate: PipelineDelegate? = nil
+    delegate: PipelineDelegate? = nil,
+    handle: PipelineHandle = PipelineHandle()
 ) async throws {
     let sink: OutputSink?
     if let outPath {
@@ -101,7 +160,7 @@ public func runPipeline(
     } else {
         sink = nil
     }
-    try await runPipeline(transport: transport, sink: sink, stats: stats, delegate: delegate)
+    try await runPipeline(transport: transport, sink: sink, stats: stats, delegate: delegate, handle: handle)
 }
 
 /// Task 2.2: `GogglesHelper`'s entry point -- takes an already-constructed
@@ -114,14 +173,17 @@ public func runPipeline(
     transport: GogglesTransport,
     sink: OutputSink?,
     stats: Bool,
-    delegate: PipelineDelegate? = nil
+    delegate: PipelineDelegate? = nil,
+    handle: PipelineHandle = PipelineHandle()
 ) async throws {
-    currentTransport = transport
-    defer { currentTransport = nil }
-    currentSink = sink
+    handle.transport = transport
+    handle.sink = sink
+    registerHandle(handle)
     defer {
-        sink?.close()
-        currentSink = nil
+        unregisterHandle(handle)
+        handle.sink?.close()
+        handle.sink = nil
+        handle.transport = nil
     }
 
     let sessionId = WireProtocol.randomSessionId()
@@ -132,7 +194,7 @@ public func runPipeline(
 
     func send(_ frame: Data) {
         do {
-            try currentTransport?.send(frame)
+            try handle.transport?.send(frame)
         } catch {
             FileHandle.standardError.write(Data("[gvcli] send failed: \(error)\n".utf8))
         }
