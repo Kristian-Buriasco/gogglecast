@@ -1,5 +1,17 @@
 # Dev setup: `GogglesHelper` registration & iteration loop
 
+## Phase 4 prerequisite: Apple Developer Program membership
+
+As of 2026-08-29: **no paid Apple Developer Program membership** on this account yet
+(expected to be obtained in the future). Per docs/plan.md's Phase 4 gate and design.md
+§8.5, this means Phase 4 (CMIOExtension virtual camera) targets
+`systemextensionsctl developer on` (personal-use-only, unsigned/dev-mode system
+extension install) rather than a properly notarized, App-Store/notarization-eligible
+system extension. Revisit this note and upgrade the install path once a paid membership
+is active — the CMIOExtension code itself shouldn't need to change, only the
+installation/signing/notarization flow.
+
+
 Task 2.4. Covers how to register/unregister the privileged root helper
 daemon as a `SMAppService` Login Item, how to check its status, how to
 iterate on the helper's code without a machine reboot, and how to recover
