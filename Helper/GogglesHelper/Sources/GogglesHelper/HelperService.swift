@@ -62,6 +62,17 @@ final class HelperService: NSObject, GogglesHelperProtocol {
     private final class DeviceState {
         let deviceId: String
 
+        /// BLOCKER 1 fix (review round 2): what `RNDISTransport
+        /// (targetDeviceId:)` actually tries to match right now --
+        /// initially equal to `deviceId`, but reassignable by
+        /// `resolveMigrationTarget` when `deviceId` is `bus:address`-
+        /// derived (no serial) and the device reappears at a different
+        /// `bus:address` after a replug/reboot. `deviceId` itself (the
+        /// wire-facing identity every client sees) never changes -- see
+        /// `DeviceMigration.swift`'s file doc comment for the full
+        /// rationale.
+        var claimTarget: String
+
         var streamingSubscriberIDs: Set<ObjectIdentifier> = []
 
         var pipelineTask: Task<Void, Never>?
@@ -104,6 +115,7 @@ final class HelperService: NSObject, GogglesHelperProtocol {
 
         init(deviceId: String) {
             self.deviceId = deviceId
+            self.claimTarget = deviceId
         }
     }
 
@@ -335,14 +347,15 @@ final class HelperService: NSObject, GogglesHelperProtocol {
         let priorClose = device.pendingClose
         device.pendingClose = nil
         let deviceId = device.deviceId
+        let claimTarget = device.claimTarget
         let newHandle = PipelineHandle()
         device.handle = newHandle
-        Logging.usb.info("[\(deviceId, privacy: .public)] claiming IF0/IF1 and bringing up RNDIS...")
+        Logging.usb.info("[\(deviceId, privacy: .public)] claiming IF0/IF1 and bringing up RNDIS (claim target: \(claimTarget, privacy: .public))...")
         Task.detached { [weak self] in
             guard let self else { return }
             await priorClose?.value
             do {
-                let transport = try RNDISTransport(targetDeviceId: deviceId)
+                let transport = try RNDISTransport(targetDeviceId: claimTarget)
                 let raw = transport.deviceInfo
                 let info = GogglesXPC.DeviceInfo(
                     product: raw.product,
@@ -376,17 +389,25 @@ final class HelperService: NSObject, GogglesHelperProtocol {
                         // state.
                         guard device.pipelineGeneration == myGeneration else { return }
                         device.pipelineTask = nil
-                        if newHandle.transport == nil {
-                            device.activeTransport = nil
-                            device.currentDeviceInfoValue = nil
-                            self.setState(device, .noDevice)
-                            // Task 3.7, design §9.3 scenario 1/2: the
-                            // pipeline just ended because the transport
-                            // went away. If a subscriber is still
-                            // streaming this device, it still wants video;
-                            // poll for the replug.
-                            self.scheduleDeviceRetry(device)
-                        }
+                        // LOW cleanup (review round 2): this used to be
+                        // gated behind `if newHandle.transport == nil`, but
+                        // by the time this closure runs, `runPipeline`'s own
+                        // `defer` (Pipeline.swift) has unconditionally
+                        // already nilled `newHandle.transport` -- and the
+                        // `pipelineGeneration` guard above already confirms
+                        // `newHandle` is still this device's current handle
+                        // (not superseded), so the check was always `true`
+                        // here, just misleadingly so. Removed; the
+                        // generation guard is the real, meaningful gate.
+                        device.activeTransport = nil
+                        device.currentDeviceInfoValue = nil
+                        self.setState(device, .noDevice)
+                        // Task 3.7, design §9.3 scenario 1/2: the
+                        // pipeline just ended because the transport
+                        // went away. If a subscriber is still
+                        // streaming this device, it still wants video;
+                        // poll for the replug.
+                        self.scheduleDeviceRetry(device)
                     }
                 }
                 self.stateQueue.async {
@@ -396,13 +417,35 @@ final class HelperService: NSObject, GogglesHelperProtocol {
             } catch {
                 let nsError = error as NSError
                 Logging.usb.error("[\(deviceId, privacy: .public)] claim/RNDIS bring-up failed: \(String(describing: error))")
+
+                // BLOCKER 1 fix (review round 2): before assuming "genuinely
+                // not there right now", check whether this is actually a
+                // bus:address-derived device that reappeared under a
+                // *different* bus:address (unplug/replug, or a goggles
+                // reboot -- both re-enumerate with a fresh address; a
+                // reboot can also rotate the RNDIS MAC, unrelated and
+                // already handled separately by `ARPResolver`). Safe to do
+                // here (still off `stateQueue`, inside `Task.detached`) --
+                // `resolveMigrationTarget` makes its own blocking
+                // `GogglesDeviceEnumerator.enumerate()` call, which must
+                // never run on `stateQueue`.
+                var migratedTarget: String?
+                if case RNDISTransportError.deviceNotFound = error, DeviceMigration.isBusAddressDerived(deviceId) {
+                    migratedTarget = self.resolveMigrationTarget(forDeviceId: deviceId, staleClaimTarget: claimTarget)
+                    if let migratedTarget {
+                        Logging.usb.info("[\(deviceId, privacy: .public)] migrating claim target \(claimTarget, privacy: .public) -> \(migratedTarget, privacy: .public) (likely a replug/reboot changed this device's bus:address)")
+                    }
+                }
+
                 self.stateQueue.async {
                     guard device.pipelineGeneration == myGeneration else { return }
                     device.pipelineTask = nil
                     if case RNDISTransportError.deviceNotFound = error {
-                        // Task 3.7, design §9.3 scenarios 2/3: not a genuine
-                        // claim failure -- there's just no `2CA3:0020`
-                        // matching this deviceId on the bus right now.
+                        // Task 3.7, design §9.3 scenarios 2/3: not
+                        // necessarily a genuine claim failure -- there's
+                        // just no `2CA3:0020` matching `claimTarget` on the
+                        // bus right now (possibly because `claimTarget` was
+                        // just migrated above and hasn't been retried yet).
                         //
                         // Guarded (task 3.8 bug fix): a background retry
                         // poll (`announceClaiming == false`) that finds
@@ -411,6 +454,12 @@ final class HelperService: NSObject, GogglesHelperProtocol {
                         // be a no-op state-wise but still fan out a
                         // redundant `stateChanged` call once a second,
                         // forever, for no observable benefit.
+                        if let migratedTarget {
+                            // Only meaningful if a newer beginStreaming
+                            // hasn't already superseded this generation --
+                            // the outer guard above already ensures that.
+                            device.claimTarget = migratedTarget
+                        }
                         if device.currentStateValue != .noDevice {
                             self.setState(device, .noDevice)
                         }
@@ -423,6 +472,25 @@ final class HelperService: NSObject, GogglesHelperProtocol {
                 }
             }
         }
+    }
+
+    /// BLOCKER 1 fix (review round 2): must only be called OFF
+    /// `stateQueue` (it makes a blocking `GogglesDeviceEnumerator
+    /// .enumerate()` libusb call) -- safe from inside `beginStreaming`'s
+    /// `Task.detached` body, which is exactly its one call site. Takes a
+    /// brief `stateQueue.sync` snapshot of the other devices' claim
+    /// targets (cheap, no libusb call inside that block) before the
+    /// blocking enumerate call.
+    private func resolveMigrationTarget(forDeviceId deviceId: String, staleClaimTarget: String) -> String? {
+        let otherTargets: Set<String> = stateQueue.sync {
+            Set(self.devices.values.filter { $0.deviceId != deviceId }.map(\.claimTarget))
+        }
+        let candidates = GogglesDeviceEnumerator.enumerate().map(\.deviceId)
+        return DeviceMigration.chooseMigrationTarget(
+            currentTarget: staleClaimTarget,
+            enumeratedCandidateIds: candidates,
+            otherKnownClaimTargets: otherTargets
+        )
     }
 
     /// Schedules a `beginStreaming()` retry for one device after
@@ -470,6 +538,19 @@ final class HelperService: NSObject, GogglesHelperProtocol {
             Logging.usb.info("[\(device.deviceId, privacy: .public)] linger expired with no subscribers; releasing USB interfaces")
             self.teardownHardware(device)
             self.setState(device, .noDevice)
+            // LOW fix (review round 2): `devices` otherwise grows
+            // unboundedly across a session's worth of
+            // replug/reselect/reconnect cycles for different deviceIds
+            // (small, no security impact, but worth bounding cheaply).
+            // Safe once fully idle: no subscriber (checked just above), no
+            // pipeline, no pending retry. A later `startStreaming` for the
+            // same `deviceId` just lazily recreates a fresh `DeviceState`
+            // (`deviceState(_:)`), indistinguishable from this device never
+            // having been seen before -- which is the correct behavior for
+            // a fully torn-down, unclaimed device either way.
+            if self.devices[device.deviceId] === device, device.deviceRetryTimer == nil {
+                self.devices.removeValue(forKey: device.deviceId)
+            }
         }
         timer.resume()
         device.lingerTimer = timer

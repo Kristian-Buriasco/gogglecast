@@ -44,6 +44,23 @@ let package = Package(
                 .product(name: "GogglesXPC", package: "GogglesXPC"),
                 .product(name: "GogglesPipeline", package: "gvcli")
             ]
+        ),
+        // MEDIUM 5 fix (multi-device picker review round 2): this package
+        // previously had no test target at all -- the riskiest, most
+        // multi-device-changed file (`HelperService.swift`, ~730 lines) had
+        // zero coverage despite the spec explicitly saying its
+        // device-identity/fan-out-scoping logic "can be tested with
+        // MockTransportTests" and the task brief asking for tests here.
+        // `@testable import GogglesHelper` works against an
+        // `executableTarget` from a same-package test target on this
+        // toolchain (SwiftPM 5.5+) -- no separate library target needed
+        // just to make this testable.
+        .testTarget(
+            name: "GogglesHelperTests",
+            dependencies: [
+                "GogglesHelper",
+                .product(name: "GogglesXPC", package: "GogglesXPC")
+            ]
         )
     ]
 )

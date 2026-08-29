@@ -179,15 +179,20 @@ public final class GogglesConnectionCoordinator: ObservableObject {
     }
 
     private func handleConnectionStateChange(_ state: HelperClientConnectionState) {
-        switch state {
-        case .connecting, .disconnected:
-            uiState = .noHelper(reason: nil)
-        case .versionMismatch(let reported, let expected):
-            // Not one of the 9 device/stream states (see GogglesUIState.swift's
-            // file doc comment) -- folded into `.noHelper` with a reason,
-            // since the app functionally can't use the helper either way.
-            uiState = .noHelper(reason: "helper protocol version \(reported) does not match app's \(expected) -- reinstall/update the helper or the app")
-        case .connected:
+        // Not one of the 9 device/stream states (see GogglesUIState.swift's
+        // file doc comment) -- folded into `.noHelper` with a reason (or
+        // `nil` for a plain not-connected-yet case), since the app
+        // functionally can't use the helper either way. `noHelperReasonText`/
+        // `isHelperUnavailable` (HelperClient.swift) are shared, not forked,
+        // with `DevicePickerCoordinator`'s identical check (BLOCKER 2 fix,
+        // multi-device picker review round 2).
+        if state.isHelperUnavailable {
+            uiState = .noHelper(reason: state.noHelperReasonText)
+            return
+        }
+        // Only `.connected` can reach here (`isHelperUnavailable` is `true`
+        // for every other case, and already returned above).
+        do {
             // Nothing to show yet until the first `stateChanged` callback
             // lands -- `HelperService.registerConnection` sends one
             // immediately on every fresh connection (with whatever

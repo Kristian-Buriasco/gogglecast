@@ -11,20 +11,21 @@ import CLibusb
 //
 // Design's own open question ("can the USB serial string descriptor be
 // read via a non-exclusive open, or does reading it require the same claim
-// that excludes other consumers?") -- answer, reasoned from libusb/USB
-// semantics and confirmed against the one physical unit available this
-// session (enumerated successfully *while* that same device was actively
-// claimed and streaming via a separate `RNDISTransport`, see the task
-// report): `libusb_open` alone (no `libusb_claim_interface`) only opens a
-// device handle for control transfers on endpoint 0, which string
-// descriptor reads use -- it does not claim any interface, and multiple
-// libusb handles to the same device (even across processes) can coexist as
-// long as none of them are contending over the *same* claimed interface.
-// So yes: enumeration can read `product`/`serial` without excluding, or
-// being excluded by, a concurrent claim of IF0/IF1 elsewhere. This could
-// only be verified end-to-end with a single physical unit tonight (no
-// second unit to enumerate side-by-side) -- see the task report for the
-// exact scope of what was and wasn't hardware-verified.
+// that excludes other consumers?") -- answer, reasoned ENTIRELY from
+// libusb/USB semantics, NOT verified against real hardware (no physical
+// Goggles 3 was connected to the machine this was written on -- see the
+// task report for the exact, honest scope of what was and wasn't
+// hardware-verified): `libusb_open` alone (no `libusb_claim_interface`)
+// only opens a device handle for control transfers on endpoint 0, which
+// string descriptor reads use -- it does not claim any interface, and
+// multiple libusb handles to the same device (even across processes) can
+// coexist as long as none of them are contending over the *same* claimed
+// interface. So the reasoning says yes: enumeration should be able to read
+// `product`/`serial` without excluding, or being excluded by, a concurrent
+// claim of IF0/IF1 elsewhere -- but this is a reasoned prediction, not an
+// observed result. It still needs to be confirmed against real hardware
+// (ideally with a device actively claimed/streaming elsewhere) before this
+// comment can honestly say it was verified.
 // ─────────────────────────────────────────────────────────────────────────
 
 public enum GogglesDeviceEnumerator {

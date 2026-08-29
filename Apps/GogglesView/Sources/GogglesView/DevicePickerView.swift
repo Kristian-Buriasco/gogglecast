@@ -5,9 +5,11 @@ import SwiftUI
 // `GogglesConnectionView` while `DevicePickerCoordinator` is still
 // resolving which device to stream. `.discovering` intentionally mirrors
 // `GogglesConnectionView`'s existing `.noDevice` overlay (same icon/copy)
-// so the single-device regression path looks identical to before this
-// change from a user's perspective -- only `.picking` (2+ devices, mock-
-// tested only tonight, no second physical unit available) is new UI.
+// so the single-device regression path is INTENDED to look identical to
+// before this change from a user's perspective -- `.picking` (2+ devices)
+// is new UI. Neither case is hardware-verified as of this writing (no
+// physical Goggles 3 was connected during this session) -- see the task
+// report for current verification status.
 struct DevicePickerView: View {
     @ObservedObject var picker: DevicePickerCoordinator
 
@@ -53,6 +55,22 @@ struct DevicePickerView: View {
                 .scrollContentBackground(.hidden)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+
+        case .connectionUnavailable(let reason):
+            // BLOCKER 2 fix (review round 2): mirrors
+            // `GogglesConnectionView`'s existing `.noHelper` overlay
+            // (including its "Set up" action) -- reused visual language,
+            // not new copy, for the same underlying condition surfaced one
+            // step earlier in the flow.
+            VStack(spacing: 8) {
+                Text(reason ?? "The GogglesView helper isn't installed or registered.")
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(.white)
+                Button("Set up") {
+                    try? HelperRegistration.register()
+                }
+            }
+            .accessibilityIdentifier("picker-connectionUnavailable")
         }
     }
 }

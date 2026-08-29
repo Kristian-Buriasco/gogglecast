@@ -42,20 +42,56 @@ import Darwin
 /// (in this file) ever assigns them; every other reader (a caller wanting
 /// to inspect whether the transport is still alive, or to force a release)
 /// only ever reads.
+///
+/// LOW fix (multi-device picker review round 2): `transport`/`sink` are
+/// genuinely written from more than one thread in `HelperService`'s
+/// multi-device usage -- `runPipeline`'s own body (whatever thread its
+/// `Task` runs on) assigns/clears them at the pipeline's start/end, while
+/// `HelperService.teardownHardware`/`releaseAllActivePipelines` can call
+/// `releaseSynchronously()` concurrently (from `stateQueue` or a signal
+/// handler's queue), and `requestIFrame` reads `.transport` from
+/// `stateQueue` while any of that could be happening. This is a
+/// pre-existing shape from before the multi-device change (the single
+/// process-wide globals had the same kind of unsynchronized access), but
+/// it's now exercised far more often -- every linger expiry and every
+/// `reconnect()`, not just the old SIGINT-then-`exit(0)` path, where the
+/// process was about to die anyway. A plain `NSLock` around every read/
+/// write closes this cheaply without changing any call site's code (the
+/// public surface -- `transport`/`sink` as stored properties,
+/// `releaseSynchronously()` -- is unchanged).
 public final class PipelineHandle {
-    public fileprivate(set) var transport: GogglesTransport?
-    public fileprivate(set) var sink: OutputSink?
+    private let lock = NSLock()
+    private var _transport: GogglesTransport?
+    private var _sink: OutputSink?
+
+    public fileprivate(set) var transport: GogglesTransport? {
+        get { lock.lock(); defer { lock.unlock() }; return _transport }
+        set { lock.lock(); _transport = newValue; lock.unlock() }
+    }
+    public fileprivate(set) var sink: OutputSink? {
+        get { lock.lock(); defer { lock.unlock() }; return _sink }
+        set { lock.lock(); _sink = newValue; lock.unlock() }
+    }
 
     public init() {}
 
     /// Synchronously releases this handle's transport/sink (closes the
     /// sink, drops the transport -- triggering `RNDISTransport`/
     /// `MockTransport`'s `deinit` teardown deterministically, same as the
-    /// old global-nilling did). Safe to call multiple times.
+    /// old global-nilling did). Safe to call multiple times, and from any
+    /// thread.
     public func releaseSynchronously() {
-        sink?.close()
+        // `sink?.close()` deliberately happens outside the lock -- it's
+        // `OutputSink`'s own I/O call, not this handle's state, and
+        // holding `lock` across it would serialize unrelated callers
+        // (another thread's `.transport` read, say) behind however long
+        // that close takes for no benefit. `sink` is read (and cleared)
+        // under the lock immediately before/after, so the property itself
+        // stays consistent.
+        let sinkToClose = sink
         sink = nil
         transport = nil
+        sinkToClose?.close()
     }
 }
 

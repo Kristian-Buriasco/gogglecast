@@ -792,6 +792,17 @@ public final class RNDISTransport: GogglesTransport {
     /// closing every non-matching candidate's handle along the way. Returns
     /// `nil` if no candidate matches (device unplugged since it was last
     /// enumerated, wrong id, etc.).
+    /// HIGH 4 (multi-device picker review round 2): must degrade gracefully
+    /// exactly like `GogglesDeviceEnumerator.enumerate()` does -- if this
+    /// candidate's `libusb_open` fails, its identity is still computed from
+    /// whatever's available without an open handle (`bus`/`address`, no
+    /// open required) rather than silently `continue`-ing past it. Before
+    /// this fix, a device `enumerate()` successfully listed (because ITS
+    /// `libusb_open` happened to succeed during enumeration) could become
+    /// permanently unclaimable here if a later, independent `libusb_open`
+    /// attempt at claim time transiently failed -- the identity comparison
+    /// never even ran for that candidate, so it could never match
+    /// `targetDeviceId` no matter how many retries followed.
     private static func openDevice(context: OpaquePointer, matching targetDeviceId: String) -> OpaquePointer? {
         var listPtr: UnsafeMutablePointer<OpaquePointer?>?
         let count = libusb_get_device_list(context, &listPtr)
@@ -805,18 +816,29 @@ public final class RNDISTransport: GogglesTransport {
             guard descriptor.idVendor == vendorID, descriptor.idProduct == productID else { continue }
 
             var handle: OpaquePointer?
-            guard libusb_open(device, &handle) == 0, let handle else { continue }
+            let openRC = libusb_open(device, &handle)
+            let opened = openRC == 0 ? handle : nil
 
             let candidate = DeviceInfo(
-                product: stringDescriptor(handle: handle, index: descriptor.iProduct),
-                serial: stringDescriptor(handle: handle, index: descriptor.iSerialNumber),
+                product: opened.flatMap { stringDescriptor(handle: $0, index: descriptor.iProduct) },
+                serial: opened.flatMap { stringDescriptor(handle: $0, index: descriptor.iSerialNumber) },
                 idVendor: descriptor.idVendor, idProduct: descriptor.idProduct, bcdDevice: descriptor.bcdDevice,
                 bus: libusb_get_bus_number(device), address: libusb_get_device_address(device)
             )
-            if candidate.deviceId == targetDeviceId {
-                return handle
+            guard candidate.deviceId == targetDeviceId else {
+                if let opened { libusb_close(opened) }
+                continue
             }
-            libusb_close(handle)
+            // This IS the requested device (by ID), whether or not the
+            // open above actually succeeded -- stop scanning either way,
+            // since no other candidate could also match this same ID.
+            // `opened == nil` here means the matching device exists but
+            // couldn't be opened just now (a genuine, if rare, transient
+            // failure); returning `nil` overall correctly surfaces that as
+            // "couldn't claim it this attempt" rather than incorrectly
+            // reporting `deviceNotFound` and letting the caller's retry
+            // logic possibly mis-treat an existing device as gone.
+            return opened
         }
         return nil
     }

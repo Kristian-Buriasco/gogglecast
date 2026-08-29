@@ -11,15 +11,16 @@ import GogglesXPC
 // state machine, rather than adding picker-related cases to the existing
 // GogglesUIState enum").
 //
-// Regression-path behavior (0 or 1 device -- the only case hardware-
-// verifiable tonight, one physical Goggles 3 unit available): polls
-// `enumerateDevices` once connected, same ~1s cadence the helper's own
-// (pre-existing) device-retry poll used, and auto-selects the instant
-// exactly one candidate appears -- no user action, matching the old
-// singular protocol's "just plug it in" behavior exactly. Only shows an
-// actual picker screen (`DevicePickerView`) when 2+ devices are found,
-// which this session can only mock-test (`DevicePickerCoordinatorTests`)
-// since a second physical unit isn't available.
+// Regression-path behavior (0 or 1 device): polls `enumerateDevices` once
+// connected, same ~1s cadence the helper's own (pre-existing) device-retry
+// poll used, and auto-selects the instant exactly one candidate appears --
+// no user action, matching the old singular protocol's "just plug it in"
+// behavior exactly. Only shows an actual picker screen (`DevicePickerView`)
+// when 2+ devices are found. NOT hardware-verified as of this writing (no
+// physical Goggles 3 was connected to the machine this was written on) --
+// see the task report for the honest, current verification status; this
+// comment should be read as design intent, not a claim that it was
+// observed working.
 // ─────────────────────────────────────────────────────────────────────────
 
 /// Value-type snapshot of `GogglesXPC.DeviceInfo` for `@Published`/SwiftUI
@@ -52,6 +53,20 @@ public enum DevicePickerState: Equatable {
     /// callers mount a `GogglesConnectionCoordinator` bound to it and stop
     /// consulting this coordinator's state.
     case selected(String)
+    /// BLOCKER 2 fix (multi-device picker review round 2): the XPC
+    /// connection to the helper is down, still connecting, or speaking an
+    /// incompatible protocol version -- mirrors
+    /// `GogglesUIState.noHelper(reason:)`'s exact meaning, surfaced here
+    /// too since this coordinator runs BEFORE any
+    /// `GogglesConnectionCoordinator` exists to show it. Without this
+    /// case, `--run`'s picker phase silently showed `.discovering`'s
+    /// "Connect your Goggles 3 with USB-C" for a genuinely broken
+    /// connection (helper not installed, or a protocol version mismatch)
+    /// -- a real regression of Task 3.1's hardware-verified loud-failure
+    /// behavior. `reason` is `nil` for a plain not-yet-connected case, or
+    /// the version-mismatch detail text (`HelperClientConnectionState
+    /// .noHelperReasonText`) when that's the specific cause.
+    case connectionUnavailable(reason: String?)
 }
 
 /// Drives `DevicePickerState` from a live `HelperClient`, ahead of any
@@ -73,10 +88,34 @@ public final class DevicePickerCoordinator: ObservableObject {
         self.client = client
         self.pollInterval = pollInterval
         client.onConnectionStateChange = { [weak self] connectionState in
-            if case .connected = connectionState {
-                self?.startPolling()
-            }
+            self?.handleConnectionStateChange(connectionState)
         }
+    }
+
+    /// BLOCKER 2 fix (review round 2): reacts to every connection state,
+    /// not just `.connected` -- `.connecting`/`.disconnected`/
+    /// `.versionMismatch` all surface as `.connectionUnavailable(reason:)`
+    /// instead of being silently ignored (which previously left `state`
+    /// stuck at its default `.discovering`, indistinguishable from "no
+    /// device plugged in yet" for a connection that will never succeed).
+    /// Uses the same `isHelperUnavailable`/`noHelperReasonText` shared
+    /// logic `GogglesConnectionCoordinator` uses, not a forked copy.
+    private func handleConnectionStateChange(_ connectionState: HelperClientConnectionState) {
+        guard !isSelected else { return }
+        if connectionState.isHelperUnavailable {
+            pollTimer?.invalidate()
+            pollTimer = nil
+            state = .connectionUnavailable(reason: connectionState.noHelperReasonText)
+            return
+        }
+        // `.connected`: if we were previously showing a connection
+        // failure, drop back to `.discovering` before polling resumes, so
+        // the screen doesn't sit on stale failure text while a fresh
+        // `enumerateDevices` round trip is in flight.
+        if case .connectionUnavailable = state {
+            state = .discovering
+        }
+        startPolling()
     }
 
     deinit {

@@ -311,8 +311,19 @@ if args.contains("--run") || !args.dropFirst().contains(where: { $0.hasPrefix("-
     let observer = PickerSelectionObserver(picker: picker) { deviceId in
         guard !didLaunchMain else { return }
         didLaunchMain = true
-        pickerWindow.close()
+        // MEDIUM 7 fix (review round 2): order the main window into
+        // existence BEFORE closing the picker window, not after -- the
+        // previous order (`pickerWindow.close()` then
+        // `launchMainWindow(...)`) relied on undocumented AppKit run-loop
+        // ordering to avoid `applicationShouldTerminateAfterLastWindowClosed`
+        // (still answering `true` via `pickerDelegate` at that instant)
+        // quitting the app the moment the picker window -- briefly the
+        // ONLY window -- closed. Building the main window first means at
+        // least one window is always on screen; `pickerWindow.close()`
+        // below never sees a zero-window state at all, regardless of
+        // delegate timing.
         launchMainWindow(deviceId: deviceId, client: client, app: app)
+        pickerWindow.close()
     }
     pickerCancellable = observer
 

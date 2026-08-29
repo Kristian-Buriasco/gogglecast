@@ -65,6 +65,33 @@ public enum HelperClientConnectionState: Equatable, Sendable {
     case versionMismatch(reported: Int, expected: Int)
 }
 
+public extension HelperClientConnectionState {
+    /// BLOCKER 2 fix (multi-device picker review round 2): the
+    /// `GogglesUIState.noHelper(reason:)`-style reason text this
+    /// connection state implies, if any. Extracted here (not forked
+    /// between call sites) so `GogglesConnectionCoordinator`'s existing
+    /// loud-failure mapping and `DevicePickerCoordinator`'s own copy of
+    /// the same failure (surfaced during the device-selection phase, which
+    /// runs BEFORE any `GogglesConnectionCoordinator` exists to show it)
+    /// are guaranteed to say the exact same thing. `nil` for
+    /// `.connecting`/`.disconnected` (a real "no helper" case, but with no
+    /// extra detail beyond the state itself) and for `.connected` (nothing
+    /// to report -- see `isHelperUnavailable` for that check).
+    var noHelperReasonText: String? {
+        guard case .versionMismatch(let reported, let expected) = self else { return nil }
+        return "helper protocol version \(reported) does not match app's \(expected) -- reinstall/update the helper or the app"
+    }
+
+    /// `true` for every state except `.connected` -- i.e. "the helper
+    /// can't be used right now for some reason", the same condition both
+    /// `GogglesConnectionCoordinator` and `DevicePickerCoordinator` gate
+    /// their loud-failure display on.
+    var isHelperUnavailable: Bool {
+        if case .connected = self { return false }
+        return true
+    }
+}
+
 /// The app's XPC client to `GogglesHelper` (design §5.5). One instance per
 /// subscriber "slot" the app wants -- Task 3.1's own test harness
 /// (`main.swift --test-client`) uses exactly one; a later menu-bar UI would
@@ -221,6 +248,21 @@ public final class HelperClient: NSObject {
     /// "fail toward the least presumptuous answer" pattern as every other
     /// call here.
     public func enumerateDevices(reply: @escaping ([DeviceInfo]) -> Void) {
+        // MEDIUM 6 fix (multi-device picker review round 2): test seam, not
+        // used by production code -- when set, calls straight through
+        // instead of going through the real (necessarily-not-connected-in-
+        // tests) XPC proxy. This lets `DevicePickerCoordinatorTests` drive
+        // `DevicePickerCoordinator`'s real `poll()` mechanism end-to-end
+        // (including the auto-select-on-exactly-one-candidate branch --
+        // the single-device regression path, this session's own primary
+        // verifiable-without-hardware coverage) instead of hand-
+        // constructing expected values and never actually exercising the
+        // coordinator's polling code. Synchronous (no dispatch) so tests
+        // don't need to pump a run loop/sleep to observe the result.
+        if let override = enumerateDevicesOverrideForTesting {
+            reply(override())
+            return
+        }
         stateQueue.async {
             guard let proxy = self.remoteHelperProxy() else {
                 DispatchQueue.main.async { reply([]) }
@@ -231,6 +273,11 @@ public final class HelperClient: NSObject {
             }
         }
     }
+
+    /// See `enumerateDevices(reply:)`'s doc comment. `internal`, not
+    /// `private`, so `GogglesViewTests` (same module, `@testable import`)
+    /// can set it.
+    var enumerateDevicesOverrideForTesting: (() -> [DeviceInfo])?
 
     /// Forwards to `GogglesHelperProtocol.startStreaming(deviceId:reply:)`.
     /// Refuses (with a synthetic error, no XPC round trip) while
