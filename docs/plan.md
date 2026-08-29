@@ -143,7 +143,10 @@ writes Annex-B to a file or FIFO, printing per-second fps/bitrate/drop stats. Al
 **Exit — the Phase 1 gate.** All of design §9.2 met:
 - `ffplay` on the FIFO renders correctly;
 - `ffprobe` on the dump reports 1920x1080 High L5.2;
-- fps within ±1 of Python's ~33 over 60 s, drops <= Python's, bytes within 2%;
+- fps within ±1 of Python's ~56 over 60 s (this target was originally documented as
+  ~33 fps; the Phase 1 parity run found that figure was `stream.py`'s own read-loop
+  bottleneck, not the true source rate — see `docs/parity-results.md`), drops <=
+  Python's, bytes within 2%;
 - running `stream.py` after `gvcli` succeeds (clean interface release).
 
 Record the numbers in `docs/parity-results.md`. Do not proceed until they are recorded.

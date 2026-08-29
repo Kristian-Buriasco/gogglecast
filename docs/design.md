@@ -53,7 +53,7 @@ not demonstrate.
 | A userspace RNDIS driver over libusb brings the link up | `rndis.py` |
 | Goggles answer at `192.168.60.2`; host presents as `192.168.60.1` | `stream.py` |
 | A 48-byte UDP packet to port 9003 starts the video stream | `stream.py` |
-| Video is H.264 Annex-B, 1920x1080, High Profile Level 5.2, ~33 fps measured | `get_resolution.py` + a clean per-second counter in `stream.py` |
+| Video is H.264 Annex-B, 1920x1080, High Profile Level 5.2, ~56 fps measured (Phase 1 on-hardware parity run superseded an earlier ~33 fps figure — see `docs/parity-results.md`) | `get_resolution.py` + a clean per-second counter in `stream.py` |
 | Claiming IF0/IF1 requires root on this Mac, and often a `detach_kernel_driver()` first | Empirical, this session |
 | The goggles' RNDIS MAC rotates on every goggles reboot | Empirical, this session |
 | SPS and PPS arrive bundled in one small (~40 byte) NAL blob, not as two NALs | Empirical; broke an early gating attempt |
@@ -318,8 +318,9 @@ flow that needs user consent.
 
 **GogglesCamera** is a second, independent decoder. It does *not* receive already-decoded
 frames from the app — that would require a large-buffer IOSurface hand-off between two
-sandboxes for no benefit. Both consumers decode the same compact H.264 stream. At 1080p33
-that is two hardware decode sessions, which Apple Silicon handles trivially.
+sandboxes for no benefit. Both consumers decode the same compact H.264 stream. At 1080p56
+(see `docs/parity-results.md`) that is two hardware decode sessions, which Apple Silicon
+handles trivially.
 
 ### 4.3 Why not fewer processes
 
@@ -374,7 +375,8 @@ distance) or ~250 ms, and (b) discard, not merge, a frame whose fragments are in
 when it is evicted, incrementing a drop counter.
 
 **Second implementation change:** `stream.py` uses synchronous 16 KB bulk reads with a
-200 ms timeout. At 1080p33 this is adequate in Python only because the goggles buffer.
+200 ms timeout. At 1080p56 (see `docs/parity-results.md`) this is adequate in Python only
+because the goggles buffer.
 The Swift helper uses libusb asynchronous transfers — a pool of 16 in-flight 64 KB
 transfers submitted round-robin — with `libusb_handle_events_timeout` pumped on a
 dedicated high-QoS thread. This removes the read gap between iterations entirely.
@@ -415,7 +417,10 @@ at 256. Therefore:
   add latency and jitter for no benefit.
 - The extension synthesises a CMIO timestamp from the helper's host time so that
   consumers see a monotonic, real-rate clock. Nominal rate is advertised as 30 fps with
-  the measured ~33 fps tolerated; consumers such as OBS resample.
+  the measured ~56 fps tolerated (Phase 1 on-hardware parity run; see
+  `docs/parity-results.md`, which supersedes an earlier ~33 fps figure traced to
+  `stream.py`'s own synchronous read-loop bottleneck, not the goggles' actual encoder
+  rate); consumers such as OBS resample.
 
 ### 5.5 XPC interface
 
@@ -441,7 +446,8 @@ protocol GogglesClientProtocol {                            // helper -> client
 ```
 
 Frames are delivered by the helper calling `nalUnit` on each subscriber's exported
-object. A 1080p H.264 P-frame at 33 fps averages roughly 20–60 KB; XPC handles this
+object. A 1080p H.264 P-frame at ~56 fps (see `docs/parity-results.md`) averages roughly
+20–60 KB; XPC handles this
 volume without special treatment, and `Data` above ~16 KB is transferred out-of-line by
 `NSXPCConnection` automatically. If Phase 2 profiling shows XPC overhead is material,
 the fallback is a shared-memory ring buffer whose `IOSurface`/`mach_port` handle is passed
@@ -657,7 +663,7 @@ the same goggles session and compare:
 
 | Metric | Requirement |
 |---|---|
-| Frames/sec, steady state, 60 s | Swift within ±1 fps of Python's ~33 |
+| Frames/sec, steady state, 60 s | Swift within ±1 fps of Python's ~56 (supersedes an earlier ~33 fps figure — see `docs/parity-results.md`) |
 | Dropped-frame count, 60 s | Swift <= Python |
 | Time from handshake to first displayed frame (after the user toggle) | Swift <= Python + 500 ms |
 | Bytes emitted, 60 s | within 2% of Python's |
