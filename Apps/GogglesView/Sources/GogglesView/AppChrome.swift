@@ -6,8 +6,10 @@ import SwiftUI
 // ─────────────────────────────────────────────────────────────────────────
 // GUI restyle task (post-Phase-3 v1 skin pass, bounded/approved in chat --
 // see .superpowers/sdd/plan/task-gui-restyle-brief.md): shared presentational
-// pieces for the CosmoViewer-Direct-inspired chrome -- the warm red/orange
-// top/bottom edge glow, the in-window status pill (reusing Task 3.6's
+// pieces for the CosmoViewer-Direct-inspired chrome -- the accent
+// top/bottom edge glow (light blue/blue, per a live user course-correction
+// away from the reference's literal warm red/orange), the in-window status
+// pill (reusing Task 3.6's
 // `GogglesStatusGlyphCategory`), and the version-footer text. Deliberately
 // small and dumb: no state, no XPC, nothing here changes app behavior.
 //
@@ -25,13 +27,18 @@ enum AppChrome {
     /// switch to a light theme.
     static let backgroundColor = Color(red: 0.06, green: 0.06, blue: 0.07)
 
-    /// The warm red-to-orange gradient stops used by both edge glow strips
+    /// The accent gradient stops used by both edge glow strips
     /// (`AppGlowStrip`) -- named here once so the top and bottom strips
-    /// can't drift out of sync.
+    /// can't drift out of sync. Light blue/blue, per a live user
+    /// course-correction during this task away from the reference
+    /// screenshot's literal warm red/orange -- the brief's "use your
+    /// judgment on exact colors" always left the palette itself flexible;
+    /// only the "subtle ambient edge glow, not a loud banner" shape/feel is
+    /// the actual reference-matched part.
     static let glowColors: [Color] = [
-        Color(red: 0.92, green: 0.20, blue: 0.05),
-        Color(red: 1.00, green: 0.58, blue: 0.14),
-        Color(red: 0.92, green: 0.20, blue: 0.05),
+        Color(red: 0.10, green: 0.45, blue: 0.95),
+        Color(red: 0.45, green: 0.78, blue: 1.00),
+        Color(red: 0.10, green: 0.45, blue: 0.95),
     ]
 
     /// "GogglesView, ver. X.Y (build)" -- sourced from the running bundle's
@@ -77,11 +84,14 @@ enum AppChrome {
 /// The warm red/orange ambient-glow edge strip (task brief point 1): "a
 /// warm red-to-orange horizontal gradient glow strip along the very top
 /// edge ... and a matching one along the very bottom edge ... like a soft
-/// accent light, not a solid color bar." Implemented as a fixed-height
-/// gradient band whose opacity fades from solid at the window's outer edge
-/// to fully transparent toward the content -- the "soft glow, not a loud
-/// banner" effect -- via an alpha mask rather than `.blur`, so it never
-/// bleeds an unpredictable amount into the content below/above it.
+/// accent light, not a solid color bar." (Palette since swapped to light
+/// blue/blue per a live user course-correction -- see `AppChrome.glowColors`
+/// -- the "soft ambient edge glow" shape is the part that's reference-driven,
+/// not the specific hue.) Implemented as a fixed-height gradient band whose
+/// opacity fades from solid at the window's outer edge to fully transparent
+/// toward the content -- the "soft glow, not a loud banner" effect -- via an
+/// alpha mask rather than `.blur`, so it never bleeds an unpredictable
+/// amount into the content below/above it.
 /// Non-interactive (`allowsHitTesting(false)`) so it never steals clicks
 /// from the traffic-light buttons, the status pill, or the footer.
 struct AppGlowStrip: View {
