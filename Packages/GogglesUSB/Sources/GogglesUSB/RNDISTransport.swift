@@ -297,16 +297,35 @@ public final class RNDISTransport: GogglesTransport {
     /// resources already acquired (device handle, claimed interfaces,
     /// libusb context) are released before the error propagates -- no
     /// partial state is left open.
-    public init() throws {
+    /// - Parameter targetDeviceId: multi-device picker design item 4 --
+    ///   when given, claims specifically the `2CA3:0020` device whose
+    ///   `DeviceInfo.deviceId` matches this value (via
+    ///   `Self.openDevice(context:matching:)`, enumerating without an
+    ///   exclusive claim first to identify the right one), instead of
+    ///   `libusb_open_device_with_vid_pid`'s old first-match behavior.
+    ///   `nil` (the default) preserves that original first-match behavior
+    ///   exactly -- `gvcli`/`GogglesHelper --stdout`'s single-device paths
+    ///   never pass this and are unaffected.
+    public init(targetDeviceId: String? = nil) throws {
         var contextPtr: OpaquePointer?
         let initRC = libusb_init(&contextPtr)
         guard initRC == 0, let context = contextPtr else {
             throw RNDISTransportError.libusbCall("libusb_init", initRC)
         }
 
-        guard let deviceHandle = libusb_open_device_with_vid_pid(context, Self.vendorID, Self.productID) else {
-            libusb_exit(context)
-            throw RNDISTransportError.deviceNotFound
+        let deviceHandle: OpaquePointer
+        if let targetDeviceId {
+            guard let matched = Self.openDevice(context: context, matching: targetDeviceId) else {
+                libusb_exit(context)
+                throw RNDISTransportError.deviceNotFound
+            }
+            deviceHandle = matched
+        } else {
+            guard let handle = libusb_open_device_with_vid_pid(context, Self.vendorID, Self.productID) else {
+                libusb_exit(context)
+                throw RNDISTransportError.deviceNotFound
+            }
+            deviceHandle = handle
         }
 
         var claimed: [Int32] = []
@@ -760,6 +779,46 @@ public final class RNDISTransport: GogglesTransport {
         }
         guard rc == 0 else { return nil }
         return Data(buffer.prefix(Int(transferred)))
+    }
+
+    // MARK: - Target-device selection (multi-device picker design item 4)
+
+    /// Enumerates every `2CA3:0020` device on `context` (already
+    /// initialized), non-exclusively opening each one just long enough to
+    /// read its string descriptors and compute its `DeviceInfo.deviceId`
+    /// (same non-exclusive-open reasoning as
+    /// `GogglesDeviceEnumerator.enumerate()`), and returns an already-open
+    /// handle to the one whose `deviceId` matches `targetDeviceId` --
+    /// closing every non-matching candidate's handle along the way. Returns
+    /// `nil` if no candidate matches (device unplugged since it was last
+    /// enumerated, wrong id, etc.).
+    private static func openDevice(context: OpaquePointer, matching targetDeviceId: String) -> OpaquePointer? {
+        var listPtr: UnsafeMutablePointer<OpaquePointer?>?
+        let count = libusb_get_device_list(context, &listPtr)
+        guard count >= 0, let listPtr else { return nil }
+        defer { libusb_free_device_list(listPtr, 1) }
+
+        for i in 0..<Int(count) {
+            guard let device = listPtr[i] else { continue }
+            var descriptor = libusb_device_descriptor()
+            guard libusb_get_device_descriptor(device, &descriptor) == 0 else { continue }
+            guard descriptor.idVendor == vendorID, descriptor.idProduct == productID else { continue }
+
+            var handle: OpaquePointer?
+            guard libusb_open(device, &handle) == 0, let handle else { continue }
+
+            let candidate = DeviceInfo(
+                product: stringDescriptor(handle: handle, index: descriptor.iProduct),
+                serial: stringDescriptor(handle: handle, index: descriptor.iSerialNumber),
+                idVendor: descriptor.idVendor, idProduct: descriptor.idProduct, bcdDevice: descriptor.bcdDevice,
+                bus: libusb_get_bus_number(device), address: libusb_get_device_address(device)
+            )
+            if candidate.deviceId == targetDeviceId {
+                return handle
+            }
+            libusb_close(handle)
+        }
+        return nil
     }
 
     // MARK: - DeviceInfo extraction

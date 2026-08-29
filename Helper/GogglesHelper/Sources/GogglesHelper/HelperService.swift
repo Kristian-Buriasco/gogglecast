@@ -9,132 +9,146 @@ import GogglesXPC
 // (design §5.5, `GogglesXPC`, task 2.1) -- the subscriber registry, the
 // fan-out rule, and the 5s teardown linger all live here.
 //
+// Multi-device picker design (2026-08-29): this type used to hold exactly
+// one device's worth of state as flat instance properties
+// (`currentStateValue`, `currentDeviceInfoValue`, `everReachedLive`,
+// `pipelineGeneration`, `pipelineTask`, `pendingClose`, `lingerTimer`,
+// `deviceRetryTimer`, `activeTransport`, `streamingSubscriberIDs`) --
+// correct for a helper that could only ever have one device claimed, wrong
+// the moment it can claim several at once. All of that is now
+// `DeviceState`, one instance per claimed/claiming `deviceId`
+// (`GogglesXPC.DeviceInfo.deviceId`), held in `devices: [String:
+// DeviceState]`. Every XPC entry point that used to implicitly act on "the"
+// device now takes an explicit `deviceId` and looks up (or lazily creates)
+// its own `DeviceState` -- this is item 4 of the design's scope, and it's
+// what makes item 6 (device-scoped fan-out) possible: each device's
+// `streamingSubscriberIDs` is its own set, so `fanOut(deviceId:)` only ever
+// reaches the subscribers who actually asked for that device.
+//
 // One `HelperService` instance is `exportedObject` on every accepted
 // `NSXPCConnection` (see `HelperListenerDelegate`); `NSXPCConnection`
 // dispatches each exported-object method call on its own connection's
 // queue, potentially concurrently across different connections, so every
-// piece of mutable state this type owns is only ever touched from
-// `stateQueue` (a private serial `DispatchQueue`) -- including from
-// `PipelineDelegate`'s callbacks, which arrive from whatever thread the
-// running pipeline `Task` happens to be on.
+// piece of mutable state this type owns (including every `DeviceState`) is
+// only ever touched from `stateQueue` (a private serial `DispatchQueue`) --
+// including from each device's pipeline-delegate adapter's callbacks, which
+// arrive from whatever thread that device's running pipeline `Task` happens
+// to be on.
 //
-// Fan-out rule (design §5.5, copied verbatim in the task brief):
+// Fan-out rule (design §5.5, copied verbatim in the task brief, now scoped
+// per device rather than singular):
 //   "the helper starts the hardware on the first subscriber that calls
 //   startStreaming and tears it down when the last one disconnects, with a
 //   5 s linger to survive an app relaunch. Subscribers are independent;
 //   one crashing does not stop the others."
-//
-// This implementation distinguishes two subscriber sets:
-//   - `connections`: every currently-connected client (added when its
-//     connection is accepted, removed on invalidation). ALL of these
-//     receive every `nalUnit`/`stateChanged`/`deviceChanged`/`stats`
-//     fan-out call -- "every connected subscriber gets every ... callback"
-//     per the task brief, not just the ones that called `startStreaming`.
-//   - `streamingSubscriberIDs`: the subset that has called `startStreaming`
-//     and not yet called `stopStreaming` (or disconnected). Hardware
-//     bring-up/teardown is driven purely by this set's size, matching the
-//     "first subscriber .. last one disconnects" rule.
-//
-// One subscriber's connection dying doesn't affect delivery to the others
-// because fan-out uses each connection's own
-// `remoteObjectProxyWithErrorHandler` -- a broken/dead connection just logs
-// and is skipped, no custom liveness tracking is layered on top (task
-// brief's explicit instruction).
+// A connection "subscribes" to a device by calling
+// `startStreaming(deviceId:)` for it -- `deviceChanged`/`stateChanged`/
+// `nalUnit`/`stats` for that device only ever go to connections in that
+// device's own `streamingSubscriberIDs`, never to every connected client
+// unconditionally (that was fine when there was only ever one possible
+// device to talk about; it is not once a client could be looking at a
+// different device than another).
 // ─────────────────────────────────────────────────────────────────────────
 
-final class HelperService: NSObject, GogglesHelperProtocol, PipelineDelegate {
+final class HelperService: NSObject, GogglesHelperProtocol {
 
     private let stateQueue = DispatchQueue(label: "\(Logging.subsystem).state")
 
     private var connections: [ObjectIdentifier: NSXPCConnection] = [:]
-    private var streamingSubscriberIDs: Set<ObjectIdentifier> = []
 
-    private var pipelineTask: Task<Void, Never>?
-    private var lingerTimer: DispatchSourceTimer?
+    /// Task multidevice-picker item 4: everything that used to be flat
+    /// per-helper state, now one instance per `deviceId`. Must only be
+    /// touched on `stateQueue`.
+    private final class DeviceState {
+        let deviceId: String
 
-    /// Task 3.7, design §9.3 scenarios 2/3: while a subscriber is still
-    /// streaming but no goggles are on the USB bus (`.noDevice`), retries
-    /// claiming on a short cadence so a replug (scenario 2) or a goggles
-    /// reboot (scenario 3, which briefly looks identical to a replug at
-    /// this layer -- the device drops off and re-enumerates with a new
-    /// RNDIS MAC, re-resolved fresh by `ARPResolver`/`RNDISTransport.init`
-    /// on the very next successful claim, per §8.2) reconnects the way the
-    /// helper is a long-lived daemon for in the first place: no manual
-    /// "Retry" click, no app restart. Guarded so at most one is ever
-    /// pending, same pattern as `lingerTimer`.
-    private var deviceRetryTimer: DispatchSourceTimer?
+        var streamingSubscriberIDs: Set<ObjectIdentifier> = []
+
+        var pipelineTask: Task<Void, Never>?
+        var lingerTimer: DispatchSourceTimer?
+        var deviceRetryTimer: DispatchSourceTimer?
+
+        /// The concrete transport `beginStreaming` constructed for this
+        /// device. See `RNDISTransport.close()`'s doc comment: the running
+        /// pipeline `Task` holds its own strong reference to this same
+        /// instance for its entire lifetime, so clearing `handle.transport`
+        /// alone never actually stops that `Task` while this daemon process
+        /// keeps running -- `teardownHardware` calls `.close()` on this
+        /// directly to break that deadlock.
+        var activeTransport: RNDISTransport?
+
+        /// This device's `GogglesPipeline.PipelineHandle` (task
+        /// multidevice-picker item 3's globals-bug fix) -- the per-device
+        /// replacement for what used to be the process-wide
+        /// `currentTransport`/`currentSink` globals `requestIFrame` and the
+        /// pipeline-completion check used to read. Recreated fresh every
+        /// `beginStreaming` call (a stale handle from a superseded
+        /// generation must never be read/written by a newer bring-up).
+        var handle = PipelineHandle()
+
+        /// Bumped every `beginStreaming` call for this device; lets a
+        /// superseded bring-up's own completion handler recognize it's
+        /// stale. See the original (pre-multi-device) doc comment on this
+        /// field, still accurate, just now per-device.
+        var pipelineGeneration = 0
+
+        /// Set by `teardownHardware(deviceId:)` when it hands
+        /// `activeTransport.close()` off to a detached `Task`.
+        /// `beginStreaming` awaits this before calling `RNDISTransport()`
+        /// again for the same device.
+        var pendingClose: Task<Void, Never>?
+
+        var currentDeviceInfoValue: GogglesXPC.DeviceInfo?
+        var currentStateValue: GogglesState = .noDevice
+        var everReachedLive = false
+
+        init(deviceId: String) {
+            self.deviceId = deviceId
+        }
+    }
+
+    private var devices: [String: DeviceState] = [:]
+
     private static let deviceRetryInterval: TimeInterval = 1.0
-
-    /// The concrete transport `beginStreaming` constructed, kept alongside
-    /// (not instead of) `GogglesPipeline.currentTransport`. See
-    /// `RNDISTransport.close()`'s doc comment: the running pipeline
-    /// `Task` holds its own strong reference to this same instance for its
-    /// entire lifetime, so nil-ing the *global* `currentTransport` alone
-    /// never actually stops that `Task` while this daemon process keeps
-    /// running (unlike `gvcli`'s SIGINT/`--stdout` SIGTERM paths, which
-    /// exit the process outright). `teardownHardware()` calls `.close()`
-    /// on this directly to break that deadlock.
-    private var activeTransport: RNDISTransport?
-    /// Bumped every `beginStreaming` call; lets a superseded bring-up's own
-    /// completion handler (below) recognize it's stale -- relevant for
-    /// `reconnect()`, which calls `teardownHardware()` (whose `.close()` is
-    /// synchronous/blocking but whose *effect* on the old pipeline `Task`
-    /// is only observed asynchronously) immediately followed by a new
-    /// `beginStreaming()`. Without this, the old `Task`'s completion could
-    /// fire after the new one has already been assigned and clear the
-    /// *new* `pipelineTask`/`activeTransport` out from under it.
-    private var pipelineGeneration = 0
-
-    /// Set by `teardownHardware()` when it hands `activeTransport.close()`
-    /// off to a detached `Task` (see that method's doc comment for why this
-    /// must not block `stateQueue`). `beginStreaming()` awaits this (off
-    /// `stateQueue`, inside its own detached `Task`) before calling
-    /// `RNDISTransport()` again, so a `reconnect()`-style
-    /// teardown-immediately-followed-by-bring-up still claims the device
-    /// only after the old one has actually finished releasing it -- the
-    /// same ordering the old fully-synchronous `.close()` call used to give
-    /// for free, just no longer at the cost of blocking every other
-    /// subscriber's `stateQueue` calls for up to ~4s.
-    private var pendingClose: Task<Void, Never>?
-
-    private var currentDeviceInfoValue: GogglesXPC.DeviceInfo?
-    private var currentStateValue: GogglesState = .noDevice
-    private var everReachedLive = false
 
     // MARK: - Connection bookkeeping (called by HelperListenerDelegate)
 
-    /// Registers a freshly-accepted connection as a fan-out subscriber and
-    /// immediately brings it up to speed with whatever device/state info
-    /// is already known, so it doesn't have to wait for the next event to
-    /// know where things stand.
+    /// Registers a freshly-accepted connection. Multi-device picker design:
+    /// unlike the old singular design, a fresh connection has not yet said
+    /// which device (if any) it cares about, so there is nothing to
+    /// eagerly push here anymore -- the first `deviceChanged`/
+    /// `stateChanged` this connection receives for a given device arrives
+    /// once it actually calls `startStreaming(deviceId:)` for it (see that
+    /// method, which immediately fans out current state to the whole
+    /// device's subscriber set including the new arrival).
     func registerConnection(_ connection: NSXPCConnection) {
         let id = ObjectIdentifier(connection)
         stateQueue.async {
             self.connections[id] = connection
             Logging.xpc.info("subscriber connected (\(self.connections.count) total)")
-            if let proxy = self.remoteClient(for: connection) {
-                proxy.deviceChanged(self.currentDeviceInfoValue)
-                proxy.stateChanged(self.currentStateValue.rawValue, detail: nil)
-            }
         }
     }
 
-    /// Removes a connection from both the general and streaming subscriber
-    /// sets on invalidation (crash, force-quit, explicit `invalidate()`),
-    /// starting the 5s teardown linger if it was the last streaming
-    /// subscriber.
+    /// Removes a connection from the general registry and from every
+    /// device's streaming-subscriber set on invalidation (crash, force-quit,
+    /// explicit `invalidate()`), starting each affected device's 5s
+    /// teardown linger if it was that device's last streaming subscriber.
     func unregisterConnection(_ connection: NSXPCConnection) {
         let id = ObjectIdentifier(connection)
         stateQueue.async {
             self.connections.removeValue(forKey: id)
-            let wasStreaming = self.streamingSubscriberIDs.remove(id) != nil
-            Logging.xpc.info("subscriber disconnected (\(self.connections.count) remaining, wasStreaming=\(wasStreaming))")
-            if wasStreaming {
-                self.scheduleTeardownIfNoSubscribers()
-                if self.streamingSubscriberIDs.isEmpty {
-                    self.cancelDeviceRetry()
+            var stillStreamingCount = 0
+            for device in self.devices.values {
+                let wasStreaming = device.streamingSubscriberIDs.remove(id) != nil
+                if wasStreaming {
+                    self.scheduleTeardownIfNoSubscribers(device)
+                    if device.streamingSubscriberIDs.isEmpty {
+                        self.cancelDeviceRetry(device)
+                    }
                 }
+                stillStreamingCount += device.streamingSubscriberIDs.count
             }
+            Logging.xpc.info("subscriber disconnected (\(self.connections.count) remaining, \(stillStreamingCount) device-subscriptions remain)")
         }
     }
 
@@ -144,9 +158,15 @@ final class HelperService: NSObject, GogglesHelperProtocol, PipelineDelegate {
         } as? GogglesClientProtocol
     }
 
+    /// Task multidevice-picker item 6: fan-out scoped to one device's
+    /// streaming-subscriber set, never "every connected client" -- the
+    /// direct fix for the design's explicit requirement ("a client
+    /// subscribed to device A must not receive device B's callbacks").
     /// Must only be called while already executing on `stateQueue`.
-    private func fanOut(_ body: (GogglesClientProtocol) -> Void) {
-        for connection in connections.values {
+    private func fanOut(deviceId: String, _ body: (GogglesClientProtocol) -> Void) {
+        guard let device = devices[deviceId] else { return }
+        for subscriberId in device.streamingSubscriberIDs {
+            guard let connection = connections[subscriberId] else { continue }
             if let proxy = remoteClient(for: connection) {
                 body(proxy)
             }
@@ -154,11 +174,20 @@ final class HelperService: NSObject, GogglesHelperProtocol, PipelineDelegate {
     }
 
     /// Must only be called while already executing on `stateQueue`.
-    private func setState(_ state: GogglesState, detail: String? = nil) {
-        currentStateValue = state
-        if state == .live { everReachedLive = true }
-        Logging.pipeline.info("state -> \(String(describing: state)) (\(state.rawValue))\(detail.map { " [\($0)]" } ?? "")")
-        fanOut { $0.stateChanged(state.rawValue, detail: detail) }
+    private func setState(_ device: DeviceState, _ state: GogglesState, detail: String? = nil) {
+        device.currentStateValue = state
+        if state == .live { device.everReachedLive = true }
+        Logging.pipeline.info("[\(device.deviceId, privacy: .public)] state -> \(String(describing: state)) (\(state.rawValue))\(detail.map { " [\($0)]" } ?? "")")
+        fanOut(deviceId: device.deviceId) { $0.stateChanged(device.deviceId, state.rawValue, detail: detail) }
+    }
+
+    /// Must only be called while already executing on `stateQueue`. Lazily
+    /// creates a device's state on first reference.
+    private func deviceState(_ deviceId: String) -> DeviceState {
+        if let existing = devices[deviceId] { return existing }
+        let created = DeviceState(deviceId: deviceId)
+        devices[deviceId] = created
+        return created
     }
 
     // MARK: - GogglesHelperProtocol
@@ -167,52 +196,84 @@ final class HelperService: NSObject, GogglesHelperProtocol, PipelineDelegate {
         reply(currentProtocolVersion)
     }
 
-    func currentDeviceInfo(reply: @escaping (GogglesXPC.DeviceInfo?) -> Void) {
-        stateQueue.async { reply(self.currentDeviceInfoValue) }
+    /// Multi-device picker design item 2/5: real enumeration (no claim),
+    /// off `stateQueue` since `GogglesDeviceEnumerator.enumerate()` makes
+    /// blocking libusb calls.
+    func enumerateDevices(reply: @escaping ([GogglesXPC.DeviceInfo]) -> Void) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            let found = GogglesDeviceEnumerator.enumerate()
+            let wire = found.map { raw in
+                GogglesXPC.DeviceInfo(
+                    product: raw.product, serial: raw.serial,
+                    idVendor: raw.idVendor, idProduct: raw.idProduct, bcdDevice: raw.bcdDevice,
+                    bus: raw.bus, address: raw.address
+                )
+            }
+            Logging.usb.info("enumerateDevices: found \(wire.count) candidate(s)")
+            reply(wire)
+        }
     }
 
-    func startStreaming(reply: @escaping (Bool, NSError?) -> Void) {
+    func currentDeviceInfo(deviceId: String, reply: @escaping (GogglesXPC.DeviceInfo?) -> Void) {
+        stateQueue.async { reply(self.devices[deviceId]?.currentDeviceInfoValue) }
+    }
+
+    func startStreaming(deviceId: String, reply: @escaping (Bool, NSError?) -> Void) {
         guard let connection = NSXPCConnection.current() else {
             reply(false, HelperError.noConnectionContext.asNSError())
             return
         }
         let id = ObjectIdentifier(connection)
         stateQueue.async {
-            self.lingerTimer?.cancel()
-            self.lingerTimer = nil
-            let wasEmpty = self.streamingSubscriberIDs.isEmpty
-            self.streamingSubscriberIDs.insert(id)
-            Logging.xpc.info("startStreaming from subscriber (now \(self.streamingSubscriberIDs.count) streaming)")
-            if wasEmpty, self.pipelineTask == nil {
-                self.cancelDeviceRetry()
-                self.beginStreaming(reply: reply)
+            let device = self.deviceState(deviceId)
+            device.lingerTimer?.cancel()
+            device.lingerTimer = nil
+            let wasEmpty = device.streamingSubscriberIDs.isEmpty
+            device.streamingSubscriberIDs.insert(id)
+            Logging.xpc.info("startStreaming(\(deviceId, privacy: .public)) from subscriber (now \(device.streamingSubscriberIDs.count) streaming)")
+            // Bring this new/rejoining subscriber up to speed with
+            // whatever's already known for this device, mirroring the old
+            // singular design's registerConnection behavior -- now done
+            // here instead, since which device to push is only known once
+            // a subscriber actually asks for one.
+            if let proxy = self.remoteClient(for: connection) {
+                proxy.deviceChanged(deviceId, device.currentDeviceInfoValue)
+                proxy.stateChanged(deviceId, device.currentStateValue.rawValue, detail: nil)
+            }
+            if wasEmpty, device.pipelineTask == nil {
+                self.cancelDeviceRetry(device)
+                self.beginStreaming(device, reply: reply)
             } else {
                 // Hardware already up (or in the middle of coming up) for
                 // an earlier subscriber -- this one just joins the fan-out
-                // it's already registered for via registerConnection.
+                // it's already registered for above.
                 reply(true, nil)
             }
         }
     }
 
-    func stopStreaming(reply: @escaping () -> Void) {
+    func stopStreaming(deviceId: String, reply: @escaping () -> Void) {
         guard let connection = NSXPCConnection.current() else {
             reply()
             return
         }
         let id = ObjectIdentifier(connection)
         stateQueue.async {
-            self.streamingSubscriberIDs.remove(id)
-            Logging.xpc.info("stopStreaming from subscriber (\(self.streamingSubscriberIDs.count) streaming remain)")
-            self.scheduleTeardownIfNoSubscribers()
-            if self.streamingSubscriberIDs.isEmpty {
-                self.cancelDeviceRetry()
+            guard let device = self.devices[deviceId] else {
+                reply()
+                return
+            }
+            device.streamingSubscriberIDs.remove(id)
+            Logging.xpc.info("stopStreaming(\(deviceId, privacy: .public)) from subscriber (\(device.streamingSubscriberIDs.count) streaming remain)")
+            self.scheduleTeardownIfNoSubscribers(device)
+            if device.streamingSubscriberIDs.isEmpty {
+                self.cancelDeviceRetry(device)
             }
             reply()
         }
     }
 
-    func requestIFrame(reply: @escaping () -> Void) {
+    func requestIFrame(deviceId: String, reply: @escaping () -> Void) {
         stateQueue.async {
             // Best-effort (design §8.1): the goggles' DUML 02:B3 handling
             // is unreliable even on its own regular 1.5s retry cadence
@@ -221,30 +282,37 @@ final class HelperService: NSObject, GogglesHelperProtocol, PipelineDelegate {
             // since the pipeline's own in-flight session id isn't exposed
             // outside its running Task. No failure is ever reported --
             // matches the protocol's documented contract.
-            if let transport = currentTransport {
+            //
+            // Task multidevice-picker item 3: reads this device's own
+            // `PipelineHandle.transport`, not the old process-wide
+            // `currentTransport` global -- the fix that makes this call
+            // safe under multi-claim (device A's requestIFrame can no
+            // longer land on device B's transport).
+            if let transport = self.devices[deviceId]?.handle.transport {
                 let seq = WireProtocol.randomSessionId()
                 let sessionId = WireProtocol.randomSessionId()
                 try? transport.send(WireProtocol.requestIFrameTelemetry(seq: seq, sessionId: sessionId))
-                Logging.pipeline.info("requestIFrame: sent best-effort DUML 02:B3 nudge")
+                Logging.pipeline.info("requestIFrame(\(deviceId, privacy: .public)): sent best-effort DUML 02:B3 nudge")
             } else {
-                Logging.pipeline.info("requestIFrame: no active transport, ignoring")
+                Logging.pipeline.info("requestIFrame(\(deviceId, privacy: .public)): no active transport, ignoring")
             }
             reply()
         }
     }
 
-    func reconnect(reply: @escaping () -> Void) {
+    func reconnect(deviceId: String, reply: @escaping () -> Void) {
         stateQueue.async {
-            Logging.usb.info("reconnect requested: full teardown + design §5.1 rerun")
-            self.lingerTimer?.cancel()
-            self.lingerTimer = nil
-            self.cancelDeviceRetry()
-            self.teardownHardware()
-            if self.streamingSubscriberIDs.isEmpty {
-                self.setState(.noDevice)
+            Logging.usb.info("reconnect(\(deviceId, privacy: .public)) requested: full teardown + design §5.1 rerun")
+            let device = self.deviceState(deviceId)
+            device.lingerTimer?.cancel()
+            device.lingerTimer = nil
+            self.cancelDeviceRetry(device)
+            self.teardownHardware(device)
+            if device.streamingSubscriberIDs.isEmpty {
+                self.setState(device, .noDevice)
                 reply()
             } else {
-                self.beginStreaming(reply: { _, _ in })
+                self.beginStreaming(device, reply: { _, _ in })
                 reply()
             }
         }
@@ -252,47 +320,29 @@ final class HelperService: NSObject, GogglesHelperProtocol, PipelineDelegate {
 
     // MARK: - Hardware lifecycle (must only run on stateQueue)
 
-    /// Brings the hardware up: claims IF0/IF1 + RNDIS init + ARP resolve
-    /// (all inside `RNDISTransport.init`, design §5.1), then starts the
-    /// shared pipeline (`GogglesPipeline.runPipeline`) with `self` as its
-    /// delegate. `RNDISTransport()` is a blocking call (USB control
-    /// transfers, up to a few seconds of ARP resolution), so it runs on a
-    /// detached Task rather than blocking `stateQueue` (which would freeze
-    /// every other subscriber's method calls and all fan-out for that
-    /// entire window).
-    ///   - announceClaiming: whether to transition through `.claiming` before
-    ///     attempting the claim. `true` for every subscriber-initiated call
-    ///     (first `startStreaming`, `reconnect()`) -- a real user-visible
-    ///     action deserves the "Claiming USB interfaces…" feedback. `false`
-    ///     for `scheduleDeviceRetry()`'s once-a-second background poll
-    ///     while sitting at `.noDevice` (task 3.8 bug fix -- see that
-    ///     method's doc comment): that poll has nothing new to announce on
-    ///     its (overwhelmingly common) failure leg, and forcing a
-    ///     `.claiming` transition there flashed the UI between two states
-    ///     roughly once a second even with nothing plugged in, confirmed via
-    ///     `log show` showing `state -> claiming (2)` immediately followed by
-    ///     `state -> noDevice (1)` on every retry tick. A retry that
-    ///     actually finds the device still transitions normally (the success
-    ///     path below is unconditional); only the "still nothing there"
-    ///     leg is now silent.
-    private func beginStreaming(reply: @escaping (Bool, NSError?) -> Void, announceClaiming: Bool = true) {
+    /// Brings one device's hardware up: claims IF0/IF1 + RNDIS init + ARP
+    /// resolve (all inside `RNDISTransport.init(targetDeviceId:)`, design
+    /// §5.1), then starts the shared pipeline
+    /// (`GogglesPipeline.runPipeline`) with a per-device delegate adapter.
+    /// `RNDISTransport()` is a blocking call, so it runs on a detached Task
+    /// rather than blocking `stateQueue`.
+    private func beginStreaming(_ device: DeviceState, reply: @escaping (Bool, NSError?) -> Void, announceClaiming: Bool = true) {
         if announceClaiming {
-            setState(.claiming)
+            setState(device, .claiming)
         }
-        pipelineGeneration += 1
-        let myGeneration = pipelineGeneration
-        // If a teardown just handed its .close() off to a detached Task
-        // (e.g. reconnect()'s teardownHardware() immediately followed by
-        // this call), wait for it below -- off stateQueue -- before
-        // claiming again, so we don't race the still-in-progress release.
-        let priorClose = pendingClose
-        pendingClose = nil
-        Logging.usb.info("claiming IF0/IF1 and bringing up RNDIS...")
+        device.pipelineGeneration += 1
+        let myGeneration = device.pipelineGeneration
+        let priorClose = device.pendingClose
+        device.pendingClose = nil
+        let deviceId = device.deviceId
+        let newHandle = PipelineHandle()
+        device.handle = newHandle
+        Logging.usb.info("[\(deviceId, privacy: .public)] claiming IF0/IF1 and bringing up RNDIS...")
         Task.detached { [weak self] in
             guard let self else { return }
             await priorClose?.value
             do {
-                let transport = try RNDISTransport()
+                let transport = try RNDISTransport(targetDeviceId: deviceId)
                 let raw = transport.deviceInfo
                 let info = GogglesXPC.DeviceInfo(
                     product: raw.product,
@@ -303,89 +353,71 @@ final class HelperService: NSObject, GogglesHelperProtocol, PipelineDelegate {
                     bus: raw.bus,
                     address: raw.address
                 )
-                Logging.usb.info("claimed IF0/IF1, device: \(raw.product ?? "?", privacy: .public)")
+                Logging.usb.info("[\(deviceId, privacy: .public)] claimed IF0/IF1, device: \(raw.product ?? "?", privacy: .public)")
                 self.stateQueue.async {
-                    guard self.pipelineGeneration == myGeneration else { return }
-                    self.activeTransport = transport
-                    self.currentDeviceInfoValue = info
-                    self.fanOut { $0.deviceChanged(info) }
-                    self.setState(.handshaking)
+                    guard device.pipelineGeneration == myGeneration else { return }
+                    device.activeTransport = transport
+                    device.currentDeviceInfoValue = info
+                    self.fanOut(deviceId: deviceId) { $0.deviceChanged(deviceId, info) }
+                    self.setState(device, .handshaking)
                     reply(true, nil)
                 }
+                let adapter = DevicePipelineDelegateAdapter(service: self, deviceId: deviceId)
                 let task = Task {
                     do {
-                        try await runPipeline(transport: transport, sink: nil, stats: false, delegate: self)
-                        Logging.pipeline.info("runPipeline returned (transport released, e.g. unplug or teardown)")
+                        try await runPipeline(transport: transport, sink: nil, stats: false, delegate: adapter, handle: newHandle)
+                        Logging.pipeline.info("[\(deviceId, privacy: .public)] runPipeline returned (transport released, e.g. unplug or teardown)")
                     } catch {
-                        Logging.pipeline.error("runPipeline ended with error: \(String(describing: error))")
+                        Logging.pipeline.error("[\(deviceId, privacy: .public)] runPipeline ended with error: \(String(describing: error))")
                     }
                     self.stateQueue.async {
                         // Stale (superseded by a later beginStreaming, e.g.
                         // reconnect()) -- don't clobber the newer bring-up's
                         // state.
-                        guard self.pipelineGeneration == myGeneration else { return }
-                        self.pipelineTask = nil
-                        if currentTransport == nil {
-                            self.activeTransport = nil
-                            self.currentDeviceInfoValue = nil
-                            self.setState(.noDevice)
+                        guard device.pipelineGeneration == myGeneration else { return }
+                        device.pipelineTask = nil
+                        if newHandle.transport == nil {
+                            device.activeTransport = nil
+                            device.currentDeviceInfoValue = nil
+                            self.setState(device, .noDevice)
                             // Task 3.7, design §9.3 scenario 1/2: the
                             // pipeline just ended because the transport
-                            // went away (unplug -- see
-                            // `RNDISTransport.writeEthernetFrame`'s doc
-                            // comment for why the OUT path, not the pooled
-                            // bulk-IN reads, is what actually detects this
-                            // on this hardware). If a subscriber is still
-                            // streaming, it still wants video; poll for the
-                            // replug the same way a `deviceNotFound` claim
-                            // failure does.
-                            self.scheduleDeviceRetry()
+                            // went away. If a subscriber is still
+                            // streaming this device, it still wants video;
+                            // poll for the replug.
+                            self.scheduleDeviceRetry(device)
                         }
                     }
                 }
                 self.stateQueue.async {
-                    guard self.pipelineGeneration == myGeneration else { return }
-                    self.pipelineTask = task
+                    guard device.pipelineGeneration == myGeneration else { return }
+                    device.pipelineTask = task
                 }
             } catch {
                 let nsError = error as NSError
-                Logging.usb.error("claim/RNDIS bring-up failed: \(String(describing: error))")
+                Logging.usb.error("[\(deviceId, privacy: .public)] claim/RNDIS bring-up failed: \(String(describing: error))")
                 self.stateQueue.async {
-                    guard self.pipelineGeneration == myGeneration else { return }
-                    self.pipelineTask = nil
+                    guard device.pipelineGeneration == myGeneration else { return }
+                    device.pipelineTask = nil
                     if case RNDISTransportError.deviceNotFound = error {
-                        // Task 3.7, design §9.3 scenarios 2/3: this isn't a
-                        // genuine claim failure (§6's `claimFailed` is for
-                        // root-claim/RNDIS-init errors) -- there's just no
-                        // `2CA3:0020` on the bus right now, which is
-                        // `.noDevice`'s exact documented meaning ("Connect
-                        // your Goggles 3 with USB-C"). Reply success (this
-                        // subscriber's request wasn't wrong, the hardware
-                        // just isn't there yet) and keep polling on
-                        // `deviceRetryInterval` for as long as it's still
-                        // wanted, so a replug or a post-reboot
-                        // re-enumeration (new MAC, resolved fresh by
-                        // `RNDISTransport.init` on whichever retry actually
-                        // claims it) reconnects with no manual step and no
-                        // app restart.
+                        // Task 3.7, design §9.3 scenarios 2/3: not a genuine
+                        // claim failure -- there's just no `2CA3:0020`
+                        // matching this deviceId on the bus right now.
                         //
                         // Guarded (task 3.8 bug fix): a background retry
                         // poll (`announceClaiming == false`) that finds
-                        // nothing never left `.noDevice` in the first place
-                        // (no `setState(.claiming)` above), so re-sending
-                        // the identical `.noDevice` here would be a no-op
-                        // state-wise but still fan out a redundant
-                        // `stateChanged` call to every subscriber once a
-                        // second, forever, for no observable benefit. Only
-                        // actually transition (and notify) when the state is
-                        // genuinely changing.
-                        if self.currentStateValue != .noDevice {
-                            self.setState(.noDevice)
+                        // nothing never left `.noDevice` in the first place,
+                        // so re-sending the identical `.noDevice` here would
+                        // be a no-op state-wise but still fan out a
+                        // redundant `stateChanged` call once a second,
+                        // forever, for no observable benefit.
+                        if device.currentStateValue != .noDevice {
+                            self.setState(device, .noDevice)
                         }
                         reply(true, nil)
-                        self.scheduleDeviceRetry()
+                        self.scheduleDeviceRetry(device)
                     } else {
-                        self.setState(.claimFailed, detail: nsError.localizedDescription)
+                        self.setState(device, .claimFailed, detail: nsError.localizedDescription)
                         reply(false, nsError)
                     }
                 }
@@ -393,197 +425,118 @@ final class HelperService: NSObject, GogglesHelperProtocol, PipelineDelegate {
         }
     }
 
-    /// Schedules a `beginStreaming()` retry after `deviceRetryInterval`
-    /// (task 3.7, design §9.3 scenarios 2/3 -- see the two call sites'
-    /// doc comments). A no-op if one's already pending, or if nothing is
-    /// actually streaming (nothing to reconnect for). Each firing
-    /// re-checks both conditions before actually retrying, since a lot can
-    /// change in a second: a subscriber may have called `stopStreaming`,
-    /// or a *different* path (a fresh `startStreaming`, `reconnect()`)
-    /// might already have gotten `pipelineTask` going again in the
-    /// meantime.
-    private func scheduleDeviceRetry() {
-        guard deviceRetryTimer == nil, !streamingSubscriberIDs.isEmpty else { return }
+    /// Schedules a `beginStreaming()` retry for one device after
+    /// `deviceRetryInterval`. A no-op if one's already pending for this
+    /// device, or if nothing is actually streaming it.
+    private func scheduleDeviceRetry(_ device: DeviceState) {
+        guard device.deviceRetryTimer == nil, !device.streamingSubscriberIDs.isEmpty else { return }
         let timer = DispatchSource.makeTimerSource(queue: stateQueue)
         timer.schedule(deadline: .now() + Self.deviceRetryInterval)
-        timer.setEventHandler { [weak self] in
-            guard let self else { return }
-            self.deviceRetryTimer = nil
-            guard !self.streamingSubscriberIDs.isEmpty, self.pipelineTask == nil else { return }
-            Logging.usb.info("device retry: polling for goggles on USB again")
-            // announceClaiming: false -- see beginStreaming's doc comment
-            // (task 3.8 bug fix): this is a silent background poll, not a
-            // user-visible action, so it must not flash the UI through
-            // `.claiming` every time it finds nothing.
-            self.beginStreaming(reply: { _, _ in }, announceClaiming: false)
+        timer.setEventHandler { [weak self, weak device] in
+            guard let self, let device else { return }
+            device.deviceRetryTimer = nil
+            guard !device.streamingSubscriberIDs.isEmpty, device.pipelineTask == nil else { return }
+            Logging.usb.info("[\(device.deviceId, privacy: .public)] device retry: polling for goggles on USB again")
+            self.beginStreaming(device, reply: { _, _ in }, announceClaiming: false)
         }
         timer.resume()
-        deviceRetryTimer = timer
+        device.deviceRetryTimer = timer
     }
 
-    /// Cancels any pending device-retry poll -- called wherever streaming
-    /// is stopped or superseded by a different reconnect path, so a stale
-    /// timer doesn't fire a redundant `beginStreaming()` later.
-    private func cancelDeviceRetry() {
-        deviceRetryTimer?.cancel()
-        deviceRetryTimer = nil
+    /// Cancels any pending device-retry poll for one device.
+    private func cancelDeviceRetry(_ device: DeviceState) {
+        device.deviceRetryTimer?.cancel()
+        device.deviceRetryTimer = nil
     }
 
-    /// Starts the 5s linger (design §5.5) once the streaming-subscriber set
-    /// goes empty, unless one is already pending. If a new `startStreaming`
-    /// arrives before it fires, `startStreaming` cancels it directly. If it
-    /// fires with the set still empty, the hardware is released.
-    private func scheduleTeardownIfNoSubscribers() {
-        guard streamingSubscriberIDs.isEmpty, pipelineTask != nil || currentTransport != nil, lingerTimer == nil else {
+    /// Starts one device's 5s linger (design §5.5) once its
+    /// streaming-subscriber set goes empty, unless one is already pending.
+    private func scheduleTeardownIfNoSubscribers(_ device: DeviceState) {
+        guard device.streamingSubscriberIDs.isEmpty,
+              device.pipelineTask != nil || device.handle.transport != nil,
+              device.lingerTimer == nil else {
             return
         }
-        Logging.xpc.info("no streaming subscribers left; starting 5s teardown linger")
+        Logging.xpc.info("[\(device.deviceId, privacy: .public)] no streaming subscribers left; starting 5s teardown linger")
         let timer = DispatchSource.makeTimerSource(queue: stateQueue)
         timer.schedule(deadline: .now() + 5.0)
-        timer.setEventHandler { [weak self] in
-            guard let self else { return }
-            self.lingerTimer = nil
-            guard self.streamingSubscriberIDs.isEmpty else {
-                Logging.xpc.info("linger expired but a subscriber reconnected; keeping hardware up")
+        timer.setEventHandler { [weak self, weak device] in
+            guard let self, let device else { return }
+            device.lingerTimer = nil
+            guard device.streamingSubscriberIDs.isEmpty else {
+                Logging.xpc.info("[\(device.deviceId, privacy: .public)] linger expired but a subscriber reconnected; keeping hardware up")
                 return
             }
-            Logging.usb.info("linger expired with no subscribers; releasing USB interfaces")
-            self.teardownHardware()
-            self.setState(.noDevice)
+            Logging.usb.info("[\(device.deviceId, privacy: .public)] linger expired with no subscribers; releasing USB interfaces")
+            self.teardownHardware(device)
+            self.setState(device, .noDevice)
         }
         timer.resume()
-        lingerTimer = timer
+        device.lingerTimer = timer
     }
 
-    /// Releases the USB interfaces while this daemon process keeps running.
-    ///
-    /// Unlike `installSigtermHandler` (which just nils the global
-    /// `currentTransport` and immediately `exit(0)`s -- process death
-    /// reclaims the device regardless of whether `deinit` finishes first),
-    /// this path must actually stop the specific running pipeline `Task`
-    /// without killing the process. Nil-ing the global alone doesn't do
-    /// that: `runPipeline`'s own `transport` parameter holds a strong
-    /// reference for that `Task`'s entire lifetime, so the global going nil
-    /// never triggers `RNDISTransport.deinit`, and the pipeline `Task`
-    /// would spin forever with nothing reading from it (verified while
-    /// hardware-testing the 5s linger -- see `RNDISTransport.close()`'s
-    /// doc comment for the full story). Calling `.close()` on
-    /// `activeTransport` breaks that: it finishes `inbound` immediately,
-    /// which ends the pipeline `Task`'s inbound-consumer loop and lets it
-    /// complete on its own.
-    ///
-    /// Two things this method does *synchronously* on `stateQueue`, and one
-    /// it deliberately does not:
-    ///
-    /// - `pipelineTask`/`activeTransport` (and the sink/global-transport
-    ///   bookkeeping) are cleared **synchronously here**, not left for the
-    ///   superseded pipeline `Task`'s own completion closure to clear
-    ///   asynchronously later. This closes a race where a `startStreaming`
-    ///   serialized onto `stateQueue` shortly after this method returns
-    ///   would otherwise still see a stale non-nil `pipelineTask` and
-    ///   wrongly conclude the hardware is already up, replying `true`
-    ///   without ever re-claiming it. The completion closure in
-    ///   `beginStreaming` still runs later and still clears the same
-    ///   fields, guarded by `pipelineGeneration`; by the time it fires
-    ///   those fields are either already nil (safe no-op) or -- if a fresh
-    ///   `beginStreaming` happened in between -- belong to a newer
-    ///   generation, so the guard makes it a no-op there too.
-    /// - `pipelineTask?.cancel()` is also synchronous -- cheap, cooperative,
-    ///   and helps the pipeline `Task` unwind promptly alongside the
-    ///   transport close finishing `inbound`.
-    /// - The actual `activeTransport.close()` I/O is *not* synchronous: it
-    ///   can block for up to ~4s in the worst case (bounded
-    ///   `libusb_handle_events_timeout` + `allTransfersDone.wait` loops
-    ///   inside `RNDISTransport.shutdown()`), and this method runs on
-    ///   `stateQueue` -- the single serial queue every exported
-    ///   `GogglesHelperProtocol` method and every fan-out delivery goes
-    ///   through. Blocking it here would stall every other subscriber for
-    ///   that whole window. So the close is handed to a detached `Task`
-    ///   (mirroring `beginStreaming`'s own reason for using one) and
-    ///   recorded in `pendingClose`, which `beginStreaming` awaits before
-    ///   claiming again -- see `pendingClose`'s doc comment.
-    private func teardownHardware() {
-        currentSink?.close()
-        currentSink = nil
-        currentTransport = nil
-        pipelineTask?.cancel()
-        pipelineTask = nil
-        let transport = activeTransport
-        activeTransport = nil
+    /// Releases one device's USB interfaces while this daemon process keeps
+    /// running (and keeps every other device's pipeline untouched). See the
+    /// original (pre-multi-device) doc comment on this method for the full
+    /// rationale on why `activeTransport.close()` (not just clearing
+    /// references) is what actually stops the running pipeline `Task`.
+    private func teardownHardware(_ device: DeviceState) {
+        device.handle.releaseSynchronously()
+        device.pipelineTask?.cancel()
+        device.pipelineTask = nil
+        let transport = device.activeTransport
+        device.activeTransport = nil
         if let transport {
-            Logging.usb.info("releasing USB interfaces off stateQueue...")
-            pendingClose = Task.detached {
+            Logging.usb.info("[\(device.deviceId, privacy: .public)] releasing USB interfaces off stateQueue...")
+            device.pendingClose = Task.detached {
                 transport.close()
             }
         }
     }
 
-    // MARK: - PipelineDelegate (called from the running pipeline Task's
+    // MARK: - Pipeline-delegate callbacks (called from
+    // DevicePipelineDelegateAdapter, from the running pipeline Task's
     // thread, never stateQueue -- every method hops onto stateQueue itself)
 
-    func pipeline(didEmitNAL data: Data, nalType: UInt8, isParameterSet: Bool, hostTime: UInt64) {
+    fileprivate func pipelineDidEmitNAL(deviceId: String, data: Data, nalType: UInt8, isParameterSet: Bool, hostTime: UInt64) {
         stateQueue.async {
-            // Task 3.7, design §9.3 scenario 4: `pipelineDidStart()` only
-            // fires once, the very first time a genuine SPS+IDR pair
-            // arrives -- it's the one-time `waitingForKeyframe` -> `live`
-            // transition. A later brief silence (design table: "no packets
-            // for > 2s" -> `.stalled`) that resolves on its own -- e.g. the
-            // goggles' liveview toggle, or any transient link hiccup that
-            // doesn't require a fresh keyframe because the decoder already
-            // has a format description and just keeps decoding P-frames
-            // (§8.1's "once live, the app never leaves it for a missing
-            // keyframe alone") -- was never routed back to `.live`: real
-            // NAL data was confirmed still arriving and being decoded, but
-            // `currentStateValue` (and every subscriber's UI) stayed
-            // wedged on `.stalled`'s "Signal lost -- reconnecting" overlay
-            // forever, verified against real hardware while working this
-            // scenario. Any NAL arriving while `.stalled` is exactly the
-            // "packets resumed" signal design's `stalled` row implies, so
-            // recover here, the same way `pipelineDidBeginReceivingVideo`
-            // recovers `waitingForKeyframe` from earlier states.
-            //
-            // A *second* consecutive silence escalates `.stalled` further,
-            // to `.handshaking` (see `pipelineWentSilent()`'s own
-            // `currentStateValue == .live` check below -- once no longer
-            // `.live`, further silence takes the `.handshaking` branch).
-            // Verified against real hardware that data can resume from
-            // *that* state too without a fresh keyframe, for the exact
-            // same §8.1 reason -- so this must recover from `.handshaking`
-            // as well, not just `.stalled`, guarded by `everReachedLive` so
-            // a genuine first-time connect (which legitimately needs to
-            // pass through `.waitingForKeyframe` before `.live`, driven by
-            // `pipelineDidBeginReceivingVideo`/`pipelineDidStart` instead)
-            // is never short-circuited here.
-            if self.everReachedLive, self.currentStateValue == .stalled || self.currentStateValue == .handshaking {
-                self.setState(.live)
+            guard let device = self.devices[deviceId] else { return }
+            // Task 3.7, design §9.3 scenario 4: see the original (pre-
+            // multi-device) doc comment on this recovery check -- unchanged
+            // logic, now against this device's own state instead of the
+            // helper's singular state.
+            if device.everReachedLive, device.currentStateValue == .stalled || device.currentStateValue == .handshaking {
+                self.setState(device, .live)
             }
-            self.fanOut { $0.nalUnit(data, nalType: nalType, isParameterSet: isParameterSet, hostTime: hostTime) }
+            self.fanOut(deviceId: deviceId) { $0.nalUnit(deviceId, data, nalType: nalType, isParameterSet: isParameterSet, hostTime: hostTime) }
         }
     }
 
-    func pipelineDidBeginReceivingVideo() {
+    fileprivate func pipelineDidBeginReceivingVideo(deviceId: String) {
         stateQueue.async {
-            if self.currentStateValue.rawValue < GogglesState.waitingForKeyframe.rawValue {
-                self.setState(.waitingForKeyframe)
+            let device = self.deviceState(deviceId)
+            if device.currentStateValue.rawValue < GogglesState.waitingForKeyframe.rawValue {
+                self.setState(device, .waitingForKeyframe)
             }
         }
     }
 
-    func pipelineDidStart() {
-        stateQueue.async { self.setState(.live) }
+    fileprivate func pipelineDidStart(deviceId: String) {
+        stateQueue.async { self.setState(self.deviceState(deviceId), .live) }
     }
 
-    func pipelineWentSilent() {
+    fileprivate func pipelineWentSilent(deviceId: String) {
         stateQueue.async {
-            if self.everReachedLive, self.currentStateValue == .live {
-                self.setState(.stalled, detail: "no data for 2s")
+            let device = self.deviceState(deviceId)
+            if device.everReachedLive, device.currentStateValue == .live {
+                self.setState(device, .stalled, detail: "no data for 2s")
             } else {
-                self.setState(.handshaking)
+                self.setState(device, .handshaking)
             }
         }
     }
 
-    func pipelineDidUpdateStats(_ stats: PipelineStats) {
+    fileprivate func pipelineDidUpdateStats(deviceId: String, _ stats: PipelineStats) {
         let wire = StreamStats(
             fps: stats.fps,
             bitrateKbps: stats.bitrateKbps,
@@ -592,7 +545,46 @@ final class HelperService: NSObject, GogglesHelperProtocol, PipelineDelegate {
             cumulativeBytes: stats.cumulativeBytes,
             cumulativeDrops: stats.cumulativeDrops
         )
-        stateQueue.async { self.fanOut { $0.stats(wire) } }
+        stateQueue.async { self.fanOut(deviceId: deviceId) { $0.stats(deviceId, wire) } }
+    }
+}
+
+/// Task multidevice-picker item 4: `HelperService` can now run several
+/// concurrent pipelines (one per claimed device), but `PipelineDelegate`'s
+/// methods carry no device context of their own -- `runPipeline` was built
+/// (task 2.2) around exactly one delegate per process. Rather than change
+/// `GogglesPipeline`'s public delegate protocol (a churn-inducing change to
+/// a package `gvcli` also depends on, for no benefit to `gvcli` itself,
+/// which never runs more than one pipeline), each device gets its own small
+/// adapter instance that closes over `deviceId` and forwards to
+/// `HelperService`'s own (differently-named, deviceId-taking) methods.
+private final class DevicePipelineDelegateAdapter: PipelineDelegate {
+    private weak var service: HelperService?
+    private let deviceId: String
+
+    init(service: HelperService, deviceId: String) {
+        self.service = service
+        self.deviceId = deviceId
+    }
+
+    func pipeline(didEmitNAL data: Data, nalType: UInt8, isParameterSet: Bool, hostTime: UInt64) {
+        service?.pipelineDidEmitNAL(deviceId: deviceId, data: data, nalType: nalType, isParameterSet: isParameterSet, hostTime: hostTime)
+    }
+
+    func pipelineDidBeginReceivingVideo() {
+        service?.pipelineDidBeginReceivingVideo(deviceId: deviceId)
+    }
+
+    func pipelineDidStart() {
+        service?.pipelineDidStart(deviceId: deviceId)
+    }
+
+    func pipelineWentSilent() {
+        service?.pipelineWentSilent(deviceId: deviceId)
+    }
+
+    func pipelineDidUpdateStats(_ stats: PipelineStats) {
+        service?.pipelineDidUpdateStats(deviceId: deviceId, stats)
     }
 }
 

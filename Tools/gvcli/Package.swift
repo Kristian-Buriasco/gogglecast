@@ -73,7 +73,10 @@ let package = Package(
         // former executableTarget.
         .testTarget(
             name: "GogglesPipelineTests",
-            dependencies: ["GogglesPipeline"]
+            dependencies: [
+                "GogglesPipeline",
+                .product(name: "GogglesProtocol", package: "GogglesProtocol")
+            ]
         )
     ]
 )
