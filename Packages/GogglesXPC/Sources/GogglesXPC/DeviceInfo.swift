@@ -94,6 +94,21 @@ public final class DeviceInfo: NSObject, NSSecureCoding {
         coder.encode(Int32(address), forKey: Key.address)
     }
 
+    /// Multi-device picker design item 1: mirrors `GogglesUSB.DeviceInfo
+    /// .deviceId` exactly (serial when available, else a `bus:address`
+    /// composite) -- duplicated here for the same reason the rest of this
+    /// file's fields are duplicated rather than shared (see file doc
+    /// comment): this package stays dependency-free of `GogglesUSB`.
+    /// Opaque to consumers; degrades gracefully across a replug/reboot (a
+    /// bus:address-derived ID is not guaranteed stable then) -- never
+    /// assume permanence.
+    public var deviceId: String {
+        if let serial, !serial.isEmpty {
+            return "serial:\(serial)"
+        }
+        return "bus:\(bus):\(address)"
+    }
+
     public required init?(coder: NSCoder) {
         // Type-safe decode methods only (design brief point 2): no
         // `decodeObject(forKey:)`/`decodeInteger(forKey:)`-without-class

@@ -17,4 +17,13 @@ import Foundation
 /// Bump this whenever `GogglesHelperProtocol`, `GogglesClientProtocol`,
 /// `DeviceInfo`, or `StreamStats` changes in a way a client should be able
 /// to detect (new/removed fields or methods, changed semantics).
-public let currentProtocolVersion: Int = 1
+/// Bumped 1 -> 2 for the multi-device picker design: `GogglesHelperProtocol`
+/// gained `enumerateDevices` and every per-device call
+/// (`currentDeviceInfo`/`startStreaming`/`stopStreaming`/`requestIFrame`/
+/// `reconnect`) gained a `deviceId` parameter instead of implicitly acting
+/// on "whatever's claimed"; `GogglesClientProtocol`'s fan-out callbacks
+/// (`deviceChanged`/`stateChanged`/`nalUnit`/`stats`) gained a leading
+/// `deviceId` parameter too. This is a breaking wire-protocol change (every
+/// method signature changed), which is exactly what
+/// `currentProtocolVersion`'s doc comment says to bump for.
+public let currentProtocolVersion: Int = 2

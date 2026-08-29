@@ -26,16 +26,25 @@ import Foundation
 /// `remoteObjectProxy`.
 @objc public protocol GogglesHelperProtocol {
     func protocolVersion(reply: @escaping (Int) -> Void)
-    func currentDeviceInfo(reply: @escaping (DeviceInfo?) -> Void)
-    func startStreaming(reply: @escaping (Bool, NSError?) -> Void)
-    func stopStreaming(reply: @escaping () -> Void)
+    /// Multi-device picker design item 2/5: lists every currently-connected
+    /// `2CA3:0020` device (via `GogglesUSB.GogglesDeviceEnumerator`, no
+    /// claim), each with `DeviceInfo.deviceId` populated. The app calls
+    /// this to decide whether to show a picker (more than one result) or
+    /// go straight to the single-device path (exactly one result).
+    func enumerateDevices(reply: @escaping ([DeviceInfo]) -> Void)
+    /// `deviceId` identifies which claimed/claiming device to ask about
+    /// (design item 5) -- `nil` reply if that device isn't currently known
+    /// to the helper (never claimed, or already released).
+    func currentDeviceInfo(deviceId: String, reply: @escaping (DeviceInfo?) -> Void)
+    func startStreaming(deviceId: String, reply: @escaping (Bool, NSError?) -> Void)
+    func stopStreaming(deviceId: String, reply: @escaping () -> Void)
     /// Best-effort I-frame request (design §8.1) -- no failure reporting
     /// because the helper can't guarantee the goggles honor it, only that
     /// it asked.
-    func requestIFrame(reply: @escaping () -> Void)
+    func requestIFrame(deviceId: String, reply: @escaping () -> Void)
     /// Full teardown + design §5.1 rerun (USB detach/claim through RNDIS
-    /// bring-up again), not just a stream restart.
-    func reconnect(reply: @escaping () -> Void)
+    /// bring-up again) for this one device, not just a stream restart.
+    func reconnect(deviceId: String, reply: @escaping () -> Void)
 }
 
 /// Helper -> client. Implemented by each subscriber (app window,
@@ -43,18 +52,25 @@ import Foundation
 /// call back into it -- frame delivery in particular is the helper calling
 /// `nalUnit` on every subscriber's exported object (task brief context,
 /// design §5.5).
+///
+/// Multi-device picker design item 6: every callback now leads with the
+/// `deviceId` it's about, since a single connection can (in principle)
+/// care about more than one device over its lifetime, and fan-out is
+/// scoped per-device (`HelperService.fanOut(deviceId:)`) -- a client that
+/// only ever called `startStreaming` for device A never receives a
+/// callback for any other `deviceId`.
 @objc public protocol GogglesClientProtocol {
-    func deviceChanged(_ info: DeviceInfo?)
+    func deviceChanged(_ deviceId: String, _ info: DeviceInfo?)
     /// `state` is a `GogglesState.rawValue` (design §6) -- see
     /// `GogglesState.swift` for why the wire type stays a raw `Int`
     /// rather than the enum itself. `detail` is an optional
     /// human-readable elaboration (e.g. an error string for
     /// `.claimFailed`).
-    func stateChanged(_ state: Int, detail: String?)
+    func stateChanged(_ deviceId: String, _ state: Int, detail: String?)
     /// One H.264 NAL unit. `Data` above ~16 KB is transferred out-of-line
     /// by `NSXPCConnection` automatically, so no special chunking is
     /// needed here even at the ~20-60 KB P-frame sizes measured against
     /// real hardware (task brief context; see docs/parity-results.md).
-    func nalUnit(_ data: Data, nalType: UInt8, isParameterSet: Bool, hostTime: UInt64)
-    func stats(_ stats: StreamStats)
+    func nalUnit(_ deviceId: String, _ data: Data, nalType: UInt8, isParameterSet: Bool, hostTime: UInt64)
+    func stats(_ deviceId: String, _ stats: StreamStats)
 }

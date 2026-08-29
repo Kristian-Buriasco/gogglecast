@@ -13,6 +13,38 @@ import Testing
 // different value than what was archived -- this test would catch both.
 // ─────────────────────────────────────────────────────────────────────────
 
+// Multi-device picker design item 1: `DeviceInfo.deviceId` -- serial when
+// present, `bus:address` fallback when it isn't (a real, already-observed
+// case on this hardware).
+@Suite("DeviceInfo.deviceId")
+struct DeviceInfoDeviceIdTests {
+
+    @Test("uses serial when present")
+    func usesSerialWhenPresent() {
+        let info = DeviceInfo(product: "DJI Goggles", serial: "ABC123XYZ", idVendor: 0x2CA3, idProduct: 0x0020, bcdDevice: 0x0100, bus: 20, address: 3)
+        #expect(info.deviceId == "serial:ABC123XYZ")
+    }
+
+    @Test("falls back to bus:address when serial is nil")
+    func fallsBackToBusAddressWhenSerialNil() {
+        let info = DeviceInfo(product: "DJI Goggles", serial: nil, idVendor: 0x2CA3, idProduct: 0x0020, bcdDevice: 0x0100, bus: 20, address: 3)
+        #expect(info.deviceId == "bus:20:3")
+    }
+
+    @Test("falls back to bus:address when serial is empty")
+    func fallsBackToBusAddressWhenSerialEmpty() {
+        let info = DeviceInfo(product: "DJI Goggles", serial: "", idVendor: 0x2CA3, idProduct: 0x0020, bcdDevice: 0x0100, bus: 20, address: 3)
+        #expect(info.deviceId == "bus:20:3")
+    }
+
+    @Test("two different bus:address pairs produce different IDs")
+    func differentBusAddressProducesDifferentIds() {
+        let a = DeviceInfo(product: nil, serial: nil, idVendor: 0x2CA3, idProduct: 0x0020, bcdDevice: 0, bus: 20, address: 3)
+        let b = DeviceInfo(product: nil, serial: nil, idVendor: 0x2CA3, idProduct: 0x0020, bcdDevice: 0, bus: 20, address: 4)
+        #expect(a.deviceId != b.deviceId)
+    }
+}
+
 @Suite("NSSecureCoding round-trip")
 struct SecureCodingRoundTripTests {
 
@@ -101,7 +133,10 @@ struct SecureCodingRoundTripTests {
 
     @Test("currentProtocolVersion is a stable positive constant")
     func protocolVersionConstant() {
-        #expect(currentProtocolVersion == 1)
+        // Bumped 1 -> 2 for the multi-device picker design (device-ID
+        // parameters added throughout GogglesHelperProtocol/
+        // GogglesClientProtocol) -- see ProtocolVersion.swift's doc comment.
+        #expect(currentProtocolVersion == 2)
     }
 
     @Test("GogglesState rawValue matches design §6 ordering")

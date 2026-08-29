@@ -49,6 +49,46 @@ public struct DeviceInfo: Sendable, Equatable {
     public let bcdDevice: UInt16
     public let bus: UInt8
     public let address: UInt8
+
+    public init(
+        product: String?,
+        serial: String?,
+        idVendor: UInt16,
+        idProduct: UInt16,
+        bcdDevice: UInt16,
+        bus: UInt8,
+        address: UInt8
+    ) {
+        self.product = product
+        self.serial = serial
+        self.idVendor = idVendor
+        self.idProduct = idProduct
+        self.bcdDevice = bcdDevice
+        self.bus = bus
+        self.address = address
+    }
+
+    /// Multi-device picker design item 1: a stable ID identifying this
+    /// specific physical unit across a connect session -- USB serial when
+    /// the device actually reports one, falling back to a `bus:address`
+    /// composite when it doesn't (a real, already-observed case in this
+    /// codebase: `serial` is frequently `nil` on this hardware). Opaque to
+    /// consumers -- they should treat it as an unstructured token, not rely
+    /// on its internal shape.
+    ///
+    /// Degrades gracefully, does not assume permanence (design's explicit
+    /// constraint): `bus:address` can and does change across a goggles
+    /// reboot or replug (the bus/address the OS assigns is a fresh
+    /// enumeration each time), so a device lacking a serial number will get
+    /// a *different* `deviceId` after a replug/reboot -- this is expected,
+    /// not a bug, and callers (the helper's per-device state, the picker
+    /// UI) must not assume a `deviceId` survives one.
+    public var deviceId: String {
+        if let serial, !serial.isEmpty {
+            return "serial:\(serial)"
+        }
+        return "bus:\(bus):\(address)"
+    }
 }
 
 /// Errors thrown by `RNDISTransport` at connect time or during a send.
@@ -744,7 +784,10 @@ public final class RNDISTransport: GogglesTransport {
         )
     }
 
-    private static func stringDescriptor(handle: OpaquePointer, index: UInt8) -> String? {
+    /// Not `private`: shared with `GogglesDeviceEnumerator` (same module),
+    /// which needs the identical string-descriptor read against its own
+    /// non-exclusive `libusb_open` handles.
+    static func stringDescriptor(handle: OpaquePointer, index: UInt8) -> String? {
         guard index != 0 else { return nil }
         var buffer = [UInt8](repeating: 0, count: 256)
         let rc: Int32 = buffer.withUnsafeMutableBufferPointer { buf in
