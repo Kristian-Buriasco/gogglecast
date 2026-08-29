@@ -11,6 +11,15 @@ system extension. Revisit this note and upgrade the install path once a paid mem
 is active — the CMIOExtension code itself shouldn't need to change, only the
 installation/signing/notarization flow.
 
+**Task 4.1 update:** this machine *does* now have one valid (non-expired) codesigning
+identity (`security find-identity -v -p codesigning` → 1 valid identity, "Apple
+Development: kburiasco@gmail.com (S222VMFC76)", Team ID `U8LK2QA3FL`) and Xcode-beta.app
+is installed — so `build-stub-bundle.sh` no longer falls back to ad-hoc signing on this
+machine (see that script's own updated comments). `systemextensionsctl developer` reports
+developer mode **off** as of this task. Turning it on plus the required reboot is exactly
+the disruptive step Task 4.1's brief requires asking the user about first — see
+`.superpowers/sdd/plan/task-4.1-report.md`.
+
 
 Task 2.4. Covers how to register/unregister the privileged root helper
 daemon as a `SMAppService` Login Item, how to check its status, how to

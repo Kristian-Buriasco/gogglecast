@@ -22,5 +22,14 @@ import Foundation
 // whoever writes the app-side `NSXPCConnection(machServiceName:options:)`
 // call MUST use this exact string (or its final `<TeamID>`-prefixed form,
 // updated here and only here) -- all three call sites have to agree.**
+//
+// Task 4.1: prefixed with the real Team ID (`U8LK2QA3FL`, confirmed via
+// `codesign -dv`'s `TeamIdentifier=` field against the "Apple Development:
+// kburiasco@gmail.com" cert -- see docs/dev-setup.md) now that the
+// mach-lookup spike needs it. This is exactly what design.md §4.1 Change 2
+// already committed to; nothing about the app<->helper connection's own
+// behavior changes, only the string both sides dial. `com.kburiasco.gogglesview.helper.plist`
+// (the LaunchDaemon plist) and `Apps/GogglesView/Sources/GogglesView/MachService.swift`
+// were updated to match in the same commit.
 // ─────────────────────────────────────────────────────────────────────────
-let machServiceName = "com.kburiasco.gogglesview.helper"
+let machServiceName = "U8LK2QA3FL.com.kburiasco.gogglesview.helper"

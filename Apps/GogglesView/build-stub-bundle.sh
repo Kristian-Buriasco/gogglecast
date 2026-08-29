@@ -23,12 +23,21 @@
 #
 # Signing identity selection (see task-2.3-report.md for why):
 #   - GOGGLESVIEW_SIGN_IDENTITY env var overrides identity selection.
-#   - Otherwise this machine has no valid (non-expired) codesigning identity
-#     in the keychain (`security find-identity -v -p codesigning` -> 0 valid
-#     identities), so this script falls back to ad-hoc signing (`--sign -`)
-#     for both binaries. Ad-hoc signing produces "TeamIdentifier=not set" on
-#     both -- see the report for what that means for the design §8.4
-#     "same Team ID" checklist item.
+#   - Otherwise the first *valid* codesigning identity from
+#     `security find-identity -v -p codesigning` is used, or ad-hoc
+#     (`--sign -`, "TeamIdentifier=not set") if there are none. As of Task
+#     4.1 this machine has exactly one valid identity ("Apple Development:
+#     kburiasco@gmail.com (S222VMFC76)", Team ID U8LK2QA3FL) -- Task 2.3's
+#     original "0 valid identities" state (see that task's report) no
+#     longer holds on this machine.
+#
+# Task 4.1 also adds the third bundle component
+# (`Contents/Library/SystemExtensions/`, the throwaway CMIOExtension
+# mach-lookup spike -- see `.superpowers/sdd/plan/task-4.1-report.md`) and
+# entitlements-based signing for both the app and the extension (needed for
+# `com.apple.developer.system-extension.install` / app-sandbox /
+# application-groups) -- previously nothing in this script passed
+# `--entitlements` at all.
 
 set -euo pipefail
 
@@ -67,6 +76,25 @@ if [[ ! -x "$APP_BIN" ]]; then
     exit 1
 fi
 
+# Task 4.1: third bundle component, the throwaway CMIOExtension spike
+# (Extension/GogglesCamera). Built and assembled here too so the app
+# bundle is genuinely installable end-to-end for the mach-lookup spike --
+# skipped gracefully (with a warning) if that directory doesn't exist,
+# so this script keeps working for anyone checking out a pre-4.1 commit.
+EXT_DIR="$REPO_ROOT/Extension/GogglesCamera"
+EXT_BIN=""
+if [[ -d "$EXT_DIR" && -f "$EXT_DIR/Package.swift" ]]; then
+    echo "==> Building GogglesCameraExtension (release)"
+    ( cd "$EXT_DIR" && swift build -c release )
+    EXT_BIN="$EXT_DIR/.build/release/GogglesCameraExtension"
+    if [[ ! -x "$EXT_BIN" ]]; then
+        echo "error: expected extension binary not found at $EXT_BIN" >&2
+        exit 1
+    fi
+else
+    echo "==> Skipping GogglesCameraExtension (Extension/GogglesCamera not present yet)"
+fi
+
 echo "==> Assembling bundle at $APP_BUNDLE"
 rm -rf "$APP_BUNDLE"
 mkdir -p "$APP_BUNDLE/Contents/MacOS"
@@ -79,20 +107,42 @@ cp "$SCRIPT_DIR/BundleResources/com.kburiasco.gogglesview.helper.plist" \
 cp "$APP_BIN" "$APP_BUNDLE/Contents/MacOS/GogglesView"
 cp "$HELPER_BIN" "$APP_BUNDLE/Contents/MacOS/GogglesHelper"
 
+if [[ -n "$EXT_BIN" ]]; then
+    EXT_BUNDLE="$APP_BUNDLE/Contents/Library/SystemExtensions/com.kburiasco.gogglesview.camera.systemextension"
+    mkdir -p "$EXT_BUNDLE/Contents/MacOS"
+    cp "$EXT_DIR/BundleResources/Info.plist" "$EXT_BUNDLE/Contents/Info.plist"
+    cp "$EXT_BIN" "$EXT_BUNDLE/Contents/MacOS/GogglesCameraExtension"
+fi
+
 echo "==> Code-signing GogglesHelper (hardened runtime)"
 codesign --force --options runtime --sign "$SIGN_IDENTITY" "$APP_BUNDLE/Contents/MacOS/GogglesHelper"
 
-echo "==> Code-signing GogglesView (app binary)"
-codesign --force --sign "$SIGN_IDENTITY" "$APP_BUNDLE/Contents/MacOS/GogglesView"
+if [[ -n "$EXT_BIN" ]]; then
+    echo "==> Code-signing GogglesCamera.systemextension (hardened runtime + entitlements)"
+    codesign --force --options runtime \
+        --entitlements "$EXT_DIR/BundleResources/GogglesCamera.entitlements" \
+        --sign "$SIGN_IDENTITY" "$EXT_BUNDLE"
+fi
+
+echo "==> Code-signing GogglesView (app binary, entitlements)"
+codesign --force --options runtime \
+    --entitlements "$SCRIPT_DIR/BundleResources/GogglesView.entitlements" \
+    --sign "$SIGN_IDENTITY" "$APP_BUNDLE/Contents/MacOS/GogglesView"
 
 echo "==> Code-signing the app bundle as a whole"
-codesign --force --sign "$SIGN_IDENTITY" "$APP_BUNDLE"
+codesign --force --options runtime \
+    --entitlements "$SCRIPT_DIR/BundleResources/GogglesView.entitlements" \
+    --sign "$SIGN_IDENTITY" "$APP_BUNDLE"
 
 echo "==> Verifying signatures"
 echo "--- GogglesHelper ---"
 codesign -dv --verbose=2 "$APP_BUNDLE/Contents/MacOS/GogglesHelper" 2>&1
 echo "--- GogglesView ---"
 codesign -dv --verbose=2 "$APP_BUNDLE/Contents/MacOS/GogglesView" 2>&1
+if [[ -n "$EXT_BIN" ]]; then
+    echo "--- GogglesCamera.systemextension ---"
+    codesign -dv --verbose=2 "$EXT_BUNDLE" 2>&1
+fi
 echo "--- bundle ---"
 codesign -dv --verbose=2 "$APP_BUNDLE" 2>&1
 

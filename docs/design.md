@@ -701,8 +701,40 @@ Each must leave the app in a correct state with no crash and no leaked USB claim
 ## 10. Open questions
 
 1. Does a CMIO system extension's sandbox permit Mach lookup of the helper's
-   app-group-prefixed service? **Resolved by a Phase 4 spike before any other Phase 4
-   work.** Fallback documented in §4.1.
+   app-group-prefixed service? **Task 4.1 spike built and staged, but NOT YET
+   RUN — genuinely unresolved as of this writing, not a guess either way.**
+   Everything needed to answer the question is in place: a minimal
+   `CMIOExtensionProvider`/`Device`/`Stream` skeleton
+   (`Extension/GogglesCamera`) whose only real behavior is one
+   `NSXPCConnection` attempt to the helper's Mach service and one logged
+   `stats` callback (`HelperSpikeConnector.swift`); the helper's Mach
+   service was renamed to the Team-ID-prefixed form
+   `U8LK2QA3FL.com.kburiasco.gogglesview.helper` across all three call sites
+   (helper, app, extension) and the LaunchDaemon plist; the extension bundle
+   is assembled at `Contents/Library/SystemExtensions/` by
+   `build-stub-bundle.sh` and signed with hardened runtime + entitlements
+   (`com.apple.security.app-sandbox`, `com.apple.security.application-groups`)
+   using this machine's real, valid `Apple Development` cert (Team ID
+   `U8LK2QA3FL`); the host app carries
+   `com.apple.developer.system-extension.install` and a matching
+   `OSSystemExtensionRequest` installer (`--install-camera-extension`).
+   **What is not yet done, and why:** `systemextensionsctl list` confirms
+   developer mode is currently OFF on this machine, and actually installing
+   this unsigned-for-distribution (Apple-Development-cert-only, not
+   Developer-ID/notarized) extension requires `systemextensionsctl developer
+   on` plus one machine reboot — a real, disruptive, system-level change the
+   task brief explicitly requires asking the user before performing. That
+   ask has been made (see `task-4.1-report.md`) and not yet answered/acted
+   on. One correction to this section's premise, worth recording regardless
+   of the eventual pass/fail result: the mechanism this decision actually
+   rests on is the sandbox's Team-ID-prefix mach-lookup exception (a
+   sandboxed process may look up any global Mach service name prefixed with
+   its own code-signing Team ID), not the app-group entitlement — the app
+   group is still declared (for possible future shared-container use) but
+   is not what is expected to gate the lookup. Fallback (app pushes frames
+   to the extension instead of the extension pulling from the helper)
+   remains documented in §4.1 and is adopted automatically if the eventual
+   test shows the lookup fails.
 2. Are bytes 8..15 and 19 of the video sub-header meaningful (timestamp? stream id?)? Not
    needed for v1; worth a look at the capture corpus, since a real PTS would improve the
    CMIO clock.

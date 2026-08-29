@@ -26,4 +26,9 @@ import Foundation
 // here) exactly as the helper's file already does, rather than growing
 // `GogglesXPC`'s scope to cover it.
 // ─────────────────────────────────────────────────────────────────────────
-public let helperMachServiceName = "com.kburiasco.gogglesview.helper"
+// Task 4.1: Team-ID-prefixed (see the matching comment/update in
+// `Helper/GogglesHelper/Sources/GogglesHelper/MachService.swift`) -- the
+// sandboxed CMIOExtension spike needs this exact prefixed name to exercise
+// the sandbox's documented mach-lookup exception for names beginning with
+// the requesting process's own Team ID.
+public let helperMachServiceName = "U8LK2QA3FL.com.kburiasco.gogglesview.helper"

@@ -22,6 +22,10 @@
 //                                          .requiresApproval) open System Settings'
 //                                          Login Items & Extensions pane.
 //   ./GogglesView --unregister            Call unregister(), print status.
+//   ./GogglesView --install-camera-extension
+//                                          Task 4.1 spike: submit an
+//                                          OSSystemExtensionRequest for the
+//                                          throwaway GogglesCamera bundle.
 //   ./GogglesView --test-client [secs]    Connect via HelperClient, call
 //                                          startStreaming, log fps for `secs`
 //                                          seconds (default 10), then
@@ -124,6 +128,24 @@ if args.contains("--unregister") {
     }
     printStatus("[3] AFTER unregister()", service.status)
     exit(0)
+}
+
+if args.contains("--install-camera-extension") {
+    // Task 4.1: THROWAWAY spike installer -- see CameraExtensionInstaller.swift's
+    // doc comment. Runs the process for up to 60s waiting on the async
+    // OSSystemExtensionRequest callbacks (requestNeedsUserApproval can fire
+    // and then require a human to act in System Settings, so this doesn't
+    // just exit immediately).
+    let installer = CameraExtensionInstaller()
+    let semaphore = DispatchSemaphore(value: 0)
+    var succeeded = false
+    installer.install { ok in
+        succeeded = ok
+        semaphore.signal()
+    }
+    _ = semaphore.wait(timeout: .now() + 60)
+    print("--install-camera-extension: done (succeeded=\(succeeded))")
+    exit(succeeded ? 0 : 1)
 }
 
 #if canImport(AppKit)

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- A CMIOExtension system extension always runs sandboxed; this
+	     entitlement declares it explicitly, matching Apple's CMIOExtension
+	     sample project and design.md §8.5's entitlement list. -->
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
+	<!-- Declared per design.md §4.1 Change 2 ("listed in the app group
+	     shared by app, helper and extension"). NOT what this spike's
+	     mach-lookup exception actually relies on: that is the Team-ID
+	     prefix on the Mach service name itself (see MachService.swift's
+	     doc comment and task-4.1-report.md for the citation). Kept here
+	     defensively for parity with the design doc's stated decision and
+	     for any future shared-container use, not because it is required
+	     for this spike's XPC connection to work. -->
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.com.kburiasco.gogglesview</string>
+	</array>
+</dict>
+</plist>

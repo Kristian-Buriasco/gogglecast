@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleIdentifier</key>
+	<string>com.kburiasco.gogglesview.camera</string>
+	<key>CFBundleName</key>
+	<string>GogglesCamera</string>
+	<key>CFBundleDisplayName</key>
+	<string>GogglesCamera</string>
+	<key>CFBundleExecutable</key>
+	<string>GogglesCameraExtension</string>
+	<!-- SYSX marks this bundle as a system extension, not a normal APPL/
+	     App Extension bundle (design §8.5 / task-4.1-brief.md point 1). -->
+	<key>CFBundlePackageType</key>
+	<string>SYSX</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.1</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>14.0</string>
+	<!-- The extension point identifier that marks this as a CMIOExtension
+	     camera device to systemextensionsctl / OSSystemExtensionRequest
+	     (CoreMediaIO's CMIOExtensionProvider.h + Apple's CMIOExtension
+	     sample project both use this exact identifier). -->
+	<key>NSExtension</key>
+	<dict>
+		<key>NSExtensionPointIdentifier</key>
+		<string>com.apple.cmio.extension</string>
+	</dict>
+</dict>
+</plist>
