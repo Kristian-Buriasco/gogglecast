@@ -162,16 +162,31 @@ public enum DUML {
     /// the decoded packets and the unconsumed tail (a partial frame or
     /// junk) so a caller can append more bytes and parse again. Matches
     /// Python `duml.parse_stream`.
-    public static func parseStream(_ buf: Data) -> (packets: [DumlPacket], tail: Data) {
+    ///
+    /// `onMalformedFrame` is called immediately before each skip branch
+    /// advances past something that isn't (the start of) a valid frame
+    /// (design §8.6: log, don't silently drop). It defaults to
+    /// `WireProtocol.logMalformedFrame`, which forwards to the shared
+    /// `WireProtocol.malformedFrameHandler` hook -- the right default for
+    /// production call sites. Tests that need to observe this behavior
+    /// should pass their own closure here instead of swapping the shared
+    /// `WireProtocol.malformedFrameHandler` global: this keeps each test's
+    /// observation local to its own call, so concurrent tests (Swift
+    /// Testing parallelizes by default) can't race on a shared mutable
+    /// static and cross-contaminate each other's results.
+    public static func parseStream(
+        _ buf: Data,
+        onMalformedFrame: (_ reason: String, _ context: String) -> Void = WireProtocol.logMalformedFrame
+    ) -> (packets: [DumlPacket], tail: Data) {
         let bytes = [UInt8](buf)
         var packets: [DumlPacket] = []
         var i = 0
         let n = bytes.count
         while i < n {
             if bytes[i] != magic {
-                WireProtocol.logMalformedFrame(
-                    reason: "bad magic byte 0x\(String(format: "%02X", bytes[i])) (expected 0x\(String(format: "%02X", magic)))",
-                    context: "offset \(i)"
+                onMalformedFrame(
+                    "bad magic byte 0x\(String(format: "%02X", bytes[i])) (expected 0x\(String(format: "%02X", magic)))",
+                    "offset \(i)"
                 )
                 i += 1
                 continue
@@ -183,9 +198,9 @@ public enum DUML {
             let length = Int(rawLen & 0x03FF)
             let version = UInt8(rawLen >> 10)
             if length < minLen {
-                WireProtocol.logMalformedFrame(
-                    reason: "implausible frame length \(length) (minimum \(minLen))",
-                    context: "offset \(i)"
+                onMalformedFrame(
+                    "implausible frame length \(length) (minimum \(minLen))",
+                    "offset \(i)"
                 )
                 i += 1
                 continue
@@ -196,18 +211,18 @@ public enum DUML {
             let frame = Data(bytes[i..<(i + length)])
             let frameBytes = [UInt8](frame)
             if crc8(Data(frameBytes[0..<3])) != frameBytes[3] {
-                WireProtocol.logMalformedFrame(
-                    reason: "CRC-8 header mismatch",
-                    context: "offset \(i), length \(length)"
+                onMalformedFrame(
+                    "CRC-8 header mismatch",
+                    "offset \(i), length \(length)"
                 )
                 i += 1
                 continue
             }
             let want = UInt16(frameBytes[length - 2]) | (UInt16(frameBytes[length - 1]) << 8)
             if crc16(Data(frameBytes[0..<(length - 2)])) != want {
-                WireProtocol.logMalformedFrame(
-                    reason: "CRC-16 frame mismatch",
-                    context: "offset \(i), length \(length)"
+                onMalformedFrame(
+                    "CRC-16 frame mismatch",
+                    "offset \(i), length \(length)"
                 )
                 i += 1
                 continue

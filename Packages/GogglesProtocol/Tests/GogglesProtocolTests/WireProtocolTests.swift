@@ -187,15 +187,23 @@ import Foundation
 // MARK: - malformed DUML frames are logged, not silently dropped, by
 // DUML.parseStream's skip branches (design §8.6)
 
+// These four tests observe `DUML.parseStream`'s malformed-frame diagnostics
+// via the `onMalformedFrame` parameter added specifically so tests don't
+// need to swap the shared `WireProtocol.malformedFrameHandler` global in
+// and out. Swift Testing parallelizes tests by default, and a save/mutate/
+// defer-restore dance around one shared static var is not safe under that:
+// two of these tests can be mid-flight at once, so one test's mutation of
+// the global is visible to (or gets overwritten by) another's before either
+// restores it, producing nondeterministic cross-test contamination. Passing
+// a closure straight into `parseStream` keeps each test's observation local
+// to its own call stack, with no shared mutable state at all.
+
 @Test func parseStreamBadMagicIsLoggedNotSilentlyDropped() {
     var reasons: [String] = []
-    let previous = WireProtocol.malformedFrameHandler
-    defer { WireProtocol.malformedFrameHandler = previous }
-    WireProtocol.malformedFrameHandler = { reason, _ in reasons.append(reason) }
 
     // A single stray byte that is not the DUML magic (0x55) and never
     // resolves into a valid frame.
-    let (packets, tail) = DUML.parseStream(Data([0xAA]))
+    let (packets, tail) = DUML.parseStream(Data([0xAA])) { reason, _ in reasons.append(reason) }
     #expect(packets.isEmpty)
     #expect(tail.isEmpty)
     #expect(reasons.count == 1)
@@ -204,9 +212,6 @@ import Foundation
 
 @Test func parseStreamCRC8FailureIsLoggedNotSilentlyDropped() {
     var reasons: [String] = []
-    let previous = WireProtocol.malformedFrameHandler
-    defer { WireProtocol.malformedFrameHandler = previous }
-    WireProtocol.malformedFrameHandler = { reason, _ in reasons.append(reason) }
 
     // A validly-built frame with its CRC-8 header byte corrupted --
     // magic and length are intact, so parseStream reaches the CRC-8
@@ -216,7 +221,7 @@ import Foundation
     ))
     frame[3] = frame[3] &+ 1 // flip the CRC-8 byte so it no longer matches
 
-    let (packets, tail) = DUML.parseStream(Data(frame))
+    let (packets, tail) = DUML.parseStream(Data(frame)) { reason, _ in reasons.append(reason) }
     #expect(packets.isEmpty)
     #expect(tail.isEmpty)
     #expect(reasons.contains { $0.contains("CRC-8") })
@@ -224,9 +229,6 @@ import Foundation
 
 @Test func parseStreamCRC16FailureIsLoggedNotSilentlyDropped() {
     var reasons: [String] = []
-    let previous = WireProtocol.malformedFrameHandler
-    defer { WireProtocol.malformedFrameHandler = previous }
-    WireProtocol.malformedFrameHandler = { reason, _ in reasons.append(reason) }
 
     // A validly-built frame with its trailing CRC-16 byte corrupted --
     // the CRC-8 header check still passes, so parseStream reaches the
@@ -236,7 +238,7 @@ import Foundation
     ))
     frame[frame.count - 1] = frame[frame.count - 1] &+ 1 // flip the last CRC-16 byte
 
-    let (packets, tail) = DUML.parseStream(Data(frame))
+    let (packets, tail) = DUML.parseStream(Data(frame)) { reason, _ in reasons.append(reason) }
     #expect(packets.isEmpty)
     #expect(tail.isEmpty)
     #expect(reasons.contains { $0.contains("CRC-16") })
@@ -244,9 +246,6 @@ import Foundation
 
 @Test func parseStreamImplausibleLengthIsLoggedNotSilentlyDropped() {
     var reasons: [String] = []
-    let previous = WireProtocol.malformedFrameHandler
-    defer { WireProtocol.malformedFrameHandler = previous }
-    WireProtocol.malformedFrameHandler = { reason, _ in reasons.append(reason) }
 
     // Magic byte followed by a length field claiming a frame shorter
     // than DUML.minLen (13). Length is encoded little-endian across
@@ -256,7 +255,7 @@ import Foundation
     // (fewer than 4 bytes hits the "header not all here yet" break,
     // not the length check).
     let buf = Data([DUML.magic, 0x05, 0x00, 0x00])
-    let (packets, tail) = DUML.parseStream(buf)
+    let (packets, tail) = DUML.parseStream(buf) { reason, _ in reasons.append(reason) }
     #expect(packets.isEmpty)
     #expect(tail.isEmpty)
     #expect(reasons.contains { $0.contains("implausible") })
