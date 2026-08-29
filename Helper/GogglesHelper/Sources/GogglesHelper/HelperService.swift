@@ -260,8 +260,25 @@ final class HelperService: NSObject, GogglesHelperProtocol, PipelineDelegate {
     /// detached Task rather than blocking `stateQueue` (which would freeze
     /// every other subscriber's method calls and all fan-out for that
     /// entire window).
-    private func beginStreaming(reply: @escaping (Bool, NSError?) -> Void) {
-        setState(.claiming)
+    ///   - announceClaiming: whether to transition through `.claiming` before
+    ///     attempting the claim. `true` for every subscriber-initiated call
+    ///     (first `startStreaming`, `reconnect()`) -- a real user-visible
+    ///     action deserves the "Claiming USB interfaces…" feedback. `false`
+    ///     for `scheduleDeviceRetry()`'s once-a-second background poll
+    ///     while sitting at `.noDevice` (task 3.8 bug fix -- see that
+    ///     method's doc comment): that poll has nothing new to announce on
+    ///     its (overwhelmingly common) failure leg, and forcing a
+    ///     `.claiming` transition there flashed the UI between two states
+    ///     roughly once a second even with nothing plugged in, confirmed via
+    ///     `log show` showing `state -> claiming (2)` immediately followed by
+    ///     `state -> noDevice (1)` on every retry tick. A retry that
+    ///     actually finds the device still transitions normally (the success
+    ///     path below is unconditional); only the "still nothing there"
+    ///     leg is now silent.
+    private func beginStreaming(reply: @escaping (Bool, NSError?) -> Void, announceClaiming: Bool = true) {
+        if announceClaiming {
+            setState(.claiming)
+        }
         pipelineGeneration += 1
         let myGeneration = pipelineGeneration
         // If a teardown just handed its .close() off to a detached Task
@@ -351,7 +368,20 @@ final class HelperService: NSObject, GogglesHelperProtocol, PipelineDelegate {
                         // `RNDISTransport.init` on whichever retry actually
                         // claims it) reconnects with no manual step and no
                         // app restart.
-                        self.setState(.noDevice)
+                        //
+                        // Guarded (task 3.8 bug fix): a background retry
+                        // poll (`announceClaiming == false`) that finds
+                        // nothing never left `.noDevice` in the first place
+                        // (no `setState(.claiming)` above), so re-sending
+                        // the identical `.noDevice` here would be a no-op
+                        // state-wise but still fan out a redundant
+                        // `stateChanged` call to every subscriber once a
+                        // second, forever, for no observable benefit. Only
+                        // actually transition (and notify) when the state is
+                        // genuinely changing.
+                        if self.currentStateValue != .noDevice {
+                            self.setState(.noDevice)
+                        }
                         reply(true, nil)
                         self.scheduleDeviceRetry()
                     } else {
@@ -381,7 +411,11 @@ final class HelperService: NSObject, GogglesHelperProtocol, PipelineDelegate {
             self.deviceRetryTimer = nil
             guard !self.streamingSubscriberIDs.isEmpty, self.pipelineTask == nil else { return }
             Logging.usb.info("device retry: polling for goggles on USB again")
-            self.beginStreaming(reply: { _, _ in })
+            // announceClaiming: false -- see beginStreaming's doc comment
+            // (task 3.8 bug fix): this is a silent background poll, not a
+            // user-visible action, so it must not flash the UI through
+            // `.claiming` every time it finds nothing.
+            self.beginStreaming(reply: { _, _ in }, announceClaiming: false)
         }
         timer.resume()
         deviceRetryTimer = timer
