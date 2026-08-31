@@ -60,8 +60,14 @@ final class HelperSpikeConnector: NSObject {
             // question (protocolVersion already proves the round trip
             // works), but the brief specifically asks for one logged
             // `stats` callback as the deliverable, and `stats` only flows
-            // while streaming.
-            proxy.startStreaming { ok, error in
+            // while streaming. This spike doesn't enumerate devices (that
+            // would be real Task 4.2-scope work, out of bounds for a
+            // throwaway Mach-lookup spike) -- an empty deviceId is a
+            // deliberate placeholder that fails the same way "no device"
+            // already failed pre-multi-device, since this spike can't run
+            // at all yet regardless (blocked on a paid Apple Developer
+            // Program membership, see docs/dev-setup.md).
+            proxy.startStreaming(deviceId: "") { ok, error in
                 if let error {
                     Logging.spike.error("SPIKE: startStreaming failed (expected if no goggles are connected to this machine right now): \(String(describing: error), privacy: .public)")
                 } else {
@@ -92,20 +98,25 @@ final class HelperSpikeConnector: NSObject {
 private final class ExportedSpikeClient: NSObject, GogglesClientProtocol {
     weak var owner: HelperSpikeConnector?
 
-    func deviceChanged(_ info: DeviceInfo?) {
+    // `deviceId` params below are accepted-but-ignored: this spike doesn't
+    // enumerate/target a specific device (see the empty-deviceId comment
+    // at the `startStreaming` call site), so there's only ever one
+    // (degenerate) device stream to correlate callbacks against.
+
+    func deviceChanged(_ deviceId: String, _ info: DeviceInfo?) {
         owner?.handleDeviceChanged(info)
     }
 
-    func stateChanged(_ state: Int, detail: String?) {
+    func stateChanged(_ deviceId: String, _ state: Int, detail: String?) {
         owner?.handleStateChanged(state, detail: detail)
     }
 
-    func nalUnit(_ data: Data, nalType: UInt8, isParameterSet: Bool, hostTime: UInt64) {
+    func nalUnit(_ deviceId: String, _ data: Data, nalType: UInt8, isParameterSet: Bool, hostTime: UInt64) {
         // Not logged per-NAL (would flood the log at ~30fps) -- the spike
         // only cares about `stats`, which arrives at a much lower rate.
     }
 
-    func stats(_ stats: StreamStats) {
+    func stats(_ deviceId: String, _ stats: StreamStats) {
         owner?.handleStats(stats)
     }
 }
