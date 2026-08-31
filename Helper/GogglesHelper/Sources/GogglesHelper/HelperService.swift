@@ -538,19 +538,19 @@ final class HelperService: NSObject, GogglesHelperProtocol {
             Logging.usb.info("[\(device.deviceId, privacy: .public)] linger expired with no subscribers; releasing USB interfaces")
             self.teardownHardware(device)
             self.setState(device, .noDevice)
-            // LOW fix (review round 2): `devices` otherwise grows
-            // unboundedly across a session's worth of
-            // replug/reselect/reconnect cycles for different deviceIds
-            // (small, no security impact, but worth bounding cheaply).
-            // Safe once fully idle: no subscriber (checked just above), no
-            // pipeline, no pending retry. A later `startStreaming` for the
-            // same `deviceId` just lazily recreates a fresh `DeviceState`
-            // (`deviceState(_:)`), indistinguishable from this device never
-            // having been seen before -- which is the correct behavior for
-            // a fully torn-down, unclaimed device either way.
-            if self.devices[device.deviceId] === device, device.deviceRetryTimer == nil {
-                self.devices.removeValue(forKey: device.deviceId)
-            }
+            // Deliberately NOT removing this entry from `devices` here.
+            // `teardownHardware` starts an ASYNC `transport.close()` and
+            // parks it in `device.pendingClose` -- at this exact point
+            // that close is still in flight, so this `DeviceState` is not
+            // yet fully idle. `beginStreaming` serializes reopen-after-
+            // close by awaiting `priorClose` on the SAME `DeviceState`
+            // instance; removing the entry here would make a fast
+            // relaunch land on a freshly-recreated `DeviceState` with no
+            // `pendingClose`, bypassing that serialization and racing the
+            // in-flight `libusb` interface release (review round 2,
+            // finding 1 -- this was unrequested scope creep the first
+            // time and made the single-device teardown/reopen path worse,
+            // not better; reverted rather than re-guarded).
         }
         timer.resume()
         device.lingerTimer = timer

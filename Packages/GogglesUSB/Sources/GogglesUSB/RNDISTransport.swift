@@ -834,10 +834,17 @@ public final class RNDISTransport: GogglesTransport {
             // since no other candidate could also match this same ID.
             // `opened == nil` here means the matching device exists but
             // couldn't be opened just now (a genuine, if rare, transient
-            // failure); returning `nil` overall correctly surfaces that as
-            // "couldn't claim it this attempt" rather than incorrectly
-            // reporting `deviceNotFound` and letting the caller's retry
-            // logic possibly mis-treat an existing device as gone.
+            // failure). CORRECTION (review round 2, finding 3): this
+            // still surfaces to the sole caller (`init`) as
+            // `.deviceNotFound`, same as a genuinely absent device -- an
+            // earlier version of this comment incorrectly claimed the two
+            // cases were distinguished. In practice this is harmless:
+            // `DeviceMigration.chooseMigrationTarget` excludes
+            // `currentTarget` from its candidate pool, so a still-present-
+            // but-momentarily-unopenable device yields zero unclaimed
+            // candidates, `nil` migration, and a plain retry against the
+            // same target next poll -- it self-heals, it just isn't
+            // distinguished at this layer the way this comment used to say.
             return opened
         }
         return nil
