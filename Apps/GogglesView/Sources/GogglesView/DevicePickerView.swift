@@ -12,13 +12,50 @@ import SwiftUI
 // report for current verification status.
 struct DevicePickerView: View {
     @ObservedObject var picker: DevicePickerCoordinator
+    /// Settings is genuinely usable before any device is selected --
+    /// registering/re-registering the helper is exactly the thing you'd
+    /// need to do *first*, before a device can even show up -- so this
+    /// screen gets the same footer `GogglesConnectionView` has, not just
+    /// the post-selection one. `nil` only in contexts with no real
+    /// `SettingsWindowController` (mirrors `GogglesConnectionView`'s own
+    /// `onOpenSettings?` optionality).
+    var onOpenSettings: (() -> Void)?
 
     var body: some View {
-        ZStack {
-            AppChrome.backgroundColor.ignoresSafeArea()
-            content
-                .padding()
+        VStack(spacing: 16) {
+            ZStack {
+                AppChrome.backgroundColor.ignoresSafeArea()
+                content
+                    .padding()
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            footerBar
         }
+        .background(AppChrome.backgroundColor)
+    }
+
+    private var footerBar: some View {
+        HStack(alignment: .center) {
+            Button {
+                onOpenSettings?()
+            } label: {
+                Label("Settings", systemImage: "gearshape")
+                    .font(.caption)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
+            .disabled(onOpenSettings == nil)
+            .help(onOpenSettings == nil ? "Settings isn't available in this build." : "Open Settings")
+            .accessibilityIdentifier("settingsButton")
+
+            Spacer()
+
+            Text(AppChrome.versionFooterText)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .accessibilityIdentifier("versionFooterText")
+        }
+        .padding([.horizontal, .bottom])
     }
 
     @ViewBuilder

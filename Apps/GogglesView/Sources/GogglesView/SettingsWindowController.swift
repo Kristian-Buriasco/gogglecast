@@ -22,14 +22,15 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
     private let window: NSWindow
     private let viewModel: SettingsViewModel
 
-    /// - Parameter onReconnect: forwarded to `SettingsView`'s "Reconnect"
-    ///   button -- the caller (`main.swift`) passes
-    ///   `coordinator.reconnect()`, the exact same call the menu bar's
-    ///   "Reconnect" item makes.
-    init(onReconnect: @escaping () -> Void) {
+    /// No `onReconnect` parameter: Settings is built once, at app launch,
+    /// before any device is selected (so it's reachable from the device
+    /// picker too -- see `main.swift`) -- there is no
+    /// `GogglesConnectionCoordinator.reconnect()` to call yet at that
+    /// point. Call `setReconnectHandler(_:)` once one exists.
+    override init() {
         let viewModel = SettingsViewModel()
         self.viewModel = viewModel
-        let view = SettingsView(viewModel: viewModel, onReconnect: onReconnect)
+        let view = SettingsView(viewModel: viewModel)
         let hostingController = NSHostingController(rootView: view)
         // Matches `main.swift`'s `sizingOptions = []` fix (Task 3.5) --
         // this window's content is a fixed-size settings form, not
@@ -73,6 +74,15 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         viewModel.refresh()
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    /// Called once a device is selected and a real
+    /// `GogglesConnectionCoordinator` exists -- wires the Settings
+    /// screen's "Reconnect" button (previously disabled/absent) to
+    /// `coordinator.reconnect()`, the exact same call the menu bar's
+    /// "Reconnect" item makes.
+    func setReconnectHandler(_ handler: @escaping () -> Void) {
+        viewModel.reconnectHandler = handler
     }
 
     // MARK: - NSWindowDelegate

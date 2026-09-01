@@ -30,6 +30,14 @@ public final class SettingsViewModel: ObservableObject {
     /// register()/unregister() call's error, or a note that approval is
     /// pending. `nil` most of the time (no news is good news).
     @Published public private(set) var actionMessage: String?
+    /// The "Reconnect" button's action -- `nil` until a device has been
+    /// selected (no active `GogglesConnectionCoordinator` exists yet).
+    /// Settings itself is reachable long before that (from the device
+    /// picker too -- registering/re-registering the helper is exactly what
+    /// you'd need *before* a device shows up), so this is a mutable,
+    /// externally-settable property rather than a fixed init-time closure:
+    /// `main.swift` sets it once `launchMainWindow` runs.
+    @Published public var reconnectHandler: (() -> Void)?
 
     private var pollTimer: Timer?
 

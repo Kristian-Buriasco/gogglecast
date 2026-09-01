@@ -292,8 +292,64 @@ if args.contains("--run") || !args.dropFirst().contains(where: { $0.hasPrefix("-
     let app = NSApplication.shared
     app.setActivationPolicy(.regular)
 
+    // Settings fix (post-multi-device UX gap): built ONCE, here, before the
+    // picker -- not inside `launchMainWindow` as originally shipped.
+    // Registering/re-registering the helper daemon is exactly the thing a
+    // user needs to do *before* a device can show up at all, so gating
+    // Settings behind device selection made it unreachable at precisely
+    // the moment it's most needed. `setReconnectHandler` below wires the
+    // Reconnect button once a real coordinator exists post-selection; it
+    // stays disabled (not absent) before that, same "disabled reads more
+    // honest than silently missing" reasoning as the footer button itself.
+    let settingsWindowController = SettingsWindowController()
+
+    // Same fix, for the real top-of-screen app menu bar (App/File/Window --
+    // see the full construction and its own doc comment further down,
+    // inside `launchMainWindow`... no: moved up here too, for the same
+    // reason as Settings. `activeCoordinator` starts `nil` and is set once
+    // `launchMainWindow` runs; the File menu's "Reconnect" item is disabled
+    // until then instead of silently no-op'ing.
+    var activeCoordinator: GogglesConnectionCoordinator?
+    let mainMenu = NSMenu()
+    let appMenuItem = NSMenuItem()
+    mainMenu.addItem(appMenuItem)
+    let appMenu = NSMenu()
+    appMenu.addItem(withTitle: "About GogglesView", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
+    appMenu.addItem(.separator())
+    appMenu.addItem(withTitle: "Quit GogglesView", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+    appMenuItem.submenu = appMenu
+
+    let fileMenuItem = NSMenuItem()
+    mainMenu.addItem(fileMenuItem)
+    let fileMenu = NSMenu(title: "File")
+    let settingsMenuTarget = MenuActionTarget { settingsWindowController.show() }
+    let settingsMenuItem = NSMenuItem(title: "Settings…", action: #selector(MenuActionTarget.invoke), keyEquivalent: ",")
+    settingsMenuItem.target = settingsMenuTarget
+    fileMenu.addItem(settingsMenuItem)
+    let reconnectMenuTarget = MenuActionTarget { activeCoordinator?.reconnect() }
+    let reconnectMenuItem = NSMenuItem(title: "Reconnect", action: #selector(MenuActionTarget.invoke), keyEquivalent: "")
+    reconnectMenuItem.target = reconnectMenuTarget
+    reconnectMenuItem.isEnabled = false
+    fileMenu.addItem(reconnectMenuItem)
+    fileMenuItem.submenu = fileMenu
+
+    let windowMenuItem = NSMenuItem()
+    mainMenu.addItem(windowMenuItem)
+    let windowMenu = NSMenu(title: "Window")
+    windowMenu.addItem(withTitle: "Minimize", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
+    windowMenu.addItem(withTitle: "Zoom", action: #selector(NSWindow.performZoom(_:)), keyEquivalent: "")
+    windowMenu.addItem(.separator())
+    windowMenu.addItem(withTitle: "Bring All to Front", action: #selector(NSApplication.arrangeInFront(_:)), keyEquivalent: "")
+    windowMenuItem.submenu = windowMenu
+
+    app.mainMenu = mainMenu
+    app.windowsMenu = windowMenu
+
     let picker = DevicePickerCoordinator(client: client)
-    let pickerHostingController = NSHostingController(rootView: DevicePickerView(picker: picker))
+    let pickerHostingController = NSHostingController(rootView: DevicePickerView(
+        picker: picker,
+        onOpenSettings: { settingsWindowController.show() }
+    ))
     pickerHostingController.sizingOptions = []
     let pickerWindow = NSWindow(contentViewController: pickerHostingController)
     pickerWindow.title = "GogglesView"
@@ -322,7 +378,12 @@ if args.contains("--run") || !args.dropFirst().contains(where: { $0.hasPrefix("-
         // least one window is always on screen; `pickerWindow.close()`
         // below never sees a zero-window state at all, regardless of
         // delegate timing.
-        launchMainWindow(deviceId: deviceId, client: client, app: app)
+        let coordinator = launchMainWindow(
+            deviceId: deviceId, client: client, app: app,
+            settingsWindowController: settingsWindowController
+        )
+        activeCoordinator = coordinator
+        reconnectMenuItem.isEnabled = true
         pickerWindow.close()
     }
     pickerCancellable = observer
@@ -336,7 +397,7 @@ if args.contains("--run") || !args.dropFirst().contains(where: { $0.hasPrefix("-
     // spinning, it never calls `app.run()` itself). `observer` is kept
     // alive via `withExtendedLifetime` for the same reason every other
     // menu-bar/delegate object in this file needs an explicit owner.
-    withExtendedLifetime((observer, pickerCancellable, pickerDelegate)) {
+    withExtendedLifetime((observer, pickerCancellable, pickerDelegate, settingsWindowController, settingsMenuTarget, reconnectMenuTarget)) {
         app.run()
     }
     exit(0)
@@ -355,7 +416,11 @@ if args.contains("--run") || !args.dropFirst().contains(where: { $0.hasPrefix("-
 /// `enumerateDevices` round trip), and this function does not call
 /// `app.run()`/`exit(0)` itself (the caller's single `app.run()` call,
 /// already in progress, covers this too).
-func launchMainWindow(deviceId: String, client: HelperClient, app: NSApplication) {
+@discardableResult
+func launchMainWindow(
+    deviceId: String, client: HelperClient, app: NSApplication,
+    settingsWindowController: SettingsWindowController
+) -> GogglesConnectionCoordinator {
     let coordinator = GogglesConnectionCoordinator(client: client, deviceId: deviceId)
     let session = DecodeSession()
     session.onDroppedSample = { error in
@@ -373,12 +438,10 @@ func launchMainWindow(deviceId: String, client: HelperClient, app: NSApplication
         session.handle(nalData: data, nalType: nalType, isParameterSet: isParameterSet, hostTime: hostTime)
     }
 
-    // task-gui-v2 point 5: the real Settings window, built before the main
-    // window's `GogglesConnectionView` so the footer's Settings button can
-    // be wired to `settingsWindowController.show()` directly -- `reconnect`
-    // is the exact same `coordinator.reconnect()` the menu bar's
-    // "Reconnect" item calls (`MenuBarController.swift`).
-    let settingsWindowController = SettingsWindowController(onReconnect: { coordinator.reconnect() })
+    // Settings fix: `settingsWindowController` is now passed in, built
+    // once at app launch (before the picker) -- not rebuilt here. Just
+    // wire the Reconnect button it's been sitting without since launch.
+    settingsWindowController.setReconnectHandler { coordinator.reconnect() }
 
     let hostingController = NSHostingController(rootView: GogglesConnectionView(
         coordinator: coordinator,
@@ -463,82 +526,12 @@ func launchMainWindow(deviceId: String, client: HelperClient, app: NSApplication
     // decision and full behavior.
     let menuBarController = MenuBarController(coordinator: coordinator, window: window)
 
-    // task-gui-v3 point 2: the real top-of-screen macOS app menu bar. Task
-    // 3.6's `MenuBarController` above is a *different* surface (an
-    // `NSStatusItem` menu-bar-extra, a persistent status-bar icon) and stays
-    // exactly as-is -- this is the actual `NSApplication.shared.mainMenu`,
-    // which this app never had before (it isn't built on the SwiftUI
-    // `App`/`Scene` lifecycle -- see `MenuBarController.swift`'s doc comment
-    // for why -- so nothing was ever auto-supplying one the way a `@main
-    // App` would). `Settings`/`Reconnect` below call the exact same
-    // `settingsWindowController.show()`/`coordinator.reconnect()` the
-    // footer button and the status-item menu already call -- no duplicated
-    // logic, same objects, same methods.
-    //
-    // `MenuActionTarget` (defined at the bottom of this file, already used
-    // by `MenuBarController`) adapts a plain closure to the `@objc`
-    // selector `NSMenuItem.action` needs. `NSMenuItem.target` is a
-    // weak-ish reference (see `MenuBarController`'s own doc comment on the
-    // same pattern), so `settingsMenuTarget`/`reconnectMenuTarget` are
-    // `let`-bound here and kept alive for the app's lifetime via the
-    // `withExtendedLifetime` call below, same as `menuBarController`/
-    // `hideOnCloseDelegate`/`settingsWindowController` already are.
-    let mainMenu = NSMenu()
-
-    // App menu: "About GogglesView" / "Quit GogglesView" -- the standard
-    // macOS app-menu pattern. `Cmd+Q` stays wired through the same
-    // `NSApplication.terminate(_:)` selector Task 3.5/3.6 already used here.
-    let appMenuItem = NSMenuItem()
-    mainMenu.addItem(appMenuItem)
-    let appMenu = NSMenu()
-    // `action`'s target is left `nil` (the default) so it dispatches via the
-    // standard AppKit responder chain -- `NSApplication` itself implements
-    // `orderFrontStandardAboutPanel(_:)`, so a `nil`-targeted menu item
-    // reaches it with no extra plumbing, same as any other standard
-    // first-responder-chain menu action.
-    appMenu.addItem(withTitle: "About GogglesView", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
-    appMenu.addItem(.separator())
-    appMenu.addItem(withTitle: "Quit GogglesView", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
-    appMenuItem.submenu = appMenu
-
-    // File menu: Settings (reuses `settingsWindowController.show()`, the
-    // exact same controller/method the footer's Settings button opens) and
-    // Reconnect (reuses `coordinator.reconnect()`, the exact same call the
-    // status-item menu's "Reconnect" item makes). "File" per the task
-    // brief's own reasoning: the safe, conventional macOS top-level menu
-    // name even for an app with no real documents.
-    let fileMenuItem = NSMenuItem()
-    mainMenu.addItem(fileMenuItem)
-    let fileMenu = NSMenu(title: "File")
-    let settingsMenuTarget = MenuActionTarget { settingsWindowController.show() }
-    let settingsMenuItem = NSMenuItem(title: "Settings…", action: #selector(MenuActionTarget.invoke), keyEquivalent: ",")
-    settingsMenuItem.target = settingsMenuTarget
-    fileMenu.addItem(settingsMenuItem)
-    let reconnectMenuTarget = MenuActionTarget { coordinator.reconnect() }
-    // No conventional macOS keyboard shortcut exists for "Reconnect" (per
-    // the task brief) -- left with no `keyEquivalent`, same as the
-    // status-item menu's own "Reconnect" item does NOT do (that one uses
-    // "r" as a status-item-local convenience); a blank shortcut here avoids
-    // colliding with that unrelated surface's binding.
-    let reconnectMenuItem = NSMenuItem(title: "Reconnect", action: #selector(MenuActionTarget.invoke), keyEquivalent: "")
-    reconnectMenuItem.target = reconnectMenuTarget
-    fileMenu.addItem(reconnectMenuItem)
-    fileMenuItem.submenu = fileMenu
-
-    // Window menu: standard macOS Minimize/Zoom/Bring-All-to-Front
-    // boilerplate, wired through `NSApp.windowsMenu` so AppKit maintains the
-    // usual "list of open windows" section at the bottom automatically.
-    let windowMenuItem = NSMenuItem()
-    mainMenu.addItem(windowMenuItem)
-    let windowMenu = NSMenu(title: "Window")
-    windowMenu.addItem(withTitle: "Minimize", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
-    windowMenu.addItem(withTitle: "Zoom", action: #selector(NSWindow.performZoom(_:)), keyEquivalent: "")
-    windowMenu.addItem(.separator())
-    windowMenu.addItem(withTitle: "Bring All to Front", action: #selector(NSApplication.arrangeInFront(_:)), keyEquivalent: "")
-    windowMenuItem.submenu = windowMenu
-
-    app.mainMenu = mainMenu
-    app.windowsMenu = windowMenu
+    // task-gui-v3 point 2's `NSApplication.shared.mainMenu` (App/File/Window,
+    // with Settings/Reconnect) is now built ONCE at app launch (see the
+    // caller, before the picker is even shown) -- not rebuilt here. This
+    // function only needed to enable the Reconnect menu item and set
+    // `activeCoordinator`, both of which the caller does right after this
+    // function returns `coordinator`.
 
     // `applicationShouldTerminateAfterLastWindowClosed` is `false` here
     // (unlike `LiveViewAppDelegate`, used by the `--live-view`/
@@ -570,17 +563,18 @@ func launchMainWindow(deviceId: String, client: HelperClient, app: NSApplication
     // still-live `hostingController` holds a strong reference to it), but
     // listed explicitly here too for the same "don't rely on an indirect
     // capture chain to keep this alive" clarity the other two get.
-    // task-gui-v3: `settingsMenuTarget`/`reconnectMenuTarget` added to this
-    // tuple for the same reason as the three that were already here --
-    // `NSMenuItem.target` doesn't retain, so the app-menu's Settings/
-    // Reconnect items need a living owner for the app's whole run, same as
-    // `MenuBarController`'s equivalent targets are kept alive by that
-    // class's own stored properties. Unlike Task 3.6's original code, this
-    // can't use `withExtendedLifetime(...) { app.run() }` any more -- the
-    // caller's `app.run()` is already in progress by the time this function
-    // runs -- so these are retained in a top-level array instead (see
-    // `mainWindowRetainedObjects`'s doc comment).
-    mainWindowRetainedObjects = [menuBarController, hideOnCloseDelegate, settingsWindowController, settingsMenuTarget, reconnectMenuTarget, delegate]
+    // `settingsWindowController`/the main-menu's `MenuActionTarget`s are now
+    // retained by the caller's `withExtendedLifetime` tuple (built once at
+    // app launch, alongside them) instead of here. Unlike Task 3.6's
+    // original code, this function can't use
+    // `withExtendedLifetime(...) { app.run() }` any more -- the caller's
+    // `app.run()` is already in progress by the time this function runs --
+    // so `menuBarController`/`hideOnCloseDelegate`/`delegate` (all still
+    // genuinely first-constructed here, per device selection) are retained
+    // in a top-level array instead (see `mainWindowRetainedObjects`'s doc
+    // comment).
+    mainWindowRetainedObjects = [menuBarController, hideOnCloseDelegate, delegate]
+    return coordinator
 }
 if args.contains("--force-state") {
     // Task 3.4 exit criterion ("verified by forcing each one"): opens a

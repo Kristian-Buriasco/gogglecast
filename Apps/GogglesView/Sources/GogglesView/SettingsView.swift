@@ -17,7 +17,6 @@ import SwiftUI
 
 struct SettingsView: View {
     @ObservedObject var viewModel: SettingsViewModel
-    let onReconnect: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -85,9 +84,15 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Connection").font(.headline)
             Button("Reconnect") {
-                onReconnect()
+                viewModel.reconnectHandler?()
             }
+            .disabled(viewModel.reconnectHandler == nil)
             .accessibilityIdentifier("settingsReconnectButton")
+            if viewModel.reconnectHandler == nil {
+                Text("No device selected yet.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 }
