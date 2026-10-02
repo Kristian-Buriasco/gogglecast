@@ -124,14 +124,29 @@ if [[ -n "$EXT_BIN" ]]; then
         --sign "$SIGN_IDENTITY" "$EXT_BUNDLE"
 fi
 
+# GOGGLESVIEW_WITH_EXTENSION_INSTALL=1 opts into the
+# com.apple.developer.system-extension.install entitlement for testing
+# Task 4.1's OSSystemExtensionRequest path -- requires a paid Apple
+# Developer Program membership just to provision (confirmed via AMFI -413
+# "No matching profile found"; see docs/dev-setup.md). Without that
+# membership, building WITH this entitlement makes the whole app fail
+# AMFI validation and refuse to launch at all, not just refuse to install
+# the extension -- so it's opt-in, not the default.
+if [[ -n "${GOGGLESVIEW_WITH_EXTENSION_INSTALL:-}" ]]; then
+    APP_ENTITLEMENTS="$SCRIPT_DIR/BundleResources/GogglesView-with-extension-install.entitlements"
+    echo "==> GOGGLESVIEW_WITH_EXTENSION_INSTALL set: using $APP_ENTITLEMENTS"
+else
+    APP_ENTITLEMENTS="$SCRIPT_DIR/BundleResources/GogglesView.entitlements"
+fi
+
 echo "==> Code-signing GogglesView (app binary, entitlements)"
 codesign --force --options runtime \
-    --entitlements "$SCRIPT_DIR/BundleResources/GogglesView.entitlements" \
+    --entitlements "$APP_ENTITLEMENTS" \
     --sign "$SIGN_IDENTITY" "$APP_BUNDLE/Contents/MacOS/GogglesView"
 
 echo "==> Code-signing the app bundle as a whole"
 codesign --force --options runtime \
-    --entitlements "$SCRIPT_DIR/BundleResources/GogglesView.entitlements" \
+    --entitlements "$APP_ENTITLEMENTS" \
     --sign "$SIGN_IDENTITY" "$APP_BUNDLE"
 
 echo "==> Verifying signatures"

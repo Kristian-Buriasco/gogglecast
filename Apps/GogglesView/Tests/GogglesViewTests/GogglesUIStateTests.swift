@@ -421,6 +421,17 @@ struct MenuBarControllerTests {
         #expect(MenuBarController.displayText(for: .noHelper(reason: reason)) == reason)
     }
 
+    @Test("live with stats appends resolution and real fps, not a placeholder")
+    func liveWithStatsShowsFpsAndResolution() {
+        let stats = StreamStats(fps: 56, bitrateKbps: 8200, drops: 0, cumulativeFrames: 1000, cumulativeBytes: 1_000_000, cumulativeDrops: 0)
+        #expect(MenuBarController.displayText(for: .live, stats: stats) == "Live · 1920x1080 · 56fps")
+    }
+
+    @Test("live with no stats yet omits the suffix rather than showing a stale/zero placeholder")
+    func liveWithNoStatsOmitsSuffix() {
+        #expect(MenuBarController.displayText(for: .live, stats: nil) == "Live")
+    }
+
     @Test("glyphImage returns a non-nil image for every kind")
     func glyphImageAlwaysProducesAnImage() {
         for kind in GogglesUIStateKind.allCases {

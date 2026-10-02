@@ -4,20 +4,24 @@ import GogglesXPC
 import SwiftUI
 
 // ─────────────────────────────────────────────────────────────────────────
-// Task 3.4: the device-info card (design §6/plan 3.4: "product / serial /
-// `2CA3:0020` / bus-address ... styled after CosmoViewer Direct's layout").
-// CosmoViewer Direct is a UX reference only (design §6's explicit caveat,
-// copied into the task brief) -- nothing about its internals is known and
-// nothing here is derived from it beyond "a small identity summary card."
+// Task 3.4 originally put this info in a big standalone card (design §6/plan
+// 3.4: "product / serial / `2CA3:0020` / bus-address"). User feedback
+// (round 3, live hardware testing) asked for it moved into the same title-
+// bar-level row as the status pill instead -- "Name of the goggles and
+// serial + small usb mention at the same level of the live bubble card" --
+// so this is now a compact, single-line inline chip (`CompactDeviceIdentity`,
+// this file's sole content), not a separate full-width card.
+// CosmoViewer Direct is a UX reference only (design §6's explicit caveat);
+// nothing here is derived from it beyond "a small identity summary."
 // ─────────────────────────────────────────────────────────────────────────
 
-/// Product/serial/VID:PID/bus-address summary, shown from `.claiming`
-/// onward (`GogglesUIStateKind.showsDeviceCard`). `info == nil` is a real,
+/// Product name, serial, and USB ID as one compact inline row -- shown from
+/// `.claiming` onward (`GogglesUIStateKind.showsDeviceCard`,
+/// `GogglesConnectionView`'s `topIdentityRow`). `info == nil` is a real,
 /// renderable state (e.g. `.claiming`, before `currentDeviceInfo`'s first
 /// `deviceChanged` callback has landed) -- shown with placeholder text
-/// rather than hidden, so the card's presence itself stays a reliable
-/// "we're past `noDevice`" signal across every state that should show it.
-struct DeviceInfoCard: View {
+/// rather than hidden.
+struct CompactDeviceIdentity: View {
     let info: DeviceInfo?
 
     /// design's literal `2CA3:0020` when no device info is known yet
@@ -29,24 +33,28 @@ struct DeviceInfoCard: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        HStack(spacing: 6) {
             Text(info?.product ?? "DJI Goggles 3")
-                .font(.headline)
-            LabeledContent("Serial", value: info?.serial ?? "—")
-            LabeledContent("USB ID", value: usbIDText)
-            LabeledContent("Bus / Address", value: info.map { "\($0.bus) / \($0.address)" } ?? "—")
+                .font(.subheadline.bold())
+                .foregroundStyle(.white)
+            Text("·")
+                .foregroundStyle(.secondary)
+            Text("S/N \(info?.serial ?? "—")")
+            Text("·")
+                .foregroundStyle(.secondary)
+            Text("USB \(usbIDText)")
         }
-        .font(.subheadline)
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 10))
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .lineLimit(1)
+        .truncationMode(.middle)
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("deviceInfoCard")
     }
 }
 
 #Preview("Known device") {
-    DeviceInfoCard(info: DeviceInfo(
+    CompactDeviceIdentity(info: DeviceInfo(
         product: "DJI Goggles 3",
         serial: "ABC123XYZ",
         idVendor: 0x2CA3,
@@ -56,10 +64,12 @@ struct DeviceInfoCard: View {
         address: 3
     ))
     .padding()
+    .background(Color.black)
 }
 
 #Preview("Unknown device (claiming, before deviceChanged)") {
-    DeviceInfoCard(info: nil)
+    CompactDeviceIdentity(info: nil)
         .padding()
+        .background(Color.black)
 }
 #endif

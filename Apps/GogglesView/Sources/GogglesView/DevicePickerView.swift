@@ -67,29 +67,23 @@ struct DevicePickerView: View {
                 .accessibilityIdentifier("picker-discovering")
 
         case .picking(let candidates):
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Multiple Goggles found — choose one")
-                    .font(.headline)
+            VStack(alignment: .leading, spacing: 14) {
+                // User-directed change: no more auto-select, so this
+                // screen (and its heading) is now the every-time path,
+                // not just the 2+-device case -- the heading adapts
+                // rather than always saying "Multiple Goggles found".
+                Text(candidates.count == 1 ? "Select your Goggles" : "Multiple Goggles found — choose one")
+                    .font(.title3.bold())
                     .foregroundStyle(.white)
-                List(candidates) { candidate in
-                    Button {
-                        picker.select(candidate.id)
-                    } label: {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(candidate.product ?? "DJI Goggles 3")
-                                .foregroundStyle(.primary)
-                            Text(candidate.serial.map { "S/N \($0)" } ?? candidate.id)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                ScrollView {
+                    VStack(spacing: 10) {
+                        ForEach(candidates) { candidate in
+                            DevicePickerCandidateRow(candidate: candidate) {
+                                picker.select(candidate.id)
+                            }
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("picker-candidate-\(candidate.id)")
                 }
-                .listStyle(.plain)
-                .scrollContentBackground(.hidden)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
 
@@ -109,6 +103,53 @@ struct DevicePickerView: View {
             }
             .accessibilityIdentifier("picker-connectionUnavailable")
         }
+    }
+}
+
+/// One selectable candidate in the `.picking` list: goggles icon, product
+/// name (the "type of goggles" -- currently always "DJI Goggles 3", the
+/// only VID:PID this app targets, but shown explicitly rather than
+/// assumed, per user feedback -- ready to actually distinguish models the
+/// day this app supports more than one), and the same Serial/USB ID/
+/// Bus-Address detail `DeviceInfoCard` shows post-selection, so a user with
+/// several identical-looking units can actually tell them apart.
+private struct DevicePickerCandidateRow: View {
+    let candidate: DevicePickerCandidate
+    let onSelect: () -> Void
+
+    var body: some View {
+        Button(action: onSelect) {
+            HStack(spacing: 14) {
+                // "eyeglasses" rather than "visionpro" -- guaranteed present
+                // across SF Symbols versions/deployment targets, where a
+                // newer/rarer symbol name risks silently rendering nothing.
+                Image(systemName: "eyeglasses")
+                    .font(.system(size: 28))
+                    .foregroundStyle(.white)
+                    .frame(width: 40)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(candidate.product ?? "DJI Goggles 3")
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                    LabeledContent("Serial", value: candidate.serial ?? "—")
+                    LabeledContent("USB ID", value: candidate.usbIDText)
+                    LabeledContent("Bus / Address", value: "\(candidate.bus) / \(candidate.address)")
+                }
+                .font(.caption)
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .foregroundStyle(.secondary)
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 10))
+            .contentShape(RoundedRectangle(cornerRadius: 10))
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("picker-candidate-\(candidate.id)")
     }
 }
 #endif

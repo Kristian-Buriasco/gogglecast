@@ -2,13 +2,15 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- Task 4.1: required to call OSSystemExtensionRequest at all.
-	     design.md §8.5: available to any Apple Developer Program member
-	     (even a free/personal team), no case-by-case approval needed.
-	     The real gate for actually installing on a normal Mac is signing
-	     (Developer ID + notarization), not this entitlement. -->
-	<key>com.apple.developer.system-extension.install</key>
-	<true/>
+	<!-- `com.apple.developer.system-extension.install` deliberately
+	     NOT included here. Confirmed (Task 4.1, post-fix): that
+	     entitlement requires a paid Apple Developer Program membership
+	     just to provision; without one, AMFI rejects the WHOLE APP at
+	     launch (Error -413 "No matching profile found"), not just the
+	     extension-install call. This is the default, day-to-day-usable
+	     app entitlements file; see GogglesView-with-extension-install
+	     .entitlements for the Task-4.1-testing variant (usable only once
+	     a paid membership is active). -->
 	<key>com.apple.security.application-groups</key>
 	<array>
 		<string>group.com.kburiasco.gogglesview</string>

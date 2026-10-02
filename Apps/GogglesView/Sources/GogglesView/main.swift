@@ -353,7 +353,12 @@ if args.contains("--run") || !args.dropFirst().contains(where: { $0.hasPrefix("-
     pickerHostingController.sizingOptions = []
     let pickerWindow = NSWindow(contentViewController: pickerHostingController)
     pickerWindow.title = "GogglesView"
-    pickerWindow.setContentSize(NSSize(width: 640, height: 360))
+    // User feedback ("its too small the window"): the picker now always
+    // shows (no auto-select) and its rows carry full device-identity
+    // detail, so it needs real room -- bumped from the original 640x360
+    // (sized for a single-line "connect your goggles" message) to
+    // something that comfortably fits a few detailed candidate cards.
+    pickerWindow.setContentSize(NSSize(width: 720, height: 520))
     pickerWindow.styleMask = [.titled, .closable, .resizable, .miniaturizable]
     applyCustomTitleBarChrome(to: pickerWindow)
     pickerWindow.center()
@@ -479,7 +484,13 @@ func launchMainWindow(
     hostingController.sizingOptions = []
     let window = NSWindow(contentViewController: hostingController)
     window.title = "GogglesView"
-    let defaultContentSize = NSSize(width: 640, height: 360) // exactly 16:9
+    // User feedback ("still too small"): 640x360 cramped every state's
+    // content (the waitingForKeyframe card's own text was clipped at the
+    // window's bottom edge). 960x540 is still exactly 16:9 (contentAspectRatio
+    // below still governs user resizing), just 1.5x the linear size --
+    // window remains freely resizable, this only changes the launch default.
+    let defaultContentSize = NSSize(width: 960, height: 540) // exactly 16:9
+
     window.setContentSize(defaultContentSize)
     window.styleMask = [.titled, .closable, .resizable, .miniaturizable]
     // task-gui-v2: custom in-app title bar (see the function's own doc
@@ -518,6 +529,23 @@ func launchMainWindow(
     let hideOnCloseDelegate = HideOnCloseWindowDelegate()
     window.delegate = hideOnCloseDelegate
     window.makeKeyAndOrderFront(nil)
+
+    // User feedback (round 3): the previous fixed-constant pill/traffic-
+    // light alignment did not actually match on screen; a first attempt at
+    // a real measurement, taken right after `applyCustomTitleBarChrome`
+    // but BEFORE the window was ever ordered on screen, was closer but
+    // still visibly off -- the title bar's internal layout evidently isn't
+    // fully settled until the window is actually displayed. Measuring here
+    // instead, right after `makeKeyAndOrderFront`, and re-assigning
+    // `rootView` with the result (a `NSHostingController`'s `rootView` can
+    // be reassigned after creation, so this doesn't require restructuring
+    // anything above).
+    hostingController.rootView = GogglesConnectionView(
+        coordinator: coordinator,
+        session: session,
+        onOpenSettings: { settingsWindowController.show() },
+        pillBandHeight: AppChrome.measuredPillBandHeight(for: window)
+    )
 
     // Task 3.6: the real menu bar presence -- state glyph, "Reconnect"
     // (relocated here, its proper home, from the temporary "Goggles" main-

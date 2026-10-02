@@ -11,16 +11,15 @@ import GogglesXPC
 // state machine, rather than adding picker-related cases to the existing
 // GogglesUIState enum").
 //
-// Regression-path behavior (0 or 1 device): polls `enumerateDevices` once
-// connected, same ~1s cadence the helper's own (pre-existing) device-retry
-// poll used, and auto-selects the instant exactly one candidate appears --
-// no user action, matching the old singular protocol's "just plug it in"
-// behavior exactly. Only shows an actual picker screen (`DevicePickerView`)
-// when 2+ devices are found. NOT hardware-verified as of this writing (no
-// physical Goggles 3 was connected to the machine this was written on) --
-// see the task report for the honest, current verification status; this
-// comment should be read as design intent, not a claim that it was
-// observed working.
+// UPDATED per live user feedback (hardware-verified, post-multi-device):
+// the picker screen (`DevicePickerView`) always shows and always requires
+// an explicit tap, even for exactly one candidate -- the original design
+// auto-selected a sole candidate (matching the pre-multi-device app's
+// "just plug it in, no extra step" behavior); the user asked for that
+// removed after seeing it live, so `poll()` now routes any non-zero
+// candidate count to `.picking`. 0 candidates still shows `.discovering`
+// (visually equivalent to the existing `.noDevice` screen), polled at the
+// same ~1s cadence the helper's own (pre-existing) device-retry poll uses.
 // ─────────────────────────────────────────────────────────────────────────
 
 /// Value-type snapshot of `GogglesXPC.DeviceInfo` for `@Published`/SwiftUI
@@ -31,15 +30,36 @@ public struct DevicePickerCandidate: Equatable, Identifiable, Sendable {
     public let id: String
     public let product: String?
     public let serial: String?
+    /// Full USB identity, carried through so the picker row can show the
+    /// same "type of goggles" detail (`VID:PID`, bus/address) the
+    /// post-selection `DeviceInfoCard` shows -- useful the moment this app
+    /// ever supports more than one goggles model/VID:PID, and honest right
+    /// now about which physical port each candidate is on.
+    public let idVendor: UInt16
+    public let idProduct: UInt16
+    public let bus: UInt8
+    public let address: UInt8
 
-    public init(id: String, product: String?, serial: String?) {
+    public init(id: String, product: String?, serial: String?, idVendor: UInt16, idProduct: UInt16, bus: UInt8, address: UInt8) {
         self.id = id
         self.product = product
         self.serial = serial
+        self.idVendor = idVendor
+        self.idProduct = idProduct
+        self.bus = bus
+        self.address = address
     }
 
     public init(_ info: DeviceInfo) {
-        self.init(id: info.deviceId, product: info.product, serial: info.serial)
+        self.init(
+            id: info.deviceId, product: info.product, serial: info.serial,
+            idVendor: info.idVendor, idProduct: info.idProduct, bus: info.bus, address: info.address
+        )
+    }
+
+    /// `"2CA3:0020"`-style, matching `DeviceInfoCard`'s own formatting.
+    public var usbIDText: String {
+        String(format: "%04X:%04X", idVendor, idProduct)
     }
 }
 
@@ -146,9 +166,13 @@ public final class DevicePickerCoordinator: ObservableObject {
             switch infos.count {
             case 0:
                 self.state = .discovering
-            case 1:
-                self.select(infos[0].deviceId)
             default:
+                // User-directed change: always show the picker screen and
+                // require an explicit tap, even for exactly one candidate
+                // -- no more auto-select. (Originally this case
+                // auto-selected the sole candidate, matching the pre-
+                // multi-device app's "just plug it in" behavior; the user
+                // asked for that removed after seeing it live.)
                 self.state = .picking(infos.map(DevicePickerCandidate.init))
             }
         }

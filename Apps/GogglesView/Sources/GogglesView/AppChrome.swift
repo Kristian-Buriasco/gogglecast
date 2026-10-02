@@ -107,6 +107,52 @@ enum AppChrome {
     /// definition, next to the other window-chrome constants in this file.
     static let titleBarHeight: CGFloat = 32
 
+    #if canImport(AppKit)
+    /// Live-measured replacement for the fixed `titleBarHeight` constant
+    /// above: user feedback confirmed the assumed-symmetric-centering
+    /// approach (`.frame(height: titleBarHeight)`, HStack's default
+    /// `.center` alignment) did NOT actually line up with the real traffic
+    /// lights on screen, despite the constant's own doc comment claiming a
+    /// verified measurement -- rather than re-guess a new fixed number,
+    /// this reads the REAL close-button frame off the actual live window
+    /// at the point it's called (after `applyCustomTitleBarChrome` has been
+    /// applied), and returns twice its distance from the window's top edge.
+    /// A top-pinned view given `.frame(height: this value)` then has its
+    /// SwiftUI-default-centered content land exactly on the real traffic
+    /// lights' vertical center, by construction, not by an assumption about
+    /// AppKit's internal title-bar-container symmetry that turned out not
+    /// to hold. Falls back to `titleBarHeight` if the button/window geometry
+    /// isn't available for any reason (should not happen for a real,
+    /// on-screen `NSWindow`, but this must never crash a production path).
+    static func measuredPillBandHeight(for window: NSWindow) -> CGFloat {
+        guard let closeButton = window.standardWindowButton(.closeButton) else {
+            return titleBarHeight
+        }
+        // BUG FOUND LIVE (round 3): `closeButton.frame` is relative to its
+        // IMMEDIATE SUPERVIEW (an internal titlebar container view, only a
+        // few dozen points tall), not the window's own coordinate space --
+        // reading `.frame.origin.y` directly against `window.frame.height`
+        // (540pt for this window) produced a wildly-too-large "offset from
+        // top", which is exactly why the identity/pill row rendered ~200pt
+        // down the window instead of at the real top edge. Converting the
+        // button's bounds to the window's base coordinate system (`nil`
+        // target, standard AppKit `NSView.convert(_:to:)` idiom for "give
+        // me coordinates relative to the window") fixes this properly.
+        let frameInWindow = closeButton.convert(closeButton.bounds, to: nil)
+        let buttonCenterYFromBottom = frameInWindow.origin.y + frameInWindow.height / 2
+        let offsetFromTop = window.frame.height - buttonCenterYFromBottom
+        guard offsetFromTop > 0, offsetFromTop < window.frame.height / 2 else {
+            // Sanity bound: a real title-bar-band offset is small (tens of
+            // points), never more than half the window -- if geometry ever
+            // looks implausible (e.g. read before layout has settled),
+            // fall back rather than render something worse than the fixed
+            // constant.
+            return titleBarHeight
+        }
+        return offsetFromTop * 2
+    }
+    #endif
+
     /// Status-dot color per `GogglesStatusGlyphCategory` -- the same
     /// three-bucket mapping `MenuBarController.glyphImage(for:)` uses for
     /// the real `NSStatusItem` (red/yellow/green), reused here so the

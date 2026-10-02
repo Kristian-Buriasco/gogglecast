@@ -21,6 +21,14 @@ struct GogglesConnectionView: View {
     /// Settings window to open (none currently; kept optional rather than
     /// forcing every future harness/test host of this view to supply one).
     var onOpenSettings: (() -> Void)?
+    /// User feedback (round 3): the previous fixed `AppChrome.titleBarHeight`-
+    /// based centering did not actually line up with the real traffic
+    /// lights on screen. `main.swift` now measures the real live window
+    /// (`AppChrome.measuredPillBandHeight(for:)`) once, after
+    /// `applyCustomTitleBarChrome` has been applied, and passes the result
+    /// here -- falls back to the fixed constant for previews/tests/harnesses
+    /// that don't have a real on-screen window to measure.
+    var pillBandHeight: CGFloat = AppChrome.titleBarHeight
 
     // ── GUI restyle task: CosmoViewer-Direct-inspired chrome ──
     // (.superpowers/sdd/plan/task-gui-restyle-brief.md, later revised by
@@ -31,21 +39,32 @@ struct GogglesConnectionView: View {
     // `AppGlowStrip` ambient-glow overlay here -- removed in the v2 pass per
     // live user feedback (see `AppChrome.swift`'s file doc comment).
     var body: some View {
+        // ROOT CAUSE FOUND (Opus research, empirically proven): `.fullSizeContentView`
+        // insets ALL SwiftUI content by the title bar height (32pt) via the
+        // safe area -- `.ignoresSafeArea()` was previously attached only to
+        // the background `Color`, not this whole ZStack, so every sibling
+        // (including `topIdentityRow` below) stayed laid out INSIDE that
+        // 32pt inset. Its `.frame(height: pillBandHeight)` band therefore
+        // started at 32pt from the window top (not 0), landing its centered
+        // content at 32+16=48pt -- exactly the 32pt-too-low offset seen in
+        // every screenshot across four rounds of (correct, but irrelevant)
+        // measurement debugging. Moving `.ignoresSafeArea()` here, to the
+        // whole ZStack, makes ALL content (including this view's top edge)
+        // span the true window top, matching what `pillBandHeight`'s
+        // measurement always correctly assumed.
         ZStack(alignment: .top) {
             AppChrome.backgroundColor
-                .ignoresSafeArea()
 
             VStack(spacing: 0) {
-                // task-gui-v3: this used to be `statusRow` itself (see git
-                // history) -- the pill now lives in the overlay just below,
-                // vertically centered on the traffic lights instead of
-                // flowing in-line here. This `Color.clear` spacer keeps
-                // `mainContent` starting below that same band (rather than
-                // sliding up under the traffic lights now that the pill row
-                // no longer occupies layout space), so nothing else in this
-                // VStack's layout had to change.
+                // The top row (compact device identity + status pill) is
+                // drawn as an overlay just below, pinned to the window's
+                // very top edge and vertically centered against the real
+                // measured traffic-light position -- this spacer just
+                // reserves that same band's height in the normal layout
+                // flow so `mainContent` starts below it instead of sliding
+                // up underneath.
                 Color.clear
-                    .frame(height: AppChrome.titleBarHeight)
+                    .frame(height: pillBandHeight)
 
                 mainContent
 
@@ -55,38 +74,37 @@ struct GogglesConnectionView: View {
                     .padding(.bottom, 10)
             }
 
-            // task-gui-v3 point 1: user feedback after seeing v2 live --
-            // "move the status pill up to the same vertical level as the
-            // traffic-light window buttons" (they were previously in their
-            // own row below the titlebar band, not aligned with them). Drawn
-            // as a ZStack(alignment: .top) overlay rather than left in the
-            // VStack's normal flow specifically so it can be pinned to the
-            // window's very top edge and vertically centered against
-            // `AppChrome.titleBarHeight` -- the same band the real
-            // traffic-light buttons occupy (`applyCustomTitleBarChrome` in
-            // main.swift extends this view's content up under them via
+            // User feedback (round 3): device identity (name, serial, a
+            // small USB mention) moved from a separate full-width card
+            // below into THIS same top row, alongside the status pill --
+            // "at the same level of the live bubble card" -- rather than
+            // occupying its own block in `mainContent`. Pinned to the
+            // window's very top edge (`ZStack(alignment: .top)`) and
+            // vertically centered within `pillBandHeight`, the REAL
+            // measured traffic-light band (`main.swift`,
+            // `AppChrome.measuredPillBandHeight(for:)`), not an assumed
+            // constant -- `applyCustomTitleBarChrome` extends this view's
+            // content up under the (transparent) title bar via
             // `.fullSizeContentView`, so this view's top edge IS the
-            // window's top edge, not offset by a real titlebar). `HStack`'s
-            // default vertical alignment is `.center`, so pinning this row's
-            // height to `AppChrome.titleBarHeight` centers the pill in
-            // exactly the same band AppKit centers the traffic lights in,
-            // without hand-tuning a top-padding number to eyeball the same
-            // result (see `AppChrome.titleBarHeight`'s doc comment for where
-            // that 28pt figure comes from).
-            statusRow
-                .padding(.horizontal, 14)
-                .frame(height: AppChrome.titleBarHeight)
+            // window's top edge.
+            topIdentityRow
+                // 78pt leading clearance -- the exact x-offset AppKit
+                // itself uses for a `.leading` `NSTitlebarAccessoryViewController`
+                // (verified empirically: traffic lights occupy roughly
+                // x=7...70, AppKit's own leading-accessory placement starts
+                // its content at x=78), not a guessed number -- avoids the
+                // device-identity text overlapping the traffic lights.
+                .padding(.leading, 78)
+                .padding(.trailing, 14)
+                .frame(height: pillBandHeight)
         }
+        .ignoresSafeArea()
     }
 
-    /// Task 3.4/3.5's original body, unchanged (device-info card from
-    /// `.claiming` onward, then state-appropriate content) -- this skin
-    /// pass only relocates it inside the new chrome, it does not alter it.
+    /// Task 3.4/3.5's original body, minus the device-info card (moved to
+    /// `topIdentityRow`) -- state-appropriate content only now.
     private var mainContent: some View {
         VStack(alignment: .leading, spacing: 16) {
-            if coordinator.uiState.kind.showsDeviceCard {
-                DeviceInfoCard(info: coordinator.deviceInfo)
-            }
             content
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -94,17 +112,22 @@ struct GogglesConnectionView: View {
         .accessibilityIdentifier("state-\(coordinator.uiState.kind.rawValue)")
     }
 
-    /// Task brief point 2's in-window equivalent of the reference's
-    /// right-aligned grouped title-bar status items -- see `StatusPill`'s
-    /// doc comment for why this is one honest pill, not a fabricated
-    /// "Goggles"/"Video" pair. Reuses `MenuBarController.displayText(for:)`
-    /// verbatim rather than re-deriving status copy a second time.
-    private var statusRow: some View {
-        HStack {
-            Spacer()
+    /// The window's top row: compact device identity (left) + status pill
+    /// (right), both vertically centered against the real traffic-light
+    /// position. Device identity only shows from `.claiming` onward
+    /// (`GogglesUIStateKind.showsDeviceCard`, unchanged threshold from the
+    /// old standalone card), same one honest pill as before (see
+    /// `StatusPill`'s doc comment for why this isn't a fabricated
+    /// "Goggles"/"Video" pair) reusing `MenuBarController.displayText(for:)`.
+    private var topIdentityRow: some View {
+        HStack(spacing: 10) {
+            if coordinator.uiState.kind.showsDeviceCard {
+                CompactDeviceIdentity(info: coordinator.deviceInfo)
+            }
+            Spacer(minLength: 8)
             StatusPill(
                 category: coordinator.uiState.kind.statusGlyphCategory,
-                text: MenuBarController.displayText(for: coordinator.uiState)
+                text: MenuBarController.displayText(for: coordinator.uiState, stats: coordinator.stats)
             )
         }
     }

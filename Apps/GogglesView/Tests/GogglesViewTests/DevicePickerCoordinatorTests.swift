@@ -8,14 +8,15 @@ import GogglesXPC
 // `HelperClient.enumerateDevicesOverrideForTesting` (a test seam,
 // HelperClient.swift), not by hand-constructing expected values and
 // asserting on those without ever exercising the coordinator's own polling
-// code (MEDIUM 6 fix, multi-device picker review round 2: the original
-// version of this file did exactly that, and its single-device
-// auto-select branch -- the MOST important line in the picker, this
-// session's own primary path verifiable without a second physical unit --
-// had no test at all). No real XPC/helper process is involved (no hardware
-// this session): this is the "mock-tested, not hardware-verified"
-// multi-claim/multi-device coverage the design's own verification section
-// calls for.
+// code (MEDIUM 6 fix, multi-device picker review round 2). Auto-select on a
+// single candidate was later removed per live user feedback -- every
+// non-zero candidate count now shows the picker screen and requires an
+// explicit tap (see `DevicePickerCoordinator.swift`'s file doc comment for
+// the history). No real XPC/helper process is involved here: this is the
+// "mock-tested, not hardware-verified" coordinator-logic coverage the
+// design's own verification section calls for; the picker UI itself and
+// the underlying single-device connect flow ARE now hardware-verified
+// (see the task report).
 
 @Suite("DevicePickerCoordinator")
 struct DevicePickerCoordinatorTests {
@@ -29,8 +30,10 @@ struct DevicePickerCoordinatorTests {
         #expect(picker.state == .discovering)
     }
 
-    @Test("exactly 1 candidate -> auto-selects with no user action (the single-device regression path)")
-    func exactlyOneCandidateAutoSelects() {
+    @Test("exactly 1 candidate -> shows the picker, does not auto-select")
+    func exactlyOneCandidateShowsPicking() {
+        // User-directed change (post-hardware-testing): auto-select was
+        // removed -- even a single candidate requires an explicit tap.
         let client = HelperClient()
         let device = DeviceInfo(product: "DJI Goggles 3", serial: "XYZ789", idVendor: 0x2CA3, idProduct: 0x0020, bcdDevice: 0x0100, bus: 20, address: 3)
         client.enumerateDevicesOverrideForTesting = { [device] }
@@ -38,17 +41,17 @@ struct DevicePickerCoordinatorTests {
 
         client.onConnectionStateChange?(.connected)
 
-        // This is the exact behavior the design requires for the
-        // regression path: no picker screen, no user action -- `state`
-        // goes straight to `.selected`, driven by the real `poll()` ->
-        // `enumerateDevices` -> `case 1:` branch, not asserted by hand.
+        #expect(picker.state == .picking([DevicePickerCandidate(device)]))
+
+        // The explicit tap still works and still reaches `.selected`.
+        picker.select(device.deviceId)
         #expect(picker.state == .selected(device.deviceId))
     }
 
-    @Test("exactly 1 candidate with no serial still auto-selects (bus:address fallback ID)")
-    func exactlyOneCandidateWithNoSerialAutoSelects() {
+    @Test("exactly 1 candidate with no serial still shows the picker (bus:address fallback ID)")
+    func exactlyOneCandidateWithNoSerialShowsPicking() {
         // RNDISTransport.swift's own doc comment: serial is "frequently
-        // nil on this hardware" -- the auto-select path must work for the
+        // nil on this hardware" -- the picker path must work for the
         // bus:address-fallback-ID case too, not just the serial-backed one.
         let client = HelperClient()
         let device = DeviceInfo(product: "DJI Goggles 3", serial: nil, idVendor: 0x2CA3, idProduct: 0x0020, bcdDevice: 0x0100, bus: 20, address: 3)
@@ -57,6 +60,8 @@ struct DevicePickerCoordinatorTests {
 
         client.onConnectionStateChange?(.connected)
 
+        #expect(picker.state == .picking([DevicePickerCandidate(device)]))
+        picker.select("bus:20:3")
         #expect(picker.state == .selected("bus:20:3"))
     }
 

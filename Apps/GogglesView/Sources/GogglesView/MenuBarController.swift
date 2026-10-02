@@ -1,6 +1,7 @@
 #if canImport(AppKit)
 import AppKit
 import Combine
+import GogglesXPC
 
 // ─────────────────────────────────────────────────────────────────────────
 // Task 3.6: the real menu bar presence -- state glyph (design plan §3.6:
@@ -111,7 +112,16 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     /// design §6-derived short status text for the disabled top menu line --
     /// intentionally not `String(describing:)`'d off `GogglesUIStateKind`'s
     /// raw case names, which read as code, not UI copy.
-    static func displayText(for state: GogglesUIState) -> String {
+    ///
+    /// - Parameter stats: user-requested addition -- when live, append the
+    ///   current resolution and framerate ("Live · 1920x1080 · 56fps").
+    ///   Resolution is the one fixed profile this app decodes (design §1's
+    ///   single VID:PID/stream profile), not read per-frame; framerate is
+    ///   `stats.fps`, the same real, live-updating value the app's own
+    ///   `[client-fps]` log line and `gvcli --stats` report. `stats == nil`
+    ///   (not yet received one, or a non-`.live` state) omits the suffix
+    ///   entirely rather than showing a stale/zero placeholder.
+    static func displayText(for state: GogglesUIState, stats: StreamStats? = nil) -> String {
         switch state {
         case .noHelper(let reason):
             return reason ?? "Helper not installed"
@@ -128,7 +138,8 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         case .waitingForKeyframe:
             return "Waiting for video…"
         case .live:
-            return "Live"
+            guard let stats else { return "Live" }
+            return "Live · 1920x1080 · \(stats.fps)fps"
         case .stalled:
             return "Signal lost — reconnecting…"
         }

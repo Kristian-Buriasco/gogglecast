@@ -353,7 +353,27 @@ public final class HelperClient: NSObject {
         connectionState = .connecting
 
         let newConnection = NSXPCConnection(machServiceName: machServiceName, options: .privileged)
-        newConnection.remoteObjectInterface = NSXPCInterface(with: GogglesHelperProtocol.self)
+        let helperInterface = NSXPCInterface(with: GogglesHelperProtocol.self)
+        // Real bug found live (multi-device hardware testing): unlike a
+        // single custom NSSecureCoding-conforming parameter/reply (which
+        // NSXPCInterface can auto-derive the allowed class from the
+        // Objective-C method signature), an ARRAY of one -- here,
+        // `enumerateDevices(reply: ([DeviceInfo]) -> Void)`'s
+        // `[DeviceInfo]` reply -- is never auto-whitelisted. Without this,
+        // the connection logs "Exception caught during decoding of reply
+        // to message 'enumerateDevicesWithReply:', dropping incoming
+        // message" on every call and the picker never sees any candidate,
+        // even though the helper-side enumeration itself succeeds (visible
+        // in its own log as "found N candidate(s)") -- the failure is
+        // purely in the client decoding the reply, hence this is set on
+        // `remoteObjectInterface`, not the helper's `exportedInterface`.
+        helperInterface.setClasses(
+            NSSet(array: [NSArray.self, DeviceInfo.self]) as! Set<AnyHashable>,
+            for: #selector(GogglesHelperProtocol.enumerateDevices(reply:)),
+            argumentIndex: 0,
+            ofReply: true
+        )
+        newConnection.remoteObjectInterface = helperInterface
         newConnection.exportedInterface = NSXPCInterface(with: GogglesClientProtocol.self)
 
         let exported = ExportedClient()
