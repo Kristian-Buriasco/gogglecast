@@ -75,4 +75,75 @@ actor PipelineState {
     func cumulativeSnapshot() -> (frames: Int, bytes: Int, drops: Int) {
         (cumulativeFrameCount, cumulativeByteCount, cumulativeDropCount)
     }
+
+    // MARK: - Protocol diagnostics (`[proto]` stderr line under --stats)
+    //
+    // Per udp_protocol.md (samuelsadok/dji_protocol), every goggles->host
+    // type-0x01 (telemetry, ~10 Hz) and type-0x02 (video) packet carries the
+    // goggles' *type-2 send window* in body bytes 0..7: window start, window
+    // end, resend state 1, resend state 2 (u16 LE each). Logging these per
+    // second shows directly whether a video silence is the goggles blocking
+    // on its flow-control window (end - start pinned at a cap, start not
+    // advancing, resend states non-zero) while telemetry keeps flowing.
+
+    struct GogglesWindow: Sendable {
+        var start: UInt16
+        var end: UInt16
+        var resend1: UInt16
+        var resend2: UInt16
+    }
+
+    private var inboundTypeCountsThisSecond: [UInt8: Int] = [:]
+    private var retransmittedVideoThisSecond = 0
+    private var latestGogglesWindow: GogglesWindow?
+    private var videoPacketsThisSecond = 0
+
+    func noteInbound(pktType: UInt8, seq: UInt16, body: Data) {
+        inboundTypeCountsThisSecond[pktType, default: 0] += 1
+        if pktType == 0x02 {
+            videoPacketsThisSecond += 1
+            if seq & 0x7 != 0 { retransmittedVideoThisSecond += 1 }
+        }
+        if (pktType == 0x01 || pktType == 0x02), body.count >= 8 {
+            let b = body.startIndex
+            func u16(_ o: Int) -> UInt16 { UInt16(body[b + o]) | (UInt16(body[b + o + 1]) << 8) }
+            latestGogglesWindow = GogglesWindow(start: u16(0), end: u16(2), resend1: u16(4), resend2: u16(6))
+        }
+    }
+
+    /// Returns a one-line summary and resets the per-second counters.
+    func snapshotAndResetProto(lastAck: UInt16?) -> String {
+        let types = inboundTypeCountsThisSecond.keys.sorted()
+            .map { String(format: "t%02X=%d", $0, inboundTypeCountsThisSecond[$0] ?? 0) }
+            .joined(separator: " ")
+        var line = "in{\(types.isEmpty ? "none" : types)} retx=\(retransmittedVideoThisSecond)"
+        if let w = latestGogglesWindow {
+            let outstanding = Int(w.end &- w.start) / 8
+            line += String(format: " gwin=%04X..%04X (%d pkts) rs1=%04X rs2=%04X", w.start, w.end, outstanding, w.resend1, w.resend2)
+        }
+        if let lastAck {
+            line += String(format: " lastAck=%04X", lastAck)
+        }
+        inboundTypeCountsThisSecond.removeAll(keepingCapacity: true)
+        retransmittedVideoThisSecond = 0
+        videoPacketsThisSecond = 0
+        return line
+    }
+
+    // MARK: - Cumulative-window ack keepalive (AckMode.cumulativeWindow)
+
+    private(set) var lastWindowAck: UInt16?
+    private(set) var lastVideoRxTime = Date.distantPast
+    private(set) var lastAckSentTime = Date.distantPast
+
+    func recordWindowAck(_ seq: UInt16) {
+        lastWindowAck = seq
+        lastAckSentTime = Date()
+    }
+
+    func markVideoRx() { lastVideoRxTime = Date() }
+
+    func windowAckSnapshot() -> (lastAck: UInt16?, lastVideoRx: Date, lastAckSent: Date) {
+        (lastWindowAck, lastVideoRxTime, lastAckSentTime)
+    }
 }

@@ -18,11 +18,13 @@ func printUsage() {
           Connect over USB/RNDIS, print device info (product, serial,
           bcdDevice, bus/address), and exit. No video pipeline.
 
-      gvcli stream --out <path> [--stats]
+      gvcli stream --out <path> [--stats] [--ack-mode frame|window]
           Connect to real hardware over USB/RNDIS, run the full receive
           pipeline, and write raw Annex-B H.264 to <path> (a regular file
           or a FIFO -- opening a FIFO blocks until a reader attaches).
           Requires root to claim the goggles' USB interfaces on macOS.
+          --ack-mode window: EXPERIMENTAL cumulative receive-window acks
+          (also selectable via GOGGLES_ACK_MODE=window). Default 'frame'.
 
       gvcli replay <capture-file> [--out <path>] [--stats]
           Same pipeline, driven by a .gvcap capture file via MockTransport
@@ -31,7 +33,9 @@ func printUsage() {
           alone) without writing output.
 
     In both stream/replay, --stats prints one [stats] line per second to
-    stderr with fps, bitrate, and drop-count (per-second and cumulative).
+    stderr with fps, bitrate, and drop-count (per-second and cumulative),
+    plus a [proto] line: inbound packet counts by type, retransmitted video
+    packets, and the goggles' own type-2 send window (gwin) / resend state.
     """
     print(usage)
 }

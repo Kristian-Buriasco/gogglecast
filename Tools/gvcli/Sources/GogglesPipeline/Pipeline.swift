@@ -184,7 +184,8 @@ public func runPipeline(
     outPath: String?,
     stats: Bool,
     delegate: PipelineDelegate? = nil,
-    handle: PipelineHandle = PipelineHandle()
+    handle: PipelineHandle = PipelineHandle(),
+    ackMode: AckMode = .fromEnvironment()
 ) async throws {
     let sink: OutputSink?
     if let outPath {
@@ -196,7 +197,7 @@ public func runPipeline(
     } else {
         sink = nil
     }
-    try await runPipeline(transport: transport, sink: sink, stats: stats, delegate: delegate, handle: handle)
+    try await runPipeline(transport: transport, sink: sink, stats: stats, delegate: delegate, handle: handle, ackMode: ackMode)
 }
 
 /// Task 2.2: `GogglesHelper`'s entry point -- takes an already-constructed
@@ -210,7 +211,8 @@ public func runPipeline(
     sink: OutputSink?,
     stats: Bool,
     delegate: PipelineDelegate? = nil,
-    handle: PipelineHandle = PipelineHandle()
+    handle: PipelineHandle = PipelineHandle(),
+    ackMode: AckMode = .fromEnvironment()
 ) async throws {
     handle.transport = transport
     handle.sink = sink
@@ -224,6 +226,7 @@ public func runPipeline(
 
     let sessionId = WireProtocol.randomSessionId()
     FileHandle.standardError.write(Data(String(format: "[gvcli] Session ID: 0x%04X\n", sessionId).utf8))
+    FileHandle.standardError.write(Data("[gvcli] Ack mode: \(ackMode.rawValue)\(ackMode == .cumulativeWindow ? " (EXPERIMENTAL cumulative receive-window acks)" : "")\n".utf8))
 
     let state = PipelineState()
     let reassembler = FrameReassembler()
@@ -256,6 +259,15 @@ public func runPipeline(
     // `FrameReassembler`'s own age/distance eviction does -- see that
     // file for the stream.py correspondence.
     var ackTracker = FrameBoundaryAckTracker()
+    // Experimental alternative (`AckMode.cumulativeWindow`) -- see
+    // `WindowAckTracker.swift` for the protocol rationale.
+    var windowAckTracker = WindowAckTracker()
+
+    func sendWindowAck(_ ackSeq: UInt16) async {
+        let seq = await state.nextSeq()
+        send(WireProtocol.buildAck(startSeq: ackSeq, endSeq: ackSeq, seq: seq, sessionId: sessionId))
+        await state.recordWindowAck(ackSeq)
+    }
 
     try await withThrowingTaskGroup(of: Void.self) { group in
         // MARK: inbound-packet consumer
@@ -264,6 +276,7 @@ public func runPipeline(
                 await state.markRx()
                 guard let outer = WireProtocol.parseOuter(payload) else { continue }
                 WireProtocol.logUnknownPacketType(outer.pktType, context: "gvcli inbound")
+                await state.noteInbound(pktType: outer.pktType, seq: outer.seq, body: outer.body)
 
                 guard outer.pktType == WireProtocol.packetTypeVideo else {
                     continue
@@ -277,6 +290,13 @@ public func runPipeline(
 
                 let base = outer.body.startIndex
                 let frameNum = outer.body[base + 8]
+                await state.markVideoRx()
+
+                if ackMode == .cumulativeWindow {
+                    if let ackSeq = windowAckTracker.recordPacket(seq: outer.seq) {
+                        await sendWindowAck(ackSeq)
+                    }
+                }
 
                 // Frame-boundary ack: fires whenever this packet's
                 // frame_num differs from the previous packet's, covering
@@ -284,9 +304,10 @@ public func runPipeline(
                 // of whether FrameReassembler ever completed it. Matches
                 // stream.py's boundary-transition ack -- see
                 // `FrameBoundaryAckTracker.swift`.
-                if let range = ackTracker.recordPacket(frameNum: frameNum, seq: outer.seq) {
+                if ackMode == .frameRange, let range = ackTracker.recordPacket(frameNum: frameNum, seq: outer.seq) {
                     let ackSeq = await state.nextSeq()
                     send(WireProtocol.buildAck(startSeq: range.first, endSeq: range.last, seq: ackSeq, sessionId: sessionId))
+                    await state.recordWindowAck(range.first)
                 }
 
                 guard let nal = reassembler.process(videoPayload: outer.body, receivedAt: Date()) else {
@@ -299,9 +320,14 @@ public func runPipeline(
                 // completes, in addition to (never instead of) the
                 // boundary ack above -- matches stream.py's
                 // frag-count-reached branch.
-                if let range = ackTracker.recordCompletion(frameNum: frameNum) {
-                    let ackSeq = await state.nextSeq()
-                    send(WireProtocol.buildAck(startSeq: range.first, endSeq: range.last, seq: ackSeq, sessionId: sessionId))
+                if ackMode == .frameRange {
+                    if let range = ackTracker.recordCompletion(frameNum: frameNum) {
+                        let ackSeq = await state.nextSeq()
+                        send(WireProtocol.buildAck(startSeq: range.first, endSeq: range.last, seq: ackSeq, sessionId: sessionId))
+                        await state.recordWindowAck(range.first)
+                    }
+                } else if let ackSeq = windowAckTracker.flush() {
+                    await sendWindowAck(ackSeq)
                 }
 
                 // Started-gate: matches stream.py's flush_frame. NAL type
@@ -344,6 +370,18 @@ public func runPipeline(
                 if Task.isCancelled { break }
                 let timers = await state.snapshotTimers()
                 let now = Date()
+                // Cumulative-window mode only: if video has paused for
+                // >200ms, re-send the last cumulative ack (at most every
+                // 200ms tick) so a lost/ignored ack can never leave the
+                // goggles' send window blocked waiting on us.
+                if ackMode == .cumulativeWindow {
+                    let w = await state.windowAckSnapshot()
+                    if let last = w.lastAck,
+                       now.timeIntervalSince(w.lastVideoRx) > 0.2,
+                       now.timeIntervalSince(w.lastAckSent) > 0.2 {
+                        await sendWindowAck(last)
+                    }
+                }
                 if now.timeIntervalSince(timers.lastRx) > 2.0 {
                     let seq = await state.nextSeq()
                     send(WireProtocol.buildHandshake(seq: seq, sessionId: sessionId))
@@ -374,6 +412,8 @@ public func runPipeline(
                     let (fps, bytes, drops) = await state.snapshotAndResetPerSecond()
                     let (cumFrames, cumBytes, cumDrops) = await state.cumulativeSnapshot()
                     let kbps = Double(bytes) * 8.0 / 1000.0
+                    let lastAck = await state.windowAckSnapshot().lastAck
+                    let proto = await state.snapshotAndResetProto(lastAck: lastAck)
                     if stats {
                         FileHandle.standardError.write(Data(
                             String(
@@ -381,6 +421,7 @@ public func runPipeline(
                                 second, fps, kbps, drops, cumFrames, cumBytes, cumDrops
                             ).utf8
                         ))
+                        FileHandle.standardError.write(Data("[proto] t=\(String(format: "%4d", second))s \(proto)\n".utf8))
                     }
                     delegate?.pipelineDidUpdateStats(PipelineStats(
                         fps: fps,
