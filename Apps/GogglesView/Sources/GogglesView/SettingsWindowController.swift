@@ -44,7 +44,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         // not a resizable document window; matches the fixed
         // `.frame(width:height:)` `SettingsView` sets on itself.
         window.styleMask = [.titled, .closable, .miniaturizable]
-        window.setContentSize(NSSize(width: 380, height: 340))
+        window.setContentSize(NSSize(width: 380, height: 600))
         // Survive being closed (red button / Cmd+W) instead of being
         // deallocated -- `show()` reuses the same window/view
         // model on the next open, same "hide, don't destroy" pattern
@@ -83,6 +83,11 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
     /// "Reconnect" item makes.
     func setReconnectHandler(_ handler: @escaping () -> Void) {
         viewModel.reconnectHandler = handler
+    }
+
+    /// Wired once a `DecodeSession` exists; also applies the saved preference immediately.
+    func setCaptureWindowHandler(_ handler: @escaping (_ enabled: Bool, _ onTop: Bool) -> Void) {
+        viewModel.captureWindowHandler = handler
     }
 
     // MARK: - NSWindowDelegate

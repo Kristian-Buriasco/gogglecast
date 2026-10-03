@@ -39,10 +39,34 @@ public final class SettingsViewModel: ObservableObject {
     /// `main.swift` sets it once `launchMainWindow` runs.
     @Published public var reconnectHandler: (() -> Void)?
 
+    /// Applies the capture-window prefs (enabled, keep-on-top). `nil` until a
+    /// `DecodeSession` exists (set by `launchMainWindow`), same as `reconnectHandler`.
+    public var captureWindowHandler: ((_ enabled: Bool, _ onTop: Bool) -> Void)? {
+        didSet { applyCaptureWindow() }
+    }
+    @Published public var captureWindowEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(captureWindowEnabled, forKey: CaptureWindowPrefs.enabledKey)
+            applyCaptureWindow()
+        }
+    }
+    @Published public var captureWindowOnTop: Bool {
+        didSet {
+            UserDefaults.standard.set(captureWindowOnTop, forKey: CaptureWindowPrefs.onTopKey)
+            applyCaptureWindow()
+        }
+    }
+
+    private func applyCaptureWindow() {
+        captureWindowHandler?(captureWindowEnabled, captureWindowOnTop)
+    }
+
     private var pollTimer: Timer?
 
     public init() {
         status = HelperRegistration.status
+        captureWindowEnabled = UserDefaults.standard.bool(forKey: CaptureWindowPrefs.enabledKey)
+        captureWindowOnTop = UserDefaults.standard.bool(forKey: CaptureWindowPrefs.onTopKey)
     }
 
     deinit {

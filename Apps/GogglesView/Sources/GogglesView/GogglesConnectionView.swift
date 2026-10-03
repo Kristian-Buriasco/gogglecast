@@ -29,6 +29,60 @@ struct GogglesConnectionView: View {
     /// here -- falls back to the fixed constant for previews/tests/harnesses
     /// that don't have a real on-screen window to measure.
     var pillBandHeight: CGFloat = AppChrome.titleBarHeight
+    @StateObject private var recorder = Recorder()
+
+    private var isLive: Bool {
+        if case .live = coordinator.uiState { return true }
+        return false
+    }
+
+    private var recordControl: some View {
+        HStack(spacing: 6) {
+            if recorder.isRecording {
+                Text(Self.formatElapsed(recorder.elapsed))
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.red)
+            }
+            if let err = recorder.lastError {
+                Text(err).font(.caption2).foregroundStyle(.red).lineLimit(1)
+            }
+            Button {
+                recorder.isRecording ? stopRecording(wait: false) : startRecording()
+            } label: {
+                Image(systemName: recorder.isRecording ? "stop.circle.fill" : "record.circle")
+                    .foregroundStyle(recorder.isRecording ? Color.red : Color.secondary)
+            }
+            .buttonStyle(.plain)
+            .disabled(!isLive && !recorder.isRecording)
+            .help(recorder.isRecording ? "Stop recording" : "Record to ~/Movies/GogglesView")
+            .accessibilityIdentifier("recordButton")
+        }
+        .onChange(of: isLive) { live in
+            if live && RecordingPrefs.autoStart && !recorder.isRecording { startRecording() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
+            stopRecording(wait: true)
+        }
+    }
+
+    private func startRecording() {
+        session.addConsumer(recorder)
+        do { try recorder.start() } catch { session.removeConsumer(recorder) }
+    }
+
+    private func stopRecording(wait: Bool) {
+        guard recorder.isRecording else { return }
+        session.removeConsumer(recorder)
+        let sem = DispatchSemaphore(value: 0)
+        recorder.stop { _ in sem.signal() }
+        // On quit, block briefly so the .mov is finalized before exit.
+        if wait { _ = sem.wait(timeout: .now() + 3) }
+    }
+
+    static func formatElapsed(_ t: TimeInterval) -> String {
+        let s = Int(t)
+        return String(format: "%02d:%02d", s / 60, s % 60)
+    }
 
     // ── GUI restyle task: CosmoViewer-Direct-inspired chrome ──
     // (.superpowers/sdd/plan/task-gui-restyle-brief.md, later revised by
@@ -153,6 +207,9 @@ struct GogglesConnectionView: View {
             .accessibilityIdentifier("settingsButton")
 
             Spacer()
+
+            recordControl
+                .padding(.trailing, 10)
 
             Text(AppChrome.versionFooterText)
                 .font(.caption2)

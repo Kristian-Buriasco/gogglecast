@@ -29,11 +29,15 @@ struct SettingsView: View {
             helperStatusSection
             Divider()
             connectionSection
+            Divider()
+            recordingSection
+
+            captureWindowSection
 
             Spacer(minLength: 0)
         }
         .padding(22)
-        .frame(width: 380, height: 340, alignment: .top)
+        .frame(width: 380, height: 600, alignment: .top)
         .background(AppChrome.backgroundColor)
         .foregroundStyle(.white)
         .onAppear { viewModel.refresh() }
@@ -77,6 +81,49 @@ struct SettingsView: View {
                 }
                 .accessibilityIdentifier("reRegisterButton")
             }
+        }
+    }
+
+    @AppStorage(RecordingPrefs.folderKey) private var recordingFolder = ""
+    @AppStorage(RecordingPrefs.containerKey) private var recordingContainer = RecordingPrefs.Container.mov.rawValue
+    @AppStorage(RecordingPrefs.prefixKey) private var recordingPrefix = ""
+    @AppStorage(RecordingPrefs.autoStartKey) private var recordingAutoStart = false
+
+    private var recordingSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Recording").font(.headline)
+            HStack {
+                Text(recordingFolder.isEmpty ? Recorder.defaultDirectory.path : recordingFolder)
+                    .font(.caption).foregroundStyle(.secondary)
+                    .lineLimit(1).truncationMode(.middle)
+                Spacer()
+                Button("Choose…") {
+                    let panel = NSOpenPanel()
+                    panel.canChooseFiles = false
+                    panel.canChooseDirectories = true
+                    panel.canCreateDirectories = true
+                    if panel.runModal() == .OK, let url = panel.url { recordingFolder = url.path }
+                }
+            }
+            Picker("Format", selection: $recordingContainer) {
+                ForEach(RecordingPrefs.Container.allCases) { Text(".\($0.ext)").tag($0.rawValue) }
+            }
+            .pickerStyle(.segmented)
+            TextField("File name prefix", text: $recordingPrefix, prompt: Text("GogglesView"))
+            Toggle("Start recording automatically when live", isOn: $recordingAutoStart)
+            Text("Records the goggles' stream as-is (no re-encoding), so quality is whatever the goggles send.")
+                .font(.caption2).foregroundStyle(.secondary)
+        }
+    }
+
+    private var captureWindowSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Capture window").font(.headline)
+            Toggle("Show capture window (for OBS Window Capture)", isOn: $viewModel.captureWindowEnabled)
+                .disabled(viewModel.captureWindowHandler == nil)
+                .accessibilityIdentifier("captureWindowToggle")
+            Toggle("Keep on top", isOn: $viewModel.captureWindowOnTop)
+                .accessibilityIdentifier("captureWindowOnTopToggle")
         }
     }
 
