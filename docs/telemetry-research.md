@@ -321,9 +321,10 @@ read-only get/query commands to 10 addresses (no drone linked or unknown).
   controller address.
 - Useful static data: version strings, device info and build dates, RTC clock,
   RC firmware info (`06:79`), country code (`07:19`).
-- Possibly live: `0D:02 smart_battery_get_dynamic_info` from 0x1C returned a
-  payload ending in `0x64` (100), plausibly the goggles' battery percentage;
-  layout not verified.
+- `0D:02 smart_battery_get_dynamic_info` from 0x1C returned a 33-byte payload
+  that is all zero except one `0x64` byte. The goggles' battery read 91% at
+  the time (0x5B), which does not appear, so this is NOT the goggles' battery
+  percentage; meaning unknown.
 - Most other queries were rejected (`0xE0`); link SNR (`07:29`) and
   `00:97 link_monitor_request` were rejected by the goggles, so live link and
   flight telemetry needs either a subscription/registration step or a linked
