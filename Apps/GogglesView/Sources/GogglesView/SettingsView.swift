@@ -43,6 +43,8 @@ struct SettingsView: View {
                     case .general:
                         launchAtLoginSection
                         Divider()
+                        AutoOpenSettingsSection()
+                        Divider()
                         helperStatusSection
                         Divider()
                         connectionSection

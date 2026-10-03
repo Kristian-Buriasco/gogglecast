@@ -99,10 +99,15 @@ echo "==> Assembling bundle at $APP_BUNDLE"
 rm -rf "$APP_BUNDLE"
 mkdir -p "$APP_BUNDLE/Contents/MacOS"
 mkdir -p "$APP_BUNDLE/Contents/Library/LaunchDaemons"
+mkdir -p "$APP_BUNDLE/Contents/Library/LaunchAgents"
 
 cp "$SCRIPT_DIR/BundleResources/Info.plist" "$APP_BUNDLE/Contents/Info.plist"
 cp "$SCRIPT_DIR/BundleResources/com.kburiasco.gogglesview.helper.plist" \
    "$APP_BUNDLE/Contents/Library/LaunchDaemons/com.kburiasco.gogglesview.helper.plist"
+# Opt-in plug-in auto-open agent (AutoOpenRegistration). Covered by the bundle
+# seal; plists aren't signed individually.
+cp "$SCRIPT_DIR/BundleResources/com.kburiasco.gogglesview.autoopen.plist" \
+   "$APP_BUNDLE/Contents/Library/LaunchAgents/com.kburiasco.gogglesview.autoopen.plist"
 
 cp "$APP_BIN" "$APP_BUNDLE/Contents/MacOS/GogglesView"
 cp "$HELPER_BIN" "$APP_BUNDLE/Contents/MacOS/GogglesHelper"
@@ -160,5 +165,7 @@ if [[ -n "$EXT_BIN" ]]; then
 fi
 echo "--- bundle ---"
 codesign -dv --verbose=2 "$APP_BUNDLE" 2>&1
+codesign --verify --strict --verbose=2 "$APP_BUNDLE" 2>&1
+grep -q autoopen "$APP_BUNDLE/Contents/_CodeSignature/CodeResources" && echo "autoopen.plist sealed in bundle"
 
 echo "==> Done: $APP_BUNDLE"
