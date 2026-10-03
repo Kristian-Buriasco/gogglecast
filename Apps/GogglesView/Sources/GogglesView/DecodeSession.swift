@@ -1,6 +1,8 @@
 import Foundation
 import CoreMedia
 import VideoToolbox
+import AVFoundation
+import Combine
 
 // ─────────────────────────────────────────────────────────────────────────
 // Task 3.3: decode and display. Turns the raw per-NAL callbacks from
@@ -36,7 +38,7 @@ enum DecodeSessionError: Error, Equatable {
 /// Owns the parameter-set cache (Task 3.2) and the running
 /// consecutive-decode-failure count (design §7), and builds/enqueues
 /// `CMSampleBuffer`s for slice NALs against a `SampleBufferRendering`.
-final class DecodeSession {
+final class DecodeSession: ObservableObject {
 
     /// design.md §7: "on 30 consecutive errors, tear down the decode
     /// session."
@@ -50,6 +52,8 @@ final class DecodeSession {
     private struct WeakConsumer {
         weak var value: SampleBufferRendering?
     }
+    /// Real stream size from the SPS, nil until the first parameter set.
+    @Published private(set) var dimensions: CMVideoDimensions?
     private(set) var consecutiveFailures = 0
     private(set) var teardownCount = 0
 
@@ -72,6 +76,12 @@ final class DecodeSession {
     /// `NSView` exists).
     func attach(renderer: SampleBufferRendering) {
         self.renderer = renderer
+    }
+
+    /// The frame currently on screen in the primary display layer (screenshots).
+    func copyDisplayedFrame() -> CVPixelBuffer? {
+        guard #available(macOS 14.4, *) else { return nil }
+        return (renderer as? AVSampleBufferDisplayLayer)?.sampleBufferRenderer.displayedPixelBuffer()
     }
 
     /// Adds an extra sample-buffer consumer (second display window,
@@ -128,6 +138,12 @@ final class DecodeSession {
     private func handleParameterSet(_ data: Data) {
         do {
             try formatCache.update(withBundledBlob: [UInt8](data))
+            if let fd = formatCache.formatDescription {
+                let dims = CMVideoFormatDescriptionGetDimensions(fd)
+                if dims.width != dimensions?.width || dims.height != dimensions?.height {
+                    DispatchQueue.main.async { self.dimensions = dims }
+                }
+            }
             // A parameter set that parses fine is itself a "things are
             // healthy" signal -- reset the streak so a run of unrelated
             // slice-NAL failures before this point doesn't carry over and

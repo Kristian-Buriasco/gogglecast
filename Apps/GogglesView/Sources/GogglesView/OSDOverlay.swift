@@ -14,6 +14,7 @@ enum OSDPrefs {
 /// capture window, which must stay clean for OBS).
 struct OSDOverlay: View {
     let stats: StreamStats?
+    var resolution: String?
 
     @AppStorage(OSDPrefs.enabledKey) private var enabled = false
     @AppStorage(OSDPrefs.showFpsKey) private var showFps = true
@@ -22,10 +23,10 @@ struct OSDOverlay: View {
     @AppStorage(OSDPrefs.showDropsKey) private var showDrops = false
 
     static func lines(
-        stats: StreamStats, fps: Bool, bitrate: Bool, resolution: Bool, drops: Bool
+        stats: StreamStats, resolution: String?, fps: Bool, bitrate: Bool, showResolution: Bool, drops: Bool
     ) -> [String] {
         var out: [String] = []
-        if resolution { out.append("1920x1080") }
+        if showResolution, let resolution { out.append(resolution) }
         if fps { out.append("\(stats.fps) fps") }
         if bitrate { out.append(String(format: "%.1f Mbps", stats.bitrateKbps / 1000)) }
         if drops { out.append("\(stats.cumulativeDrops) dropped") }
@@ -34,8 +35,8 @@ struct OSDOverlay: View {
 
     var body: some View {
         if enabled, let stats {
-            let lines = Self.lines(stats: stats, fps: showFps, bitrate: showBitrate,
-                                   resolution: showResolution, drops: showDrops)
+            let lines = Self.lines(stats: stats, resolution: resolution, fps: showFps, bitrate: showBitrate,
+                                   showResolution: showResolution, drops: showDrops)
             if !lines.isEmpty {
                 VStack(alignment: .leading, spacing: 2) {
                     ForEach(lines, id: \.self) { Text($0) }

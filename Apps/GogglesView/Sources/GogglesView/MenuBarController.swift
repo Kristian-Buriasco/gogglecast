@@ -121,7 +121,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     ///   `[client-fps]` log line and `gvcli --stats` report. `stats == nil`
     ///   (not yet received one, or a non-`.live` state) omits the suffix
     ///   entirely rather than showing a stale/zero placeholder.
-    static func displayText(for state: GogglesUIState, stats: StreamStats? = nil) -> String {
+    static func displayText(for state: GogglesUIState, stats: StreamStats? = nil, resolution: String? = nil) -> String {
         switch state {
         case .noHelper(let reason):
             return reason ?? "Helper not installed"
@@ -139,7 +139,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             return "Waiting for video…"
         case .live:
             guard let stats else { return "Live" }
-            return "Live · 1920x1080 · \(stats.fps)fps"
+            return ["Live", resolution, "\(stats.fps)fps"].compactMap { $0 }.joined(separator: " · ")
         case .stalled:
             return "Signal lost — reconnecting…"
         }

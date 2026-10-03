@@ -27,10 +27,19 @@ struct RecorderTests {
     @Test func linesRespectToggles() {
         let s = StreamStats(fps: 59, bitrateKbps: 12345, drops: 0,
                             cumulativeFrames: 1, cumulativeBytes: 1, cumulativeDrops: 3)
-        #expect(OSDOverlay.lines(stats: s, fps: true, bitrate: true, resolution: false, drops: false)
+        #expect(OSDOverlay.lines(stats: s, resolution: "1920x1080", fps: true, bitrate: true, showResolution: false, drops: false)
                 == ["59 fps", "12.3 Mbps"])
-        #expect(OSDOverlay.lines(stats: s, fps: false, bitrate: false, resolution: false, drops: true)
+        #expect(OSDOverlay.lines(stats: s, resolution: "1920x1080", fps: false, bitrate: false, showResolution: true, drops: false)
+                == ["1920x1080"])
+        #expect(OSDOverlay.lines(stats: s, resolution: nil, fps: false, bitrate: false, showResolution: false, drops: true)
                 == ["3 dropped"])
-        #expect(OSDOverlay.lines(stats: s, fps: false, bitrate: false, resolution: false, drops: false).isEmpty)
+        #expect(OSDOverlay.lines(stats: s, resolution: nil, fps: false, bitrate: false, showResolution: false, drops: false).isEmpty)
+    }
+}
+
+@Suite struct ScreenshotTests {
+    @Test func fileNameFormat() {
+        let d = Date(timeIntervalSince1970: 0)
+        #expect(Screenshot.fileName(for: d, timeZone: TimeZone(identifier: "UTC")!) == "GogglesView-1970-01-01-00-00-00.png")
     }
 }

@@ -15,7 +15,7 @@ import SwiftUI
 
 struct GogglesConnectionView: View {
     @ObservedObject var coordinator: GogglesConnectionCoordinator
-    let session: DecodeSession
+    @ObservedObject var session: DecodeSession
     /// task-gui-v2: opens the real Settings window (`SettingsWindowController`,
     /// owned by `main.swift`) -- `nil` only for callers that don't have a
     /// Settings window to open (none currently; kept optional rather than
@@ -36,6 +36,23 @@ struct GogglesConnectionView: View {
         return false
     }
 
+    private var resolutionText: String? {
+        session.dimensions.map { "\($0.width)x\($0.height)" }
+    }
+
+    @State private var screenshotNote: String?
+
+    private func takeScreenshot() {
+        guard let frame = session.copyDisplayedFrame() else { screenshotNote = "No frame yet"; return }
+        do {
+            let url = try Screenshot.save(frame)
+            screenshotNote = "Saved \(url.lastPathComponent)"
+        } catch {
+            screenshotNote = "Screenshot failed"
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { screenshotNote = nil }
+    }
+
     private var recordControl: some View {
         HStack(spacing: 6) {
             if recorder.isRecording {
@@ -46,6 +63,17 @@ struct GogglesConnectionView: View {
             if let err = recorder.lastError {
                 Text(err).font(.caption2).foregroundStyle(.red).lineLimit(1)
             }
+            if let note = screenshotNote {
+                Text(note).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+            }
+            Button { takeScreenshot() } label: {
+                Image(systemName: "camera").foregroundStyle(Color.secondary)
+            }
+            .buttonStyle(.plain)
+            .disabled(!isLive)
+            .keyboardShortcut("s", modifiers: [.command, .shift])
+            .help("Save a screenshot to ~/Pictures/GogglesView (⇧⌘S)")
+            .accessibilityIdentifier("screenshotButton")
             Button {
                 recorder.isRecording ? stopRecording(wait: false) : startRecording()
             } label: {
@@ -54,7 +82,8 @@ struct GogglesConnectionView: View {
             }
             .buttonStyle(.plain)
             .disabled(!isLive && !recorder.isRecording)
-            .help(recorder.isRecording ? "Stop recording" : "Record to ~/Movies/GogglesView")
+            .keyboardShortcut("r", modifiers: [.command, .shift])
+            .help(recorder.isRecording ? "Stop recording (⇧⌘R)" : "Record to ~/Movies/GogglesView (⇧⌘R)")
             .accessibilityIdentifier("recordButton")
         }
         .onChange(of: isLive) { live in
@@ -181,7 +210,7 @@ struct GogglesConnectionView: View {
             Spacer(minLength: 8)
             StatusPill(
                 category: coordinator.uiState.kind.statusGlyphCategory,
-                text: MenuBarController.displayText(for: coordinator.uiState, stats: coordinator.stats)
+                text: MenuBarController.displayText(for: coordinator.uiState, stats: coordinator.stats, resolution: resolutionText)
             )
         }
     }
@@ -249,7 +278,7 @@ struct GogglesConnectionView: View {
         ZStack {
             GogglesVideoView(session: session)
                 .opacity(videoOpacity)
-            OSDOverlay(stats: coordinator.stats)
+            OSDOverlay(stats: coordinator.stats, resolution: resolutionText)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 .opacity(videoOpacity)
             overlay
