@@ -90,3 +90,16 @@ struct RecorderTests {
         #expect(DataCollector.seiPayloads(in: Data(au)).isEmpty)
     }
 }
+
+@Suite struct KeyframeDetectionTests {
+    @Test func detectsIDRAndPFrames() {
+        let idr: [UInt8] = [0, 0, 0, 3, 0x65, 1, 2, 0, 0, 0, 2, 0x06, 9]
+        let p: [UInt8] = [0, 0, 0, 3, 0x41, 1, 2]
+        let sei: [UInt8] = [0, 0, 0, 2, 0x06, 9]
+        #expect(Recorder.containsIDR(avcc: idr) == true)
+        #expect(Recorder.containsIDR(avcc: p) == false)
+        #expect(Recorder.containsIDR(avcc: sei) == nil)
+        let pAfterSEI: [UInt8] = [0, 0, 0, 2, 0x06, 9, 0, 0, 0, 3, 0x41, 1, 2]
+        #expect(Recorder.containsIDR(avcc: pAfterSEI) == false)
+    }
+}

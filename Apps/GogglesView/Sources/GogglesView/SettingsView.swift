@@ -74,6 +74,8 @@ struct SettingsView: View {
                     case .capture:
                         recordingSection
                         RecordingExtrasSettingsSection()
+                        Divider()
+                        BurnInSettingsSection()
                         GallerySettingsRow()
                         Divider()
                         ReplaySettingsSection()

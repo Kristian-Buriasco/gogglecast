@@ -63,11 +63,43 @@ final class Recorder: ObservableObject, SampleBufferRendering {
         CMTimeSubtract(time, start)
     }
 
-    /// A sample is a keyframe unless it carries `NotSync = true`.
+    /// A sample is a keyframe if it is not flagged `NotSync` AND its AVCC data
+    /// does not show only non-IDR slices. Live samples never carry a NotSync
+    /// flag, so the NAL types are what actually tell IDR from P frames.
     static func isKeyframe(_ sampleBuffer: CMSampleBuffer) -> Bool {
-        guard let arr = CMSampleBufferGetSampleAttachmentsArray(sampleBuffer, createIfNecessary: false)
-                as? [[CFString: Any]], let first = arr.first else { return true }
-        return (first[kCMSampleAttachmentKey_NotSync] as? Bool) != true
+        if let arr = CMSampleBufferGetSampleAttachmentsArray(sampleBuffer, createIfNecessary: false)
+            as? [[CFString: Any]], let first = arr.first,
+           (first[kCMSampleAttachmentKey_NotSync] as? Bool) == true { return false }
+        if let block = CMSampleBufferGetDataBuffer(sampleBuffer) {
+            var length = 0
+            var ptr: UnsafeMutablePointer<Int8>?
+            if CMBlockBufferGetDataPointer(block, atOffset: 0, lengthAtOffsetOut: nil,
+                                           totalLengthOut: &length, dataPointerOut: &ptr) == kCMBlockBufferNoErr,
+               let ptr {
+                let bytes = UnsafeBufferPointer(start: UnsafeRawPointer(ptr).assumingMemoryBound(to: UInt8.self), count: length)
+                if let idr = containsIDR(avcc: bytes) { return idr }
+            }
+        }
+        return true
+    }
+
+    /// Scans 4-byte-length-prefixed NALs: true if any is an IDR slice (type 5),
+    /// false if slices were seen but none is IDR, nil if nothing decidable.
+    static func containsIDR<C: Collection>(avcc: C) -> Bool? where C.Element == UInt8, C.Index == Int {
+        var i = avcc.startIndex
+        var sawSlice = false
+        while i + 4 < avcc.endIndex {
+            let len = (Int(avcc[i]) << 24) | (Int(avcc[i + 1]) << 16) | (Int(avcc[i + 2]) << 8) | Int(avcc[i + 3])
+            let h = i + 4
+            guard len > 0, h < avcc.endIndex else { break }
+            switch avcc[h] & 0x1F {
+            case 5: return true
+            case 1: sawSlice = true
+            default: break
+            }
+            i = h + len
+        }
+        return sawSlice ? false : nil
     }
 
     // MARK: - Control

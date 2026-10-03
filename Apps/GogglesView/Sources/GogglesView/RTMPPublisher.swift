@@ -510,7 +510,6 @@ final class RTMPPublisher: ObservableObject, SampleBufferRendering {
 
 extension NetworkStreamer {
     static func isKeyframe(_ sb: CMSampleBuffer) -> Bool {
-        let a = (CMSampleBufferGetSampleAttachmentsArray(sb, createIfNecessary: false) as? [[CFString: Any]])?.first
-        return !((a?[kCMSampleAttachmentKey_NotSync] as? Bool) ?? false)
+        Recorder.isKeyframe(sb)
     }
 }

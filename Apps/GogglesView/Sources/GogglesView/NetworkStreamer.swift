@@ -83,9 +83,7 @@ final class NetworkStreamer: ObservableObject, SampleBufferRendering {
         queue.async { [self] in
             guard active, let conn = connection else { return }
             guard let avcc = Self.avccData(sampleBuffer) else { return }
-            let attachments = (CMSampleBufferGetSampleAttachmentsArray(sampleBuffer, createIfNecessary: false)
-                as? [[CFString: Any]])?.first
-            let isKey = !((attachments?[kCMSampleAttachmentKey_NotSync] as? Bool) ?? false)
+            let isKey = Recorder.isKeyframe(sampleBuffer)
             let pts = CMSampleBufferGetPresentationTimeStamp(sampleBuffer).seconds
             let ts = muxer.mux(avcc: avcc, isKeyframe: isKey,
                                parameterSets: isKey ? Self.parameterSets(sampleBuffer) : [],

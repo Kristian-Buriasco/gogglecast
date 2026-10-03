@@ -93,6 +93,7 @@ struct GogglesConnectionView: View {
             .help("Save a screenshot to ~/Pictures/GogglesView (⇧⌘S)")
             .accessibilityLabel("Take screenshot")
             .accessibilityIdentifier("screenshotButton")
+            BurnInRecordControl(session: session, isLive: isLive, info: { BurnInInfo(fps: coordinator.stats?.fps, bitrateKbps: coordinator.stats?.bitrateKbps, resolution: resolutionText) })
             MarkerControl(recorder: recorder)
             Button {
                 recorder.isRecording ? stopRecording(wait: false) : startRecording()

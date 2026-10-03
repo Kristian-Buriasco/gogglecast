@@ -175,9 +175,7 @@ final class FreezableDisplayLayer: AVSampleBufferDisplayLayer {
     }
 
     private static func isSync(_ sb: CMSampleBuffer) -> Bool {
-        guard let arr = CMSampleBufferGetSampleAttachmentsArray(sb, createIfNecessary: false) as? [[CFString: Any]],
-              let first = arr.first else { return true }
-        return !((first[kCMSampleAttachmentKey_NotSync] as? Bool) ?? false)
+        Recorder.isKeyframe(sb)
     }
 }
 
