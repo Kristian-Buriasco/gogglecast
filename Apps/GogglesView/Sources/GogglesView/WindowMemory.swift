@@ -24,6 +24,16 @@ enum WindowMemory {
         return f
     }
 
+    static func hasSavedFrame(name: String, defaults d: UserDefaults = .standard) -> Bool {
+        d.string(forKey: key(name)) != nil
+    }
+
+    /// Seeds `to` with `from`'s saved frame (no-op if `from` has none).
+    static func copySavedFrame(from: String, to: String, defaults d: UserDefaults = .standard) {
+        guard let s = d.string(forKey: key(from)) else { return }
+        d.set(s, forKey: key(to))
+    }
+
     /// Restore (if a valid saved frame exists) and start saving on move/resize.
     /// `restoreSize: false` restores position only (fixed-size windows).
     /// `contentAspect` keeps the restored content area at that ratio (top edge stays put).

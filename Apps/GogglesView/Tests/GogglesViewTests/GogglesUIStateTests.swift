@@ -148,16 +148,16 @@ struct GogglesConnectionCoordinatorTests {
     @Test("connectionState .disconnected/.connecting -> noHelper")
     func disconnectedAndConnectingMapToNoHelper() {
         let (client, coordinator, _) = makeCoordinator()
-        client.onConnectionStateChange?(.connecting)
+        client.sendConnectionState(.connecting)
         #expect(coordinator.uiState.kind == .noHelper)
-        client.onConnectionStateChange?(.disconnected)
+        client.sendConnectionState(.disconnected)
         #expect(coordinator.uiState.kind == .noHelper)
     }
 
     @Test("connectionState .versionMismatch -> noHelper with a reason mentioning the versions")
     func versionMismatchMapsToNoHelperWithReason() {
         let (client, coordinator, _) = makeCoordinator()
-        client.onConnectionStateChange?(.versionMismatch(reported: 1, expected: 2))
+        client.sendConnectionState(.versionMismatch(reported: 1, expected: 2))
         guard case .noHelper(let reason) = coordinator.uiState else {
             Issue.record("expected .noHelper, got \(coordinator.uiState)")
             return
@@ -169,7 +169,7 @@ struct GogglesConnectionCoordinatorTests {
     @Test("connectionState .connected with no prior stateChanged -> noDevice")
     func connectedWithoutStateChangedYetIsNoDevice() {
         let (client, coordinator, _) = makeCoordinator()
-        client.onConnectionStateChange?(.connected)
+        client.sendConnectionState(.connected)
         #expect(coordinator.uiState == .noDevice)
     }
 
@@ -184,19 +184,19 @@ struct GogglesConnectionCoordinatorTests {
     ])
     func helperReportedStatesAreReachable(state: GogglesXPC.GogglesState) {
         let (client, coordinator, _) = makeCoordinator()
-        client.onConnectionStateChange?(.connected)
-        client.onHelperStateChanged?(state.rawValue, nil)
+        client.sendConnectionState(.connected)
+        client.sendHelperState("test-device", state.rawValue, nil)
         #expect(coordinator.uiState.kind.rawValue == String(describing: state))
     }
 
     @Test("claimFailed is reachable via onHelperStateChanged, with the ARP-vs-interface distinction preserved")
     func claimFailedReachableWithCorrectDiagnostic() {
         let (client, coordinator, _) = makeCoordinator()
-        client.onConnectionStateChange?(.connected)
-        client.onHelperStateChanged?(GogglesXPC.GogglesState.claimFailed.rawValue, "...ARPResolverError...")
+        client.sendConnectionState(.connected)
+        client.sendHelperState("test-device", GogglesXPC.GogglesState.claimFailed.rawValue, "...ARPResolverError...")
         #expect(coordinator.uiState == .claimFailed(reason: GogglesDiagnostics.arpTimeout))
 
-        client.onHelperStateChanged?(GogglesXPC.GogglesState.claimFailed.rawValue, "...RNDISTransportError...")
+        client.sendHelperState("test-device", GogglesXPC.GogglesState.claimFailed.rawValue, "...RNDISTransportError...")
         #expect(coordinator.uiState == .claimFailed(reason: GogglesDiagnostics.interfaceClaimFailed))
     }
 
@@ -205,8 +205,8 @@ struct GogglesConnectionCoordinatorTests {
         let (client, coordinator, clock) = makeCoordinator()
         #expect(coordinator.waitingForKeyframeEnteredAt == nil)
 
-        client.onConnectionStateChange?(.connected)
-        client.onHelperStateChanged?(GogglesXPC.GogglesState.waitingForKeyframe.rawValue, nil)
+        client.sendConnectionState(.connected)
+        client.sendHelperState("test-device", GogglesXPC.GogglesState.waitingForKeyframe.rawValue, nil)
         let firstStamp = coordinator.waitingForKeyframeEnteredAt
         #expect(firstStamp == clock.now())
 
@@ -214,14 +214,14 @@ struct GogglesConnectionCoordinatorTests {
         // the helper resends it) must not reset the elapsed counter's
         // starting point.
         clock.advance(3.0)
-        client.onHelperStateChanged?(GogglesXPC.GogglesState.waitingForKeyframe.rawValue, nil)
+        client.sendHelperState("test-device", GogglesXPC.GogglesState.waitingForKeyframe.rawValue, nil)
         #expect(coordinator.waitingForKeyframeEnteredAt == firstStamp)
 
         // Leaving and re-entering the state DOES get a fresh stamp.
         clock.advance(1.0)
-        client.onHelperStateChanged?(GogglesXPC.GogglesState.live.rawValue, nil)
+        client.sendHelperState("test-device", GogglesXPC.GogglesState.live.rawValue, nil)
         clock.advance(1.0)
-        client.onHelperStateChanged?(GogglesXPC.GogglesState.waitingForKeyframe.rawValue, nil)
+        client.sendHelperState("test-device", GogglesXPC.GogglesState.waitingForKeyframe.rawValue, nil)
         #expect(coordinator.waitingForKeyframeEnteredAt == clock.now())
         #expect(coordinator.waitingForKeyframeEnteredAt != firstStamp)
     }
@@ -236,8 +236,8 @@ struct GogglesConnectionCoordinatorTests {
     @Test("requestKeyframe() forwards to the helper without touching uiState (no reliable success signal exists)")
     func requestKeyframeDoesNotChangeState() {
         let (client, coordinator, _) = makeCoordinator()
-        client.onConnectionStateChange?(.connected)
-        client.onHelperStateChanged?(GogglesXPC.GogglesState.waitingForKeyframe.rawValue, nil)
+        client.sendConnectionState(.connected)
+        client.sendHelperState("test-device", GogglesXPC.GogglesState.waitingForKeyframe.rawValue, nil)
         // Never connect()ed, so this is a no-op XPC call (remoteHelperProxy()
         // is nil) -- the point of this test is only that requestKeyframe()
         // exists, is callable, and is not presented/wired as something that
@@ -260,8 +260,8 @@ struct GogglesConnectionCoordinatorTests {
     @Test("live -> 2.5s silence -> stalled (app-side watchdog, driven by tick, not helper's own cascade)")
     func liveEscalatesToStalledAfter2sOfSilence() {
         let (client, coordinator, clock) = makeCoordinator()
-        client.onConnectionStateChange?(.connected)
-        client.onHelperStateChanged?(GogglesXPC.GogglesState.live.rawValue, nil)
+        client.sendConnectionState(.connected)
+        client.sendHelperState("test-device", GogglesXPC.GogglesState.live.rawValue, nil)
         #expect(coordinator.uiState == .live)
 
         clock.advance(2.5)
@@ -272,8 +272,8 @@ struct GogglesConnectionCoordinatorTests {
     @Test("live -> 5.5s total silence -> handshaking (not waitingForKeyframe), with a live elapsedSeconds counter")
     func liveEscalatesToHandshakingAfter5sOfSilence() {
         let (client, coordinator, clock) = makeCoordinator()
-        client.onConnectionStateChange?(.connected)
-        client.onHelperStateChanged?(GogglesXPC.GogglesState.live.rawValue, nil)
+        client.sendConnectionState(.connected)
+        client.sendHelperState("test-device", GogglesXPC.GogglesState.live.rawValue, nil)
 
         clock.advance(2.5)
         coordinator.tick()
@@ -295,25 +295,25 @@ struct GogglesConnectionCoordinatorTests {
     @Test("recovering from a silence-escalated handshaking: fresh NAL data -> live directly (helper never re-fires pipelineDidStart)")
     func nalArrivalRecoversFromEscalatedHandshaking() {
         let (client, coordinator, clock) = makeCoordinator()
-        client.onConnectionStateChange?(.connected)
-        client.onHelperStateChanged?(GogglesXPC.GogglesState.live.rawValue, nil)
+        client.sendConnectionState(.connected)
+        client.sendHelperState("test-device", GogglesXPC.GogglesState.live.rawValue, nil)
 
         clock.advance(6.0)
         coordinator.tick()
         #expect(coordinator.uiState.kind == .handshaking)
 
-        client.onNALUnit?(Data([0, 0, 0, 1, 0x65]), 5, false, 0)
+        client.sendNAL("test-device", Data([0, 0, 0, 1, 0x65]), 5, false, 0)
         #expect(coordinator.uiState == .live)
     }
 
     @Test("stats callback also counts as activity for the watchdog")
     func statsCallbackCountsAsActivity() {
         let (client, coordinator, clock) = makeCoordinator()
-        client.onConnectionStateChange?(.connected)
-        client.onHelperStateChanged?(GogglesXPC.GogglesState.live.rawValue, nil)
+        client.sendConnectionState(.connected)
+        client.sendHelperState("test-device", GogglesXPC.GogglesState.live.rawValue, nil)
 
         clock.advance(1.9)
-        client.onStats?(StreamStats(fps: 30, bitrateKbps: 4000, drops: 0, cumulativeFrames: 100, cumulativeBytes: 100_000, cumulativeDrops: 0))
+        client.sendStats("test-device", StreamStats(fps: 30, bitrateKbps: 4000, drops: 0, cumulativeFrames: 100, cumulativeBytes: 100_000, cumulativeDrops: 0))
         clock.advance(1.9) // 1.9s since the stats refresh, well under the 2s threshold
         coordinator.tick()
         #expect(coordinator.uiState == .live)

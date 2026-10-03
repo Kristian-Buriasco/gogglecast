@@ -11,8 +11,10 @@ private final class MiniWindow: NSWindow {
     override var canBecomeKey: Bool { true }
 }
 
-/// Always-on-top "picture in picture" window. Another secondary consumer of the shared `DecodeSession`;
+/// Always-on-top "picture in picture" window. Another secondary consumer of a `DecodeSession`;
 /// being its own NSWindow it keeps working while the main window is hidden.
+/// Multi-window: there is one mini window, showing the active goggles window's
+/// video (main.swift re-syncs it when the active session changes).
 final class MiniWindowController: NSObject, NSWindowDelegate {
     static let shared = MiniWindowController()
     private var window: NSWindow?
@@ -22,6 +24,14 @@ final class MiniWindowController: NSObject, NSWindowDelegate {
     func sync(session: DecodeSession) {
         if self.session !== session { hide(); self.session = session }
         if UserDefaults.standard.bool(forKey: MiniWindowPrefs.enabledKey) { show() } else { hide() }
+    }
+
+    /// Called when a goggles window is torn down: hides the mini window if it
+    /// was showing that window's video.
+    func detach(session: DecodeSession) {
+        guard self.session === session else { return }
+        hide()
+        self.session = nil
     }
 
     private func show() {

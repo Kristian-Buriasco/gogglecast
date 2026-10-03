@@ -30,7 +30,8 @@ struct ReplayControl: View {
         .onDisappear { session.removeConsumer(buffer); buffer.clear() }
         .onChange(of: enabled) { _, _ in sync() }
         .onChange(of: seconds) { _, _ in buffer.setSeconds(clamped) }
-        .onReceive(NotificationCenter.default.publisher(for: .gogglesSaveReplay)) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .gogglesSaveReplay)) { n in
+            guard GlobalHotkeyRouting.shouldHandle(n, session: session) else { return }
             if enabled && buffer.bufferedSeconds >= 1 { save() }
         }
     }

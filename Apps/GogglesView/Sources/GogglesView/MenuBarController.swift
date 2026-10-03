@@ -28,91 +28,122 @@ import GogglesXPC
 // every behavior this task needs.
 // ─────────────────────────────────────────────────────────────────────────
 
-/// Owns the `NSStatusItem`: state glyph, "Reconnect", show/hide the main
-/// window, "Quit". Created once in `main.swift`'s real-app launch path and
-/// kept alive for the app's lifetime (stored in a top-level `var` there --
-/// `NSStatusItem` does not keep itself alive, and `statusItem.menu`/
-/// `NSMenuItem.target` are unowned/weak-ish references that need a living
-/// owner).
+/// Owns the app's single `NSStatusItem`. Multi-window: the glyph summarizes
+/// every open goggles window (`summaryCategory`), and the menu lists each
+/// session with its own Show/Hide, Reconnect and Disconnect items, plus
+/// "Open Another Goggles…". Created once at launch and kept alive for the
+/// app's lifetime (`NSStatusItem` does not keep itself alive).
 final class MenuBarController: NSObject, NSMenuDelegate {
     private let statusItem: NSStatusItem
-    private let coordinator: GogglesConnectionCoordinator
-    private weak var window: NSWindow?
+    private let registry: SessionRegistry<GogglesSession>
+    private let onOpenAnother: () -> Void
+    private let onDisconnect: (String) -> Void
 
-    private let stateItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
-    private let toggleWindowItem = NSMenuItem(title: "", action: #selector(MenuActionTarget.invoke), keyEquivalent: "")
-    private let reconnectItem = NSMenuItem(title: "Reconnect", action: #selector(MenuActionTarget.invoke), keyEquivalent: "r")
+    /// `NSMenuItem.target` is weak, so the menu's closure targets live here;
+    /// rebuilt every time the menu opens.
+    private var menuTargets: [MenuActionTarget] = []
+    private var stateCancellables: [AnyCancellable] = []
+    private var registryObserver: UUID?
 
-    // Targets kept alive as stored properties for the same reason as
-    // `main.swift`'s (now-relocated) Task 3.5 "Goggles > Reconnect" item --
-    // `NSMenuItem.target` is a weak/unowned-ish reference under the hood, so
-    // whatever object implements the `@objc` action needs a real owner.
-    private let toggleWindowTarget: MenuActionTarget
-    private let reconnectTarget: MenuActionTarget
-
-    private var uiStateCancellable: AnyCancellable?
-
-    init(coordinator: GogglesConnectionCoordinator, window: NSWindow) {
-        self.coordinator = coordinator
-        self.window = window
+    init(registry: SessionRegistry<GogglesSession>, onOpenAnother: @escaping () -> Void, onDisconnect: @escaping (String) -> Void) {
+        self.registry = registry
+        self.onOpenAnother = onOpenAnother
+        self.onDisconnect = onDisconnect
         self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        self.reconnectTarget = MenuActionTarget { coordinator.reconnect() }
-        self.toggleWindowTarget = MenuActionTarget { [weak window] in
-            guard let window else { return }
-            if window.isVisible {
-                window.orderOut(nil)
-            } else {
-                window.makeKeyAndOrderFront(nil)
-                NSApp.activate(ignoringOtherApps: true)
-            }
-        }
         super.init()
-
-        reconnectItem.target = reconnectTarget
-        toggleWindowItem.target = toggleWindowTarget
-        stateItem.isEnabled = false
 
         let menu = NSMenu()
         menu.delegate = self
-        menu.addItem(stateItem)
-        menu.addItem(.separator())
-        menu.addItem(reconnectItem)
-        menu.addItem(toggleWindowItem)
-        menu.addItem(.separator())
-        menu.addItem(NSMenuItem(title: "Quit GogglesView", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         statusItem.menu = menu
+        rebuildMenu(menu)
 
-        updateGlyph(for: coordinator.uiState)
-        uiStateCancellable = coordinator.$uiState.sink { [weak self] state in
-            self?.updateGlyph(for: state)
-        }
+        registryObserver = registry.addObserver { [weak self] in self?.resubscribe() }
+        resubscribe()
     }
 
     /// Removes the status item; the controller is unusable afterwards.
     func tearDown() {
-        uiStateCancellable = nil
+        if let registryObserver { registry.removeObserver(registryObserver) }
+        stateCancellables = []
         NSStatusBar.system.removeStatusItem(statusItem)
+    }
+
+    private func resubscribe() {
+        stateCancellables = registry.all.map { session in
+            session.coordinator.$uiState.sink { [weak self] _ in
+                // `@Published` fires before the stored value changes; read
+                // the new values on the next turn.
+                DispatchQueue.main.async { self?.updateGlyph() }
+            }
+        }
+        updateGlyph()
     }
 
     // MARK: - NSMenuDelegate
 
-    /// Refresh the two dynamic lines (state text, show/hide title) right
-    /// before the menu opens, rather than only reacting to
-    /// `coordinator.$uiState` -- `window.isVisible` isn't `@Published`
-    /// anywhere the coordinator can see, so this is the simplest correct
-    /// place to pick up window-visibility changes the user made some other
-    /// way (e.g. the titlebar's own controls, once fullscreened/minimized).
-    func menuWillOpen(_ menu: NSMenu) {
-        updateGlyph(for: coordinator.uiState)
-        toggleWindowItem.title = (window?.isVisible ?? false) ? "Hide GogglesView" : "Show GogglesView"
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        rebuildMenu(menu)
+        updateGlyph()
+    }
+
+    private func item(_ title: String, key: String = "", _ action: @escaping () -> Void) -> NSMenuItem {
+        let target = MenuActionTarget(action)
+        menuTargets.append(target)
+        let item = NSMenuItem(title: title, action: #selector(MenuActionTarget.invoke), keyEquivalent: key)
+        item.target = target
+        return item
+    }
+
+    private func rebuildMenu(_ menu: NSMenu) {
+        menu.removeAllItems()
+        menuTargets = []
+        let sessions = registry.all
+        if sessions.isEmpty {
+            let none = NSMenuItem(title: "No goggles open", action: nil, keyEquivalent: "")
+            none.isEnabled = false
+            menu.addItem(none)
+        }
+        for session in sessions {
+            let state = session.coordinator.uiState
+            let header = NSMenuItem(title: "\(session.label) — \(MenuBarController.displayText(for: state))", action: nil, keyEquivalent: "")
+            header.image = MenuBarController.glyphImage(for: state.kind)
+            let sub = NSMenu()
+            let deviceId = session.deviceId
+            sub.addItem(item(session.window.isVisible ? "Hide Window" : "Show Window") { [weak session] in session?.toggleVisibility() })
+            sub.addItem(item("Reconnect") { [weak session] in session?.coordinator.reconnect() })
+            sub.addItem(.separator())
+            sub.addItem(item("Disconnect") { [weak self] in self?.onDisconnect(deviceId) })
+            header.submenu = sub
+            menu.addItem(header)
+        }
+        menu.addItem(.separator())
+        menu.addItem(item("Open Another Goggles…") { [weak self] in self?.onOpenAnother() })
+        menu.addItem(.separator())
+        menu.addItem(NSMenuItem(title: "Quit GogglesView", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
     }
 
     // MARK: - Glyph
 
-    private func updateGlyph(for state: GogglesUIState) {
-        stateItem.title = MenuBarController.displayText(for: state)
-        statusItem.button?.image = MenuBarController.glyphImage(for: state.kind)
-        statusItem.button?.image?.accessibilityDescription = "GogglesView: \(MenuBarController.displayText(for: state))"
+    private func updateGlyph() {
+        let kinds = registry.all.map { $0.coordinator.uiState.kind }
+        let category = MenuBarController.summaryCategory(kinds)
+        statusItem.button?.image = MenuBarController.glyphImage(for: category)
+        let summary = registry.all
+            .map { "\($0.label): \(MenuBarController.displayText(for: $0.coordinator.uiState))" }
+            .joined(separator: "; ")
+        statusItem.button?.image?.accessibilityDescription = "GogglesView: \(summary.isEmpty ? "no goggles open" : summary)"
+        statusItem.button?.toolTip = summary.isEmpty ? "GogglesView" : summary
+    }
+
+    /// Worst-wins summary over every open window: any error -> error, else any
+    /// in-progress -> waiting, else live. No windows -> waiting (nothing is
+    /// wrong, nothing is live).
+    static func summaryCategory(_ kinds: [GogglesUIStateKind]) -> GogglesStatusGlyphCategory {
+        let categories = kinds.map(\.statusGlyphCategory)
+        if categories.isEmpty { return .waiting }
+        if categories.contains(.error) { return .error }
+        if categories.contains(.waiting) { return .waiting }
+        return .live
     }
 
     /// design §6-derived short status text for the disabled top menu line --
@@ -158,9 +189,13 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     /// user-supplied CosmoViewer Direct reference (design §6 framing: UX
     /// reference only, not a spec).
     static func glyphImage(for kind: GogglesUIStateKind) -> NSImage? {
+        glyphImage(for: kind.statusGlyphCategory)
+    }
+
+    static func glyphImage(for category: GogglesStatusGlyphCategory) -> NSImage? {
         let symbolName: String
         let color: NSColor
-        switch kind.statusGlyphCategory {
+        switch category {
         case .error:
             symbolName = "exclamationmark.triangle.fill"
             color = .systemRed

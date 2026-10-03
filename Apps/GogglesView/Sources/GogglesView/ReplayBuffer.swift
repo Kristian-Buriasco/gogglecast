@@ -104,8 +104,8 @@ final class ReplayBuffer: ObservableObject, SampleBufferRendering {
         lock.lock()
         let samples = window.entries.map(\.item)
         lock.unlock()
-        let url = RecordingPrefs.directory.appendingPathComponent(
-            Self.fileName(for: Date(), prefix: RecordingPrefs.prefix, ext: RecordingPrefs.container.ext))
+        let url = UniqueFileURL.reserve(RecordingPrefs.directory.appendingPathComponent(
+            Self.fileName(for: Date(), prefix: RecordingPrefs.prefix, ext: RecordingPrefs.container.ext)))
         func done(_ u: URL?, _ err: String?) {
             DispatchQueue.main.async {
                 if let u { self.lastSavedURL = u; self.lastError = nil } else { self.lastError = err ?? "save failed" }

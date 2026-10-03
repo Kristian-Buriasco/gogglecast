@@ -8,6 +8,19 @@ extension Notification.Name {
     static let gogglesSaveReplay = Notification.Name("GogglesSaveReplay")
 }
 
+/// Multi-window targeting: a global hotkey acts on ONE goggles window (the
+/// active one) rather than every open window. The notification's `object`
+/// is that window's `DecodeSession`; `nil` means "every listener" (no
+/// resolver installed, e.g. dev harnesses).
+enum GlobalHotkeyRouting {
+    static var targetProvider: (() -> AnyObject?)?
+
+    static func shouldHandle(_ notification: Notification, session: AnyObject) -> Bool {
+        guard let target = notification.object else { return true }
+        return (target as AnyObject) === session
+    }
+}
+
 /// A key combo. `carbonModifiers` uses Carbon's cmdKey/optionKey/controlKey/shiftKey bits.
 struct HotkeyCombo: Equatable {
     let keyCode: UInt32
@@ -140,7 +153,7 @@ final class GlobalHotkeys: ObservableObject {
             GetEventParameter(event, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID),
                               nil, MemoryLayout<EventHotKeyID>.size, nil, &id)
             if let action = GlobalHotkeyAction(rawValue: id.id) {
-                NotificationCenter.default.post(name: action.notification, object: nil)
+                NotificationCenter.default.post(name: action.notification, object: GlobalHotkeyRouting.targetProvider?())
             }
             return noErr
         }, 1, &spec, nil, &handler)

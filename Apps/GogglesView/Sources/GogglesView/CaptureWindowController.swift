@@ -19,8 +19,13 @@ private final class CaptureWindow: NSWindow {
 /// the display layer, which the session only holds weakly) is torn down on `hide()`.
 final class CaptureWindowController: NSObject, NSWindowDelegate {
     private let session: DecodeSession
-    private var window: NSWindow?
+    private(set) var window: NSWindow?
     private var savedFrame: NSRect?
+
+    /// Per-device in multi-window mode (OBS lists windows by title).
+    var title = "GogglesView Capture" {
+        didSet { window?.title = title }
+    }
 
     var keepOnTop = false {
         didSet { window?.level = keepOnTop ? .floating : .normal }
@@ -48,7 +53,7 @@ final class CaptureWindowController: NSObject, NSWindowDelegate {
             defer: false
         )
         window.contentViewController = host
-        window.title = "GogglesView Capture"  // OBS lists windows by title
+        window.title = title
         window.backgroundColor = .black
         window.hasShadow = false
         window.isMovableByWindowBackground = true

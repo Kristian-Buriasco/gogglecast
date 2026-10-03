@@ -16,6 +16,11 @@ import ServiceManagement
 // a SwiftUI view (`GogglesConnectionView.swift`) can just `@ObservedObject`
 // it.
 //
+// (Multi-window update: callbacks are now registered per-deviceId via
+// `HelperClient.setHandlers(_:for:)`; tests drive them through the
+// client's internal `handle*`/`broadcastConnectionState` routing entry
+// points with synchronous delivery -- see `HelperClientTestSupport.swift`.)
+//
 // Test seam (task brief point 6, "unit-test the state-transition logic
 // itself" + point 5, "force/verify each state ... by feeding synthetic
 // events into your state-driving logic"): `HelperClient`'s four callback
@@ -103,6 +108,22 @@ public final class GogglesConnectionCoordinator: ObservableObject {
 
     deinit {
         watchdogTimer?.invalidate()
+        detach()
+    }
+
+    private var connectionObserverToken: HelperConnectionObserverToken?
+
+    /// Unhooks this coordinator from the shared `HelperClient` and stops its
+    /// watchdog. Idempotent. Does not stop streaming -- `GogglesSession.teardown`
+    /// does that.
+    public func detach() {
+        watchdogTimer?.invalidate()
+        watchdogTimer = nil
+        if let token = connectionObserverToken {
+            client.removeConnectionStateObserver(token)
+            connectionObserverToken = nil
+            client.removeHandlers(for: deviceId)
+        }
     }
 
     /// Best-effort retry action for the `claimFailed`/`noDevice`-ish "Retry"
@@ -162,28 +183,34 @@ public final class GogglesConnectionCoordinator: ObservableObject {
 
     // MARK: - Wiring
 
+    /// Multi-window: registers through `HelperClient`'s per-device routing
+    /// (keyed by `deviceId`) and an additive connection-state observer, so
+    /// several coordinators -- one per open goggles window -- and the picker
+    /// can share one client without clobbering each other's callbacks.
     private func wireCallbacks() {
-        client.onConnectionStateChange = { [weak self] state in
+        connectionObserverToken = client.addConnectionStateObserver { [weak self] state in
             self?.handleConnectionStateChange(state)
         }
-        client.onDeviceChanged = { [weak self] info in
-            self?.deviceInfo = info
-        }
-        client.onHelperStateChanged = { [weak self] raw, detail in
-            self?.handleHelperStateChanged(raw, detail: detail)
-        }
-        client.onNALUnit = { [weak self] data, nalType, isParameterSet, hostTime in
-            self?.handleActivitySignal()
-            self?.onNALUnit?(data, nalType, isParameterSet, hostTime)
-        }
-        client.onBatteryChanged = { [weak self] percent in
-            self?.batteryPercent = percent
-            self?.onBatteryChanged?(percent)
-        }
-        client.onStats = { [weak self] stats in
-            self?.stats = stats
-            self?.handleActivitySignal()
-        }
+        client.setHandlers(HelperDeviceHandlers(
+            onDeviceChanged: { [weak self] info in
+                self?.deviceInfo = info
+            },
+            onHelperStateChanged: { [weak self] raw, detail in
+                self?.handleHelperStateChanged(raw, detail: detail)
+            },
+            onNALUnit: { [weak self] data, nalType, isParameterSet, hostTime in
+                self?.handleActivitySignal()
+                self?.onNALUnit?(data, nalType, isParameterSet, hostTime)
+            },
+            onStats: { [weak self] stats in
+                self?.stats = stats
+                self?.handleActivitySignal()
+            },
+            onBatteryChanged: { [weak self] percent in
+                self?.batteryPercent = percent
+                self?.onBatteryChanged?(percent)
+            }
+        ), for: deviceId)
     }
 
     private func handleConnectionStateChange(_ state: HelperClientConnectionState) {

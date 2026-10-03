@@ -82,7 +82,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
     /// screen's "Reconnect" button (previously disabled/absent) to
     /// `coordinator.reconnect()`, the exact same call the menu bar's
     /// "Reconnect" item makes.
-    func setReconnectHandler(_ handler: @escaping () -> Void) {
+    func setReconnectHandler(_ handler: (() -> Void)?) {
         viewModel.reconnectHandler = handler
     }
 

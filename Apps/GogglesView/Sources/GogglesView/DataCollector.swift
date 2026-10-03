@@ -47,7 +47,7 @@ final class DataCollector: ObservableObject {
     func startCollecting() {
         try? FileManager.default.createDirectory(at: Self.directory, withIntermediateDirectories: true)
         let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd-HH-mm-ss"
-        let url = Self.directory.appendingPathComponent("collect-\(f.string(from: Date())).jsonl")
+        let url = UniqueFileURL.reserve(Self.directory.appendingPathComponent("collect-\(f.string(from: Date())).jsonl"))
         FileManager.default.createFile(atPath: url.path, contents: nil)
         handle = try? FileHandle(forWritingTo: url)
         fileURL = url
@@ -130,5 +130,9 @@ struct DataCollectControl: View {
             .help(collector.isCollecting ? "Stop collecting and show the log" : "Collect research data (frame metadata, markers) to ~/Documents/GogglesView-data")
         }
         .onChange(of: batteryPercent) { p in collector.logBattery(p) }
+        .onDisappear {
+            // Window torn down mid-collection: close the log cleanly.
+            if collector.isCollecting { collector.stopCollecting(); session.onRawNAL = nil }
+        }
     }
 }

@@ -109,6 +109,11 @@ public final class HelperClient: NSObject {
     // anyway. All four fire on the main queue (see each handle* method)
     // so a future SwiftUI/AppKit consumer never has to hop threads itself.
 
+    // Legacy single-subscriber surface, used by the dev harnesses and the
+    // self-test. Device callbacks reach these only for the device most
+    // recently passed to `startStreaming`. The real multi-window app uses
+    // `setHandlers(_:for:)` / `addConnectionStateObserver(_:)` instead, which
+    // never clobber each other.
     public var onConnectionStateChange: ((HelperClientConnectionState) -> Void)?
     public var onDeviceChanged: ((DeviceInfo?) -> Void)?
     public var onHelperStateChanged: ((Int, String?) -> Void)?
@@ -129,10 +134,42 @@ public final class HelperClient: NSObject {
     public private(set) var connectionState: HelperClientConnectionState = .disconnected {
         didSet {
             guard connectionState != oldValue else { return }
-            let state = connectionState
-            let handler = onConnectionStateChange
-            DispatchQueue.main.async { handler?(state) }
+            broadcastConnectionState(connectionState)
         }
+    }
+
+    // MARK: - Multi-subscriber routing
+
+    let router = HelperCallbackRouter()
+
+    /// How routed callbacks reach the main queue. Tests swap in `{ $0() }`
+    /// to observe routing synchronously.
+    var deliverOnMain: (@escaping () -> Void) -> Void = { DispatchQueue.main.async(execute: $0) }
+
+    /// Registers (replacing any previous set) the callbacks for one device.
+    /// Callbacks for other deviceIds never reach these.
+    public func setHandlers(_ handlers: HelperDeviceHandlers, for deviceId: String) {
+        router.setHandlers(handlers, for: deviceId)
+    }
+
+    public func removeHandlers(for deviceId: String) {
+        router.removeHandlers(for: deviceId)
+    }
+
+    /// Adds a connection-state observer alongside any others (and alongside
+    /// the legacy `onConnectionStateChange`).
+    @discardableResult
+    public func addConnectionStateObserver(_ observer: @escaping (HelperClientConnectionState) -> Void) -> HelperConnectionObserverToken {
+        router.addConnectionObserver(observer)
+    }
+
+    public func removeConnectionStateObserver(_ token: HelperConnectionObserverToken) {
+        router.removeConnectionObserver(token)
+    }
+
+    func broadcastConnectionState(_ state: HelperClientConnectionState) {
+        let targets = router.connectionObserverSnapshot() + [onConnectionStateChange].compactMap { $0 }
+        deliverOnMain { targets.forEach { $0(state) } }
     }
 
     // MARK: - Internals
@@ -171,12 +208,18 @@ public final class HelperClient: NSObject {
     /// thread each `GogglesClientProtocol` callback arrives on (including
     /// the per-NAL hot path) -- a `stateQueue.sync` per NAL would add
     /// unnecessary latency there for a single-word read.
+    ///
+    /// Multi-window: this now only scopes the legacy `on*` closures;
+    /// per-device handlers are keyed by their own deviceId.
     private let streamingDeviceIdLock = NSLock()
     private var _streamingDeviceId: String?
     private var streamingDeviceId: String? {
         get { streamingDeviceIdLock.lock(); defer { streamingDeviceIdLock.unlock() }; return _streamingDeviceId }
         set { streamingDeviceIdLock.lock(); _streamingDeviceId = newValue; streamingDeviceIdLock.unlock() }
     }
+    /// Every device with a live `startStreaming` (stateQueue only); the
+    /// client-side fps counter runs while this is non-empty.
+    private var streamingDeviceIds: Set<String> = []
 
     private let fpsCounter = NALFPSCounter()
 
@@ -239,6 +282,7 @@ public final class HelperClient: NSObject {
             self.exportedClient = nil
             self.connectionState = .disconnected
             self.streamingDeviceId = nil
+            self.streamingDeviceIds = []
         }
     }
 
@@ -306,7 +350,8 @@ public final class HelperClient: NSObject {
                 return
             }
             self.streamingDeviceId = deviceId
-            self.fpsCounter.start()
+            if self.streamingDeviceIds.isEmpty { self.fpsCounter.start() }
+            self.streamingDeviceIds.insert(deviceId)
             proxy.startStreaming(deviceId: deviceId) { ok, error in
                 DispatchQueue.main.async { reply(ok, error) }
             }
@@ -315,7 +360,8 @@ public final class HelperClient: NSObject {
 
     public func stopStreaming(deviceId: String, reply: @escaping () -> Void = {}) {
         stateQueue.async {
-            self.fpsCounter.stop()
+            self.streamingDeviceIds.remove(deviceId)
+            if self.streamingDeviceIds.isEmpty { self.fpsCounter.stop() }
             guard let proxy = self.remoteHelperProxy() else {
                 DispatchQueue.main.async { reply() }
                 return
@@ -515,52 +561,55 @@ public final class HelperClient: NSObject {
     // onto the main queue for the public closures -- mirrors
     // `HelperService`'s PipelineDelegate methods' identical pattern)
 
-    /// Multi-device picker design item 6: drops a callback whose
-    /// `deviceId` doesn't match this client's `streamingDeviceId` -- see
-    /// that property's doc comment for why this is a defensive check, not
-    /// the primary scoping mechanism (the helper's own fan-out already is).
-    private func isForCurrentDevice(_ deviceId: String) -> Bool {
-        deviceId == streamingDeviceId
+    /// Collects the per-device handler set (if that device has one) plus the
+    /// legacy single-subscriber closures (only for the legacy device -- see
+    /// `streamingDeviceId`). A callback for a device nobody registered for
+    /// resolves to nothing and is dropped.
+    private func route<T>(_ deviceId: String, _ perDevice: (HelperDeviceHandlers) -> T?, legacy: () -> T?) -> [T] {
+        var out: [T] = []
+        if let h = router.handlers(for: deviceId), let f = perDevice(h) { out.append(f) }
+        if deviceId == streamingDeviceId, let f = legacy() { out.append(f) }
+        return out
     }
 
-    fileprivate func handleDeviceChanged(_ deviceId: String, _ info: DeviceInfo?) {
-        guard isForCurrentDevice(deviceId) else { return }
-        Logging.client.info("deviceChanged: \(info?.product ?? "nil", privacy: .public)")
-        let handler = onDeviceChanged
-        DispatchQueue.main.async { handler?(info) }
+    func handleDeviceChanged(_ deviceId: String, _ info: DeviceInfo?) {
+        let targets = route(deviceId, { $0.onDeviceChanged }, legacy: { onDeviceChanged })
+        guard !targets.isEmpty else { return }
+        Logging.client.info("deviceChanged[\(deviceId, privacy: .public)]: \(info?.product ?? "nil", privacy: .public)")
+        deliverOnMain { targets.forEach { $0(info) } }
     }
 
-    fileprivate func handleStateChanged(_ deviceId: String, _ state: Int, detail: String?) {
-        guard isForCurrentDevice(deviceId) else { return }
+    func handleStateChanged(_ deviceId: String, _ state: Int, detail: String?) {
+        let targets = route(deviceId, { $0.onHelperStateChanged }, legacy: { onHelperStateChanged })
+        guard !targets.isEmpty else { return }
         let name = GogglesState(rawValue: state).map { String(describing: $0) } ?? "unknown(\(state))"
-        Logging.client.info("stateChanged: \(name, privacy: .public)\(detail.map { " [\($0)]" } ?? "", privacy: .public)")
-        let handler = onHelperStateChanged
-        DispatchQueue.main.async { handler?(state, detail) }
+        Logging.client.info("stateChanged[\(deviceId, privacy: .public)]: \(name, privacy: .public)\(detail.map { " [\($0)]" } ?? "", privacy: .public)")
+        deliverOnMain { targets.forEach { $0(state, detail) } }
     }
 
-    fileprivate func handleNALUnit(_ deviceId: String, _ data: Data, nalType: UInt8, isParameterSet: Bool, hostTime: UInt64) {
-        guard isForCurrentDevice(deviceId) else { return }
+    func handleNALUnit(_ deviceId: String, _ data: Data, nalType: UInt8, isParameterSet: Bool, hostTime: UInt64) {
+        let targets = route(deviceId, { $0.onNALUnit }, legacy: { onNALUnit })
+        guard !targets.isEmpty else { return }
         fpsCounter.recordFrame()
-        let handler = onNALUnit
-        DispatchQueue.main.async { handler?(data, nalType, isParameterSet, hostTime) }
+        deliverOnMain { targets.forEach { $0(data, nalType, isParameterSet, hostTime) } }
     }
 
-    fileprivate func handleStats(_ deviceId: String, _ stats: StreamStats) {
-        guard isForCurrentDevice(deviceId) else { return }
+    func handleStats(_ deviceId: String, _ stats: StreamStats) {
+        let targets = route(deviceId, { $0.onStats }, legacy: { onStats })
+        guard !targets.isEmpty else { return }
         // Logged alongside (not instead of) the independent client-side
         // `NALFPSCounter` -- see that type's doc comment for why both
         // numbers matter. This is the helper's own self-reported fps.
-        Logging.client.info("helper-reported stats: fps=\(stats.fps, privacy: .public) bitrate=\(stats.bitrateKbps, format: .fixed(precision: 1), privacy: .public)kbps drops=\(stats.drops, privacy: .public)")
-        let handler = onStats
-        DispatchQueue.main.async { handler?(stats) }
+        Logging.client.info("helper-reported stats[\(deviceId, privacy: .public)]: fps=\(stats.fps, privacy: .public) bitrate=\(stats.bitrateKbps, format: .fixed(precision: 1), privacy: .public)kbps drops=\(stats.drops, privacy: .public)")
+        deliverOnMain { targets.forEach { $0(stats) } }
     }
 
-    fileprivate func handleBatteryChanged(_ deviceId: String, percent: Int) {
-        guard isForCurrentDevice(deviceId) else { return }
-        Logging.client.info("batteryChanged: \(percent, privacy: .public)")
+    func handleBatteryChanged(_ deviceId: String, percent: Int) {
+        let targets = route(deviceId, { $0.onBatteryChanged }, legacy: { onBatteryChanged })
+        guard !targets.isEmpty else { return }
+        Logging.client.info("batteryChanged[\(deviceId, privacy: .public)]: \(percent, privacy: .public)")
         let value: Int? = (0...100).contains(percent) ? percent : nil
-        let handler = onBatteryChanged
-        DispatchQueue.main.async { handler?(value) }
+        deliverOnMain { targets.forEach { $0(value) } }
     }
 }
 

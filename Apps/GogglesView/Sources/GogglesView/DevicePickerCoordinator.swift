@@ -89,13 +89,9 @@ public enum DevicePickerState: Equatable {
     case connectionUnavailable(reason: String?)
 }
 
-/// Drives `DevicePickerState` from a live `HelperClient`, ahead of any
-/// `GogglesConnectionCoordinator` existing. Owns (overwrites) the client's
-/// `onConnectionStateChange` closure while active; a caller that later
-/// constructs a `GogglesConnectionCoordinator` on the same `client`
-/// instance is expected to do so only *after* `state` reaches `.selected`
-/// (that coordinator's own `init` rewires the same closure for its own
-/// per-device purposes).
+/// Drives `DevicePickerState` from a live `HelperClient`. Observes connection
+/// state through an additive observer, so it coexists with the
+/// `GogglesConnectionCoordinator`s of already-open goggles windows.
 public final class DevicePickerCoordinator: ObservableObject {
 
     @Published public private(set) var state: DevicePickerState = .discovering
@@ -107,10 +103,12 @@ public final class DevicePickerCoordinator: ObservableObject {
     public init(client: HelperClient, pollInterval: TimeInterval = 1.0) {
         self.client = client
         self.pollInterval = pollInterval
-        client.onConnectionStateChange = { [weak self] connectionState in
+        connectionObserverToken = client.addConnectionStateObserver { [weak self] connectionState in
             self?.handleConnectionStateChange(connectionState)
         }
     }
+
+    private var connectionObserverToken: HelperConnectionObserverToken?
 
     /// BLOCKER 2 fix (review round 2): reacts to every connection state,
     /// not just `.connected` -- `.connecting`/`.disconnected`/
@@ -147,6 +145,7 @@ public final class DevicePickerCoordinator: ObservableObject {
 
     deinit {
         pollTimer?.invalidate()
+        if let connectionObserverToken { client.removeConnectionStateObserver(connectionObserverToken) }
     }
 
     private func startPolling() {

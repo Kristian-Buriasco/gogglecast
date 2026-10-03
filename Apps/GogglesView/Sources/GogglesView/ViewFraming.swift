@@ -135,7 +135,9 @@ enum FramingPrefs {
     }
 }
 
-/// Process-wide freeze flag (deliberately not persisted: relaunching frozen is a trap).
+/// Freeze flag (deliberately not persisted: relaunching frozen is a trap).
+/// One per `DecodeSession` so each goggles window freezes independently;
+/// `shared` remains for hosts without a session-specific instance.
 final class FreezeState: ObservableObject {
     static let shared = FreezeState()
     private let lock = NSLock()
@@ -157,12 +159,13 @@ final class FreezeState: ObservableObject {
 /// After unfreezing, non-sync frames are dropped until the next keyframe so
 /// the decoder never sees a P-frame whose references were skipped.
 final class FreezableDisplayLayer: AVSampleBufferDisplayLayer {
+    var freezeState: FreezeState = .shared
     private var waitingForKeyframe = false
     private let gate = NSLock()
 
     override func enqueue(_ sampleBuffer: CMSampleBuffer) {
         gate.lock()
-        if FreezeState.shared.frozenNow {
+        if freezeState.frozenNow {
             waitingForKeyframe = true
             gate.unlock()
             return
@@ -180,7 +183,7 @@ final class FreezableDisplayLayer: AVSampleBufferDisplayLayer {
 }
 
 struct FreezeControl: View {
-    @ObservedObject private var state = FreezeState.shared
+    @ObservedObject var state: FreezeState
     var body: some View {
         Button { state.toggle() } label: {
             Image(systemName: state.isFrozen ? "play.fill" : "pause.fill")

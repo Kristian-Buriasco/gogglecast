@@ -165,16 +165,25 @@ final class EventBus {
     }
 }
 
-/// Bridges app state/notifications onto the bus. Call once per launched main window; re-installing replaces the previous one.
+/// Bridges app state/notifications onto the bus. Multi-window: one set of
+/// state/battery observers per open goggles window (keyed by deviceId, which
+/// is added to those events' payloads); the recording/replay/screenshot
+/// notification bridge is app-wide and installed once.
 enum EventHookInstaller {
-    private static var bag = Set<AnyCancellable>()
+    private static var perDevice: [String: Set<AnyCancellable>] = [:]
+    private static var notificationBag = Set<AnyCancellable>()
+
+    static func uninstall(deviceId: String) {
+        perDevice[deviceId] = nil
+    }
 
     static func install(coordinator: GogglesConnectionCoordinator) {
-        bag = []
+        let deviceId = coordinator.deviceId
+        var bag = Set<AnyCancellable>()
         var lastKind: GogglesUIStateKind?
         coordinator.$uiState.sink { state in
             let k = state.kind
-            if let e = EventHookLogic.streamEvent(from: lastKind, to: k) { EventBus.shared.post(e) }
+            if let e = EventHookLogic.streamEvent(from: lastKind, to: k) { EventBus.shared.post(e, payload: ["deviceId": deviceId]) }
             lastKind = k
         }.store(in: &bag)
 
@@ -182,11 +191,13 @@ enum EventHookInstaller {
         coordinator.$batteryPercent.sink { pct in
             let threshold = EventHookConfig.batteryThreshold
             if EventHookLogic.batteryCrossedBelow(previous: lastBattery, current: pct, threshold: threshold), let pct {
-                EventBus.shared.post(.batteryLow, payload: ["percent": pct, "threshold": threshold])
+                EventBus.shared.post(.batteryLow, payload: ["percent": pct, "threshold": threshold, "deviceId": deviceId])
             }
             if pct != nil { lastBattery = pct }
         }.store(in: &bag)
+        perDevice[deviceId] = bag
 
+        guard notificationBag.isEmpty else { return }
         let map: [(Notification.Name, AppEvent)] = [
             (.gogglesRecordingStarted, .recordingStarted), (.gogglesRecordingStopped, .recordingStopped),
             (.gogglesReplaySaved, .replaySaved), (.gogglesScreenshotSaved, .screenshotSaved),
@@ -194,7 +205,7 @@ enum EventHookInstaller {
         for (name, event) in map {
             NotificationCenter.default.publisher(for: name).sink { n in
                 EventBus.shared.post(event, payload: (n.userInfo as? [String: Any]) ?? [:])
-            }.store(in: &bag)
+            }.store(in: &notificationBag)
         }
     }
 }

@@ -24,7 +24,7 @@ enum Screenshot {
             throw CocoaError(.fileWriteUnknown)
         }
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let url = directory.appendingPathComponent(fileName(for: date))
+        let url = UniqueFileURL.reserve(directory.appendingPathComponent(fileName(for: date)))
         try png.write(to: url)
         return url
     }

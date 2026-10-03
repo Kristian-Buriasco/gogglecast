@@ -45,6 +45,10 @@ final class DecodeSession: ObservableObject {
     static let maxConsecutiveFailures = 30
 
     private let formatCache = ParameterSetFormatDescriptionCache()
+    #if canImport(AppKit)
+    /// Per-window freeze toggle (see `FreezableDisplayLayer`).
+    let freezeState = FreezeState()
+    #endif
     private weak var renderer: SampleBufferRendering?
     private var extraConsumers: [WeakConsumer] = []
     private let consumerLock = NSLock()

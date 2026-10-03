@@ -21,8 +21,11 @@ struct GogglesConnectionView: View {
     /// Settings window to open (none currently; kept optional rather than
     /// forcing every future harness/test host of this view to supply one).
     var onOpenSettings: (() -> Void)?
-    /// Returns to the goggles picker (stops streaming); nil hides the button.
-    var onBack: (() -> Void)?
+    /// Opens the goggles picker to add another window; this one keeps
+    /// streaming. nil hides the button.
+    var onOpenAnother: (() -> Void)?
+    /// Stops this device's stream and closes just this window; nil hides the button.
+    var onDisconnect: (() -> Void)?
     /// User feedback (round 3): the previous fixed `AppChrome.titleBarHeight`-
     /// based centering did not actually line up with the real traffic
     /// lights on screen. `main.swift` now measures the real live window
@@ -74,7 +77,7 @@ struct GogglesConnectionView: View {
             .accessibilityLabel("Open recordings folder")
             .accessibilityIdentifier("openRecordingsButton")
             GalleryButton()
-            FreezeControl()
+            FreezeControl(state: session.freezeState)
             DataCollectControl(session: session, batteryPercent: coordinator.batteryPercent)
             ReplayControl(session: session)
             MiniWindowControl(session: session)
@@ -115,17 +118,22 @@ struct GogglesConnectionView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
             stopRecording(wait: true)
         }
-        .onReceive(NotificationCenter.default.publisher(for: .gogglesToggleRecording)) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .gogglesSessionWillClose, object: session)) { _ in
+            stopRecording(wait: true)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .gogglesToggleRecording)) { n in
+            guard GlobalHotkeyRouting.shouldHandle(n, session: session) else { return }
             if recorder.isRecording { stopRecording(wait: false) } else if isLive { startRecording() }
         }
-        .onReceive(NotificationCenter.default.publisher(for: .gogglesScreenshot)) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .gogglesScreenshot)) { n in
+            guard GlobalHotkeyRouting.shouldHandle(n, session: session) else { return }
             if isLive { takeScreenshot() }
         }
     }
 
     private func startRecording() {
         session.addConsumer(recorder)
-        let url = Recorder.defaultURL()
+        let url = UniqueFileURL.reserve(Recorder.defaultURL())
         do {
             try recorder.start(to: url)
             NotificationCenter.default.post(name: .gogglesRecordingStarted, object: nil, userInfo: ["path": url.path])
@@ -259,16 +267,26 @@ struct GogglesConnectionView: View {
     /// so it's enabled whenever a real handler is actually available.
     private var footerBar: some View {
         HStack(alignment: .center) {
-            if let onBack {
-                Button(action: onBack) {
-                    Label("Devices", systemImage: "chevron.left")
+            if let onOpenAnother {
+                Button(action: onOpenAnother) {
+                    Label("Devices", systemImage: "plus.rectangle.on.rectangle")
                         .font(.caption)
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
-                .help("Back to the goggles picker")
-                .accessibilityHint("Returns to the goggles picker")
-                .accessibilityIdentifier("backButton")
+                .help("Open another goggles in a new window (this one keeps streaming)")
+                .accessibilityIdentifier("openAnotherButton")
+            }
+            if let onDisconnect {
+                Button(action: onDisconnect) {
+                    Label("Disconnect", systemImage: "xmark.circle")
+                        .font(.caption)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .help("Stop streaming these goggles and close this window")
+                .accessibilityHint("Stops streaming these goggles and closes this window")
+                .accessibilityIdentifier("disconnectButton")
             }
             Button {
                 onOpenSettings?()

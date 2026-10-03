@@ -151,20 +151,6 @@ if args.contains("--install-camera-extension") {
 
 #if canImport(AppKit)
 
-/// Top-level retain point for the real app shell's objects
-/// (`launchMainWindow`), since `--run`'s original
-/// `withExtendedLifetime(...) { app.run() }` pattern no longer applies --
-/// see that function's doc comment.
-var mainWindowRetainedObjects: [Any] = []
-
-/// Stops streaming and closes everything `launchMainWindow` created (back to picker).
-var mainWindowTeardown: (() -> Void)?
-
-/// Bridges `DevicePickerCoordinator.$state`'s Combine publisher to a plain
-/// closure fired exactly once, the first time `state` becomes `.selected`.
-/// A small dedicated type (not an inline `Combine.sink` at the call site)
-/// so it has a stable identity `withExtendedLifetime`/a retained array can
-/// hold onto for the picker phase's duration.
 /// Dev/debug-harness-only helper (`--live-view`, `--test-client`): polls
 /// `enumerateDevices` on a 0.5s cadence until a candidate appears (or
 /// `timeout` elapses), then calls `completion` with the first one's
@@ -188,17 +174,20 @@ func pollFirstAvailableDeviceId(client: HelperClient, timeout: TimeInterval = 15
     attempt()
 }
 
-var cursorAutoHider: CursorAutoHider?
-
+/// Bridges `DevicePickerCoordinator.$state` to a plain closure fired exactly
+/// once, the first time `state` becomes `.selected`, with the candidate's
+/// info from the preceding `.picking` list (for the window title).
 final class PickerSelectionObserver {
     private var cancellable: AnyObject?
 
-    init(picker: DevicePickerCoordinator, onSelected: @escaping (String) -> Void) {
+    init(picker: DevicePickerCoordinator, onSelected: @escaping (String, DevicePickerCandidate?) -> Void) {
         var fired = false
+        var lastCandidates: [DevicePickerCandidate] = []
         let sink = picker.$state.sink { state in
+            if case .picking(let candidates) = state { lastCandidates = candidates }
             guard !fired, case .selected(let deviceId) = state else { return }
             fired = true
-            onSelected(deviceId)
+            onSelected(deviceId, lastCandidates.first { $0.id == deviceId })
         }
         cancellable = sink
     }
@@ -338,54 +327,48 @@ if args.contains("--live-view") {
     exit(0)
 }
 if args.contains("--run") || !args.dropFirst().contains(where: { $0.hasPrefix("--") }) {
-    // Task 3.6: this is now v1's real default launch behavior, not just
-    // another debug flag -- the app bundle's actual entry point (no
-    // arguments, e.g. a normal Dock/Finder double-click) falls into this
-    // exact same branch as the explicit `--run` flag. `--run` is kept as an
-    // explicit, named synonym for development use (matches every other
-    // flag in this file's convention of being nameable from a terminal),
-    // but it is no longer the *only* way to reach this code path.
+    // Task 3.6: this is v1's real default launch behavior -- a plain
+    // double-click of the app bundle (no arguments) lands here, same as the
+    // explicit `--run` synonym.
     //
-    // History: originally Task 3.5's `--run` harness (first real
-    // end-to-end wiring -- unlike `--live-view`, Task 3.3, which drives
-    // `GogglesVideoView` directly off a raw `HelperClient` and never
-    // touches the state machine, and `--force-state`, Task 3.4, which never
-    // opens a real XPC connection). This task (3.6) promotes it to the
-    // default path and adds the real app shell around it: a persistent
-    // `NSStatusItem` menu bar presence (`MenuBarController` -- state glyph,
-    // Reconnect relocated here from its temporary home as a "Goggles" main
-    // -menu item, show/hide window), a 16:9 aspect-ratio window constraint,
-    // and fullscreen support.
+    // Roadmap Phase 2 (multi-goggles in separate windows): every connected
+    // goggles the user picks gets its own `GogglesSession` -- an
+    // independently sized/positioned window streaming simultaneously -- all
+    // sharing this one `HelperClient` (the helper fans out per deviceId; the
+    // client routes callbacks per deviceId). `SessionRegistry` keeps one
+    // session per device; picking an already-open device focuses its window.
+    //
+    // Window behavior:
+    //   - The picker is a single reusable window, reachable from Goggles >
+    //     Open Another Goggles… (⌘N), the menu-bar item, and each goggles
+    //     window's "Devices" button. Picking a device opens its window and
+    //     leaves every other window streaming.
+    //   - A goggles window's red close button hides it (streaming continues,
+    //     as before multi-window); "Disconnect" (footer button, Goggles menu,
+    //     or the menu-bar item's per-device submenu) stops that device and
+    //     closes only its window. Disconnecting the last one re-opens the
+    //     picker so the app never sits with no window at all.
+    //   - App-level commands (File > Reconnect, Settings' Reconnect, Goggles >
+    //     Disconnect, global hotkeys) act on the key goggles window, else
+    //     the most recently focused one.
     print("GogglesView: connecting to \(helperMachServiceName) and opening the real connection view...")
 
     let client = HelperClient()
-
-    // Multi-device picker design item 7: a device-selection step precedes
-    // the existing state machine. `launchMainWindow(deviceId:)` below is
-    // everything this branch used to do unconditionally (Task 3.6) --
-    // untouched, just now parameterized by the deviceId the picker
-    // resolved, and called once instead of unconditionally at startup.
     let app = NSApplication.shared
     app.setActivationPolicy(.regular)
 
-    // Settings fix (post-multi-device UX gap): built ONCE, here, before the
-    // picker -- not inside `launchMainWindow` as originally shipped.
-    // Registering/re-registering the helper daemon is exactly the thing a
-    // user needs to do *before* a device can show up at all, so gating
-    // Settings behind device selection made it unreachable at precisely
-    // the moment it's most needed. `setReconnectHandler` below wires the
-    // Reconnect button once a real coordinator exists post-selection; it
-    // stays disabled (not absent) before that, same "disabled reads more
-    // honest than silently missing" reasoning as the footer button itself.
+    // Built once, before the picker: registering the helper is exactly what a
+    // user needs to do before any device can show up.
     let settingsWindowController = SettingsWindowController()
+    let registry = SessionRegistry<GogglesSession>()
 
-    // Same fix, for the real top-of-screen app menu bar (App/File/Window --
-    // see the full construction and its own doc comment further down,
-    // inside `launchMainWindow`... no: moved up here too, for the same
-    // reason as Settings. `activeCoordinator` starts `nil` and is set once
-    // `launchMainWindow` runs; the File menu's "Reconnect" item is disabled
-    // until then instead of silently no-op'ing.
-    var activeCoordinator: GogglesConnectionCoordinator?
+    /// The session an app-level command should act on.
+    func sessionForCommand() -> GogglesSession? {
+        registry.all.first { $0.owns(NSApp.keyWindow) } ?? registry.activeSession
+    }
+
+    GlobalHotkeyRouting.targetProvider = { sessionForCommand()?.decodeSession }
+
     let mainMenu = NSMenu()
     let appMenuItem = NSMenuItem()
     mainMenu.addItem(appMenuItem)
@@ -398,16 +381,38 @@ if args.contains("--run") || !args.dropFirst().contains(where: { $0.hasPrefix("-
     let fileMenuItem = NSMenuItem()
     mainMenu.addItem(fileMenuItem)
     let fileMenu = NSMenu(title: "File")
+    fileMenu.autoenablesItems = false
     let settingsMenuTarget = MenuActionTarget { settingsWindowController.show() }
     let settingsMenuItem = NSMenuItem(title: "Settings…", action: #selector(MenuActionTarget.invoke), keyEquivalent: ",")
     settingsMenuItem.target = settingsMenuTarget
     fileMenu.addItem(settingsMenuItem)
-    let reconnectMenuTarget = MenuActionTarget { activeCoordinator?.reconnect() }
+    let reconnectMenuTarget = MenuActionTarget { sessionForCommand()?.coordinator.reconnect() }
     let reconnectMenuItem = NSMenuItem(title: "Reconnect", action: #selector(MenuActionTarget.invoke), keyEquivalent: "")
     reconnectMenuItem.target = reconnectMenuTarget
     reconnectMenuItem.isEnabled = false
     fileMenu.addItem(reconnectMenuItem)
     fileMenuItem.submenu = fileMenu
+
+    // Forward-declared so the menu targets below can call them.
+    var presentPicker: () -> Void = {}
+    var disconnectSession: (String) -> Void = { _ in }
+
+    let gogglesMenuItem = NSMenuItem()
+    mainMenu.addItem(gogglesMenuItem)
+    let gogglesMenu = NSMenu(title: "Goggles")
+    gogglesMenu.autoenablesItems = false
+    let openAnotherMenuTarget = MenuActionTarget { presentPicker() }
+    let openAnotherMenuItem = NSMenuItem(title: "Open Another Goggles…", action: #selector(MenuActionTarget.invoke), keyEquivalent: "n")
+    openAnotherMenuItem.target = openAnotherMenuTarget
+    gogglesMenu.addItem(openAnotherMenuItem)
+    let disconnectMenuTarget = MenuActionTarget {
+        if let session = sessionForCommand() { disconnectSession(session.deviceId) }
+    }
+    let disconnectMenuItem = NSMenuItem(title: "Disconnect", action: #selector(MenuActionTarget.invoke), keyEquivalent: "")
+    disconnectMenuItem.target = disconnectMenuTarget
+    disconnectMenuItem.isEnabled = false
+    gogglesMenu.addItem(disconnectMenuItem)
+    gogglesMenuItem.submenu = gogglesMenu
 
     let windowMenuItem = NSMenuItem()
     mainMenu.addItem(windowMenuItem)
@@ -423,294 +428,168 @@ if args.contains("--run") || !args.dropFirst().contains(where: { $0.hasPrefix("-
     app.mainMenu = mainMenu
     app.windowsMenu = windowMenu
 
-    let pickerDelegate = LiveViewAppDelegate()
-    var pickerRetained: [Any] = []
+    // Capture-window prefs apply to every open goggles window (each has its
+    // own, per-device-titled capture window); new windows apply them on open.
+    settingsWindowController.setCaptureWindowHandler { enabled, onTop in
+        registry.all.forEach { $0.applyCaptureWindowPrefs(enabled: enabled, onTop: onTop) }
+    }
 
-    // Mutually recursive: the picker launches the main window, whose "Devices"
-    // button presents a fresh picker again. The new picker window is shown
-    // before the main window closes so the app never has zero windows.
-    func presentPicker() {
+    registry.addObserver {
+        let hasSessions = !registry.isEmpty
+        reconnectMenuItem.isEnabled = hasSessions
+        disconnectMenuItem.isEnabled = hasSessions
+        settingsWindowController.setReconnectHandler(hasSessions ? { sessionForCommand()?.coordinator.reconnect() } : nil)
+        if let active = registry.activeSession {
+            MiniWindowController.shared.sync(session: active.decodeSession)
+        }
+    }
+
+    let appDelegate = MultiWindowAppDelegate(
+        shouldTerminateAfterLastWindowClosed: { registry.isEmpty },
+        onReopen: {
+            if let session = registry.activeSession { session.focus() } else { presentPicker() }
+        }
+    )
+    app.delegate = appDelegate
+
+    var pickerWindow: NSWindow?
+    var pickerRetained: [Any] = []
+    var didRunFirstSessionSetup = false
+
+    func dismissPicker() {
+        let window = pickerWindow
+        let retained = pickerRetained
+        pickerWindow = nil
+        pickerRetained = []
+        window?.close()
+        // Called from inside the selection observer's own sink: release the
+        // picker objects on the next turn, not mid-callback.
+        DispatchQueue.main.async { withExtendedLifetime(retained) {} }
+    }
+
+    func openSession(deviceId: String, info: DevicePickerCandidate?) {
+        let cascadeFrom = registry.activeSession?.window
+        let (session, created) = registry.openOrFocus(deviceId: deviceId) {
+            launchMainWindow(
+                deviceId: deviceId, initialInfo: info, client: client,
+                cascadeFrom: cascadeFrom,
+                settingsWindowController: settingsWindowController,
+                onOpenAnother: { presentPicker() },
+                onDisconnect: { disconnectSession($0) }
+            )
+        }
+        guard created else { return }
+        session.onBecameKey = { registry.markActive($0.deviceId) }
+        let defaults = UserDefaults.standard
+        session.applyCaptureWindowPrefs(
+            enabled: defaults.bool(forKey: CaptureWindowPrefs.enabledKey),
+            onTop: defaults.bool(forKey: CaptureWindowPrefs.onTopKey)
+        )
+        if !didRunFirstSessionSetup {
+            didRunFirstSessionSetup = true
+            UpdateChecker.shared.checkOnLaunchIfDue()
+        }
+        app.activate(ignoringOtherApps: true)
+    }
+
+    presentPicker = {
+        if let existing = pickerWindow {
+            existing.makeKeyAndOrderFront(nil)
+            app.activate(ignoringOtherApps: true)
+            return
+        }
         let picker = DevicePickerCoordinator(client: client)
         let pickerHostingController = NSHostingController(rootView: DevicePickerView(
             picker: picker,
             onOpenSettings: { settingsWindowController.show() }
         ))
         pickerHostingController.sizingOptions = []
-        let pickerWindow = NSWindow(contentViewController: pickerHostingController)
-        pickerWindow.title = "GogglesView"
-        pickerWindow.setContentSize(NSSize(width: 720, height: 520))
-        pickerWindow.styleMask = [.titled, .closable, .resizable, .miniaturizable]
-        applyCustomTitleBarChrome(to: pickerWindow)
-        pickerWindow.center()
-        pickerWindow.makeKeyAndOrderFront(nil)
-        app.delegate = pickerDelegate
-
-        var didLaunchMain = false
-        let observer = PickerSelectionObserver(picker: picker) { deviceId in
-            guard !didLaunchMain else { return }
-            didLaunchMain = true
-            // Order the main window in BEFORE closing the picker so the app
-            // never sees a zero-window state (the picker delegate quits on
-            // last window closed).
-            let coordinator = launchMainWindow(
-                deviceId: deviceId, client: client, app: app,
-                settingsWindowController: settingsWindowController,
-                onBack: { goBackToPicker() }
-            )
-            activeCoordinator = coordinator
-            reconnectMenuItem.isEnabled = true
-            pickerWindow.close()
+        let window = NSWindow(contentViewController: pickerHostingController)
+        window.title = "GogglesView"
+        window.setContentSize(NSSize(width: 720, height: 520))
+        window.styleMask = [.titled, .closable, .resizable, .miniaturizable]
+        window.isReleasedWhenClosed = false
+        applyCustomTitleBarChrome(to: window)
+        window.center()
+        if let active = registry.activeSession?.window {
+            window.setFrameTopLeftPoint(window.cascadeTopLeft(from: NSPoint(x: active.frame.minX, y: active.frame.maxY)))
         }
-        pickerRetained = [observer, pickerWindow, pickerHostingController, picker]
+        var closeObserver: NSObjectProtocol?
+        closeObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.willCloseNotification, object: window, queue: .main
+        ) { _ in
+            // Picker closed (by the user, or after a selection): drop it and
+            // its polling for good.
+            if let closeObserver { NotificationCenter.default.removeObserver(closeObserver) }
+            closeObserver = nil
+            if pickerWindow === window { pickerWindow = nil; pickerRetained = [] }
+        }
+        let selection = PickerSelectionObserver(picker: picker) { deviceId, info in
+            // Open (or focus) the goggles window BEFORE closing the picker so
+            // the app never passes through a zero-window state.
+            openSession(deviceId: deviceId, info: info)
+            dismissPicker()
+        }
+        pickerWindow = window
+        pickerRetained = [selection, pickerHostingController, picker]
+        window.makeKeyAndOrderFront(nil)
+        app.activate(ignoringOtherApps: true)
         picker.resumeIfConnected()
     }
 
-    func goBackToPicker() {
-        presentPicker()
-        mainWindowTeardown?()
-        mainWindowTeardown = nil
-        activeCoordinator = nil
-        reconnectMenuItem.isEnabled = false
+    disconnectSession = { deviceId in
+        guard registry.session(for: deviceId) != nil else { return }
+        // Last window: bring the picker up first (never zero windows, and
+        // `shouldTerminateAfterLastWindowClosed` must not see an empty app).
+        if registry.count == 1 { presentPicker() }
+        guard let session = registry.remove(deviceId: deviceId) else { return }
+        // Next turn: this often runs from a SwiftUI button inside the very
+        // hosting view `teardown()` removes.
+        DispatchQueue.main.async { session.teardown() }
     }
 
+    let menuBarController = MenuBarController(
+        registry: registry,
+        onOpenAnother: { presentPicker() },
+        onDisconnect: { disconnectSession($0) }
+    )
+
+    GlobalHotkeys.shared.apply()
     presentPicker()
     OnboardingWindow.showIfFirstRun()  // after the picker so it opens on top
 
     client.connect()
     app.activate(ignoringOtherApps: true)
-    // `app.run()` is called exactly once for this whole process (both the
-    // picker phase above and `launchMainWindow`'s real app shell below run
-    // inside this same call -- `launchMainWindow` reconfigures windows/menu
-    // bar from a main-queue callback fired while this loop is already
-    // spinning, it never calls `app.run()` itself). `observer` is kept
-    // alive via `withExtendedLifetime` for the same reason every other
-    // menu-bar/delegate object in this file needs an explicit owner.
-    withExtendedLifetime((pickerDelegate, settingsWindowController, settingsMenuTarget, reconnectMenuTarget)) {
+    // `app.run()` is called exactly once for the whole process; every window
+    // after this point is created from main-queue callbacks while it spins.
+    withExtendedLifetime((appDelegate, settingsWindowController, settingsMenuTarget, reconnectMenuTarget,
+                         openAnotherMenuTarget, disconnectMenuTarget, menuBarController, registry)) {
         app.run()
     }
     exit(0)
 }
 
-/// Multi-device picker design item 7: everything Task 3.6's `--run` branch
-/// used to do unconditionally at startup -- the real app shell (menu bar,
-/// aspect-ratio+fullscreen window, main menu) -- now deferred until
-/// `DevicePickerCoordinator` has resolved a `deviceId` (immediately, with
-/// no user action, for the 0/1-device regression case; after a picker tap
-/// for 2+). Unchanged from the original `--run` body except: `coordinator`
-/// is now constructed with the resolved `deviceId`, the old 1s-delayed
-/// `client.connect()`/`startStreaming` bootstrap is replaced by an
-/// immediate `startStreaming(deviceId:)` call (the client is already
-/// connected by this point -- reaching here required a successful
-/// `enumerateDevices` round trip), and this function does not call
-/// `app.run()`/`exit(0)` itself (the caller's single `app.run()` call,
-/// already in progress, covers this too).
-@discardableResult
+/// Thin factory for one goggles window: builds a `GogglesSession` (coordinator,
+/// decode session, window, capture window, hook wiring) and starts streaming.
+/// The caller registers it in the `SessionRegistry`.
 func launchMainWindow(
-    deviceId: String, client: HelperClient, app: NSApplication,
+    deviceId: String, initialInfo: DevicePickerCandidate?, client: HelperClient,
+    cascadeFrom: NSWindow?,
     settingsWindowController: SettingsWindowController,
-    onBack: (() -> Void)? = nil
-) -> GogglesConnectionCoordinator {
-    let coordinator = GogglesConnectionCoordinator(client: client, deviceId: deviceId)
-    let session = DecodeSession()
-    session.onDroppedSample = { error in
-        print("[run] dropped sample: \(error)")
-    }
-    session.onTeardown = {
-        print("[run] decode session torn down after \(DecodeSession.maxConsecutiveFailures) consecutive failures -- waiting for next parameter set")
-    }
-    // `coordinator.onNALUnit`, not `client.onNALUnit` directly -- the
-    // coordinator already owns `client.onNALUnit` itself (watchdog-activity
-    // bookkeeping) and forwards raw NAL data through its own `onNALUnit`
-    // passthrough precisely so a real decode consumer can sit alongside
-    // that without clobbering it (see that property's doc comment).
-    coordinator.onNALUnit = { data, nalType, isParameterSet, hostTime in
-        session.handle(nalData: data, nalType: nalType, isParameterSet: isParameterSet, hostTime: hostTime)
-    }
-
-    // Settings fix: `settingsWindowController` is now passed in, built
-    // once at app launch (before the picker) -- not rebuilt here. Just
-    // wire the Reconnect button it's been sitting without since launch.
-    settingsWindowController.setReconnectHandler { coordinator.reconnect() }
-    EventHookInstaller.install(coordinator: coordinator)
-    // Capture window for OBS Window Capture. Setting the handler also applies the saved
-    // preference, so it opens at launch if enabled. The closure retains the controller.
-    let captureWindowController = CaptureWindowController(session: session)
-    settingsWindowController.setCaptureWindowHandler { enabled, onTop in
-        captureWindowController.keepOnTop = onTop
-        if enabled { captureWindowController.show() } else { captureWindowController.hide() }
-    }
-
-    let hostingController = NSHostingController(rootView: GogglesConnectionView(
-        coordinator: coordinator,
-        session: session,
+    onOpenAnother: @escaping () -> Void,
+    onDisconnect: @escaping (String) -> Void
+) -> GogglesSession {
+    let session = GogglesSession(
+        deviceId: deviceId,
+        initialInfo: initialInfo,
+        client: client,
+        cascadeFrom: cascadeFrom,
         onOpenSettings: { settingsWindowController.show() },
-        onBack: onBack
-    ))
-    // Real bug found during Task 3.5's window-sizing complaint while
-    // verifying the decode fix live: `NSHostingController`'s default
-    // `sizingOptions` (`.standardBounds`, which includes
-    // `.intrinsicContentSize`) makes AppKit auto-resize the window to fit
-    // the hosted SwiftUI content's ideal/intrinsic size on every content
-    // change -- and `GogglesConnectionView`'s content uses
-    // `.frame(maxWidth: .infinity, maxHeight: .infinity)` throughout (by
-    // design, so it fills whatever window size the user picks), which
-    // reports a huge ideal height. That combination is what made the
-    // window visibly grow taller each time the content changed (device
-    // card appearing, `.live`'s video view mounting) instead of staying at
-    // the size set below. Disabling `sizingOptions` here keeps the window
-    // exactly at the size this code sets (and whatever the user drags it
-    // to via `.resizable`), matching the intent of every other explicit
-    // `setContentSize` call in this file.
-    //
-    // This task's aspect-ratio/fullscreen additions below coexist with
-    // that fix rather than fighting it: `sizingOptions = []` only stops
-    // AppKit from auto-resizing the window to chase SwiftUI's *ideal*
-    // content size; `window.contentAspectRatio` (set below) is a completely
-    // separate AppKit mechanism that only constrains *user-initiated*
-    // resize drags to a fixed ratio, and fullscreen (`.fullScreenPrimary`)
-    // is a third, independent mechanism (a window-collection-behavior flag
-    // enabling the standard green-button/Control+Cmd+F fullscreen
-    // transition). None of the three fight each other: `sizingOptions`
-    // governs "does content size drive window size" (no), the aspect
-    // ratio governs "what shapes can the user drag the window into" (16:9
-    // only), and `.fullScreenPrimary` is orthogonal to both.
-    hostingController.sizingOptions = []
-    let window = NSWindow(contentViewController: hostingController)
-    window.title = "GogglesView"
-    // User feedback ("still too small"): 640x360 cramped every state's
-    // content (the waitingForKeyframe card's own text was clipped at the
-    // window's bottom edge). 960x540 is still exactly 16:9 (contentAspectRatio
-    // below still governs user resizing), just 1.5x the linear size --
-    // window remains freely resizable, this only changes the launch default.
-    let defaultContentSize = NSSize(width: 960, height: 540) // exactly 16:9
-
-    window.setContentSize(defaultContentSize)
-    window.styleMask = [.titled, .closable, .resizable, .miniaturizable]
-    // task-gui-v2: custom in-app title bar (see the function's own doc
-    // comment) -- replaces the native gray gradient titlebar with the app's
-    // own dark chrome while keeping the real traffic-light buttons. Applied
-    // to `styleMask` before the aspect-ratio/fullscreen setup just below so
-    // there's no ordering dependency between the two (verified: `.titled`
-    // stays set the whole time, `.fullSizeContentView` just changes how its
-    // titlebar draws, and `contentAspectRatio`/`.fullScreenPrimary` are
-    // independent AppKit mechanisms per the doc comment on
-    // `sizingOptions = []` a few lines below).
-    applyCustomTitleBarChrome(to: window)
-    // Task 3.6: preserve the video's 16:9 (1920x1080) aspect ratio when the
-    // user resizes the window by dragging. `contentAspectRatio` takes a
-    // ratio in the content view's own coordinate space (not literal
-    // 1920x1080 pixels -- any 16:9-ratio `NSSize` works identically), so a
-    // small, exact 16:9 pair is used rather than the full frame resolution.
-    window.contentAspectRatio = NSSize(width: 16, height: 9)
-    // Task 3.6: standard macOS fullscreen (green button / Control+Cmd+F).
-    // `.fullScreenPrimary` is the idiomatic AppKit collection-behavior flag
-    // for "this window is a first-class fullscreen destination" -- the
-    // window-based equivalent of SwiftUI's `.toggleFullScreen` (which only
-    // exists as a `Scene`-level command for the SwiftUI `App` lifecycle
-    // this app deliberately isn't using -- see `MenuBarController.swift`'s
-    // doc comment for why). No extra plumbing needed beyond this one flag;
-    // AppKit supplies the actual fullscreen transition, title-bar button,
-    // and menu/keyboard shortcut for free once it's set.
-    window.collectionBehavior.insert(.fullScreenPrimary)
-    cursorAutoHider = CursorAutoHider(window: window)
-    window.center()
-    WindowMemory.attach(to: window, name: "main", restoreSize: true, contentAspect: 16.0 / 9.0)
-    // Task 3.6: closing the window (red titlebar button) hides it instead
-    // of destroying it -- the real "show/hide window" affordance this
-    // task's menu bar item exposes, and the reason this app is no longer a
-    // last-window-closed-quits app (see `RealAppDelegate` below). Actually
-    // quitting only ever happens via the menu bar's "Quit" (or the real
-    // app-menu's Cmd+Q, standard on `.regular`-activation-policy apps).
-    let hideOnCloseDelegate = HideOnCloseWindowDelegate()
-    window.delegate = hideOnCloseDelegate
-    window.makeKeyAndOrderFront(nil)
-
-    // User feedback (round 3): the previous fixed-constant pill/traffic-
-    // light alignment did not actually match on screen; a first attempt at
-    // a real measurement, taken right after `applyCustomTitleBarChrome`
-    // but BEFORE the window was ever ordered on screen, was closer but
-    // still visibly off -- the title bar's internal layout evidently isn't
-    // fully settled until the window is actually displayed. Measuring here
-    // instead, right after `makeKeyAndOrderFront`, and re-assigning
-    // `rootView` with the result (a `NSHostingController`'s `rootView` can
-    // be reassigned after creation, so this doesn't require restructuring
-    // anything above).
-    hostingController.rootView = GogglesConnectionView(
-        coordinator: coordinator,
-        session: session,
-        onOpenSettings: { settingsWindowController.show() },
-        onBack: onBack,
-        pillBandHeight: AppChrome.measuredPillBandHeight(for: window)
+        onOpenAnother: onOpenAnother,
+        onDisconnect: onDisconnect
     )
-
-    // Task 3.6: the real menu bar presence -- state glyph, "Reconnect"
-    // (relocated here, its proper home, from the temporary "Goggles" main-
-    // menu item Task 3.5 added), show/hide window, "Quit". See
-    // `MenuBarController.swift` for the `NSStatusItem`-vs-`MenuBarExtra`
-    // decision and full behavior.
-    let menuBarController = MenuBarController(coordinator: coordinator, window: window)
-
-    // task-gui-v3 point 2's `NSApplication.shared.mainMenu` (App/File/Window,
-    // with Settings/Reconnect) is now built ONCE at app launch (see the
-    // caller, before the picker is even shown) -- not rebuilt here. This
-    // function only needed to enable the Reconnect menu item and set
-    // `activeCoordinator`, both of which the caller does right after this
-    // function returns `coordinator`.
-
-    // `applicationShouldTerminateAfterLastWindowClosed` is `false` here
-    // (unlike `LiveViewAppDelegate`, used by the `--live-view`/
-    // `--force-state` dev harnesses, where closing the one window IS "done,
-    // exit"): this is the real app shell now, and closing/hiding the main
-    // window (via the titlebar button, or the menu bar's show/hide item)
-    // must not quit a daily-driver menu-bar app out from under the user.
-    let delegate = RealAppDelegate()
-    app.delegate = delegate
-    GlobalHotkeys.shared.apply()
-    UpdateChecker.shared.checkOnLaunchIfDue()
-
-    // The client is already connected by this point -- reaching
-    // `launchMainWindow` required a successful `enumerateDevices` round
-    // trip (`DevicePickerCoordinator.poll`) over the same `client`, which
-    // only ever happens after `onConnectionStateChange` observed
-    // `.connected`. `coordinator`'s own `init` already rewired that
-    // closure for its own purposes (see `wireCallbacks`), so unlike the
-    // pre-multi-device code this doesn't need a delayed retry -- kick
-    // `startStreaming(deviceId:)` immediately.
-    client.startStreaming(deviceId: deviceId) { ok, error in
-        print("[run] startStreaming -> ok=\(ok) error=\(error.map { String(describing: $0) } ?? "nil")")
-    }
-
-    app.activate(ignoringOtherApps: true)
-    // Keep strong references to objects nothing else in this process owns,
-    // for the remainder of the (already-running, caller-owned) run loop --
-    // mirrors why `delegate`/`hideOnCloseDelegate` are `let`-bound above,
-    // not inlined. `settingsWindowController` is technically also kept
-    // alive already (the `onOpenSettings` closure captured by the
-    // still-live `hostingController` holds a strong reference to it), but
-    // listed explicitly here too for the same "don't rely on an indirect
-    // capture chain to keep this alive" clarity the other two get.
-    // `settingsWindowController`/the main-menu's `MenuActionTarget`s are now
-    // retained by the caller's `withExtendedLifetime` tuple (built once at
-    // app launch, alongside them) instead of here. Unlike Task 3.6's
-    // original code, this function can't use
-    // `withExtendedLifetime(...) { app.run() }` any more -- the caller's
-    // `app.run()` is already in progress by the time this function runs --
-    // so `menuBarController`/`hideOnCloseDelegate`/`delegate` (all still
-    // genuinely first-constructed here, per device selection) are retained
-    // in a top-level array instead (see `mainWindowRetainedObjects`'s doc
-    // comment).
-    mainWindowRetainedObjects = [menuBarController, hideOnCloseDelegate, delegate]
-    mainWindowTeardown = {
-        client.stopStreaming(deviceId: deviceId)
-        captureWindowController.hide()
-        settingsWindowController.setCaptureWindowHandler { _, _ in }
-        settingsWindowController.setReconnectHandler {}
-        menuBarController.tearDown()
-        window.delegate = nil
-        window.close()
-        mainWindowRetainedObjects = []
-    }
-    return coordinator
+    session.start()
+    return session
 }
 if args.contains("--force-state") {
     // Task 3.4 exit criterion ("verified by forcing each one"): opens a
@@ -884,25 +763,25 @@ final class LiveViewAppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 }
 
-/// Task 3.6: the real app shell's delegate -- unlike `LiveViewAppDelegate`
-/// (used by the `--live-view`/`--force-state` dev harnesses, where the one
-/// window closing means the harness is done and should exit), this is a
-/// persistent, menu-bar-resident app: closing or hiding the main window must
-/// never quit it out from under the user. Quitting only happens via the
-/// menu bar's "Quit" item or the standard app-menu Cmd+Q.
-final class RealAppDelegate: NSObject, NSApplicationDelegate {
-    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
-}
+/// The real app shell's delegate. Before any goggles window exists, closing
+/// the picker quits (nothing else to show); once one does, the app is a
+/// persistent menu-bar-resident app and closing/hiding windows never quits
+/// it -- only the menu's Quit / Cmd+Q does. A Dock click with nothing visible
+/// brings back the active goggles window (or the picker).
+final class MultiWindowAppDelegate: NSObject, NSApplicationDelegate {
+    private let shouldTerminate: () -> Bool
+    private let onReopen: () -> Void
 
-/// Task 3.6: makes the main window's titlebar close button hide the window
-/// (`orderOut(nil)`) instead of destroying it -- the "show/hide window"
-/// affordance the menu bar's toggle item also exposes, via the same
-/// underlying window. `windowShouldClose` returning `false` cancels the
-/// real close/destroy; this delegate does the hide itself instead.
-final class HideOnCloseWindowDelegate: NSObject, NSWindowDelegate {
-    func windowShouldClose(_ sender: NSWindow) -> Bool {
-        sender.orderOut(nil)
-        return false
+    init(shouldTerminateAfterLastWindowClosed: @escaping () -> Bool, onReopen: @escaping () -> Void) {
+        self.shouldTerminate = shouldTerminateAfterLastWindowClosed
+        self.onReopen = onReopen
+    }
+
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { shouldTerminate() }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if !flag { onReopen() }
+        return true
     }
 }
 

@@ -26,7 +26,7 @@ struct DevicePickerCoordinatorTests {
         let client = HelperClient()
         client.enumerateDevicesOverrideForTesting = { [] }
         let picker = DevicePickerCoordinator(client: client, pollInterval: 999)
-        client.onConnectionStateChange?(.connected)
+        client.sendConnectionState(.connected)
         #expect(picker.state == .discovering)
     }
 
@@ -39,7 +39,7 @@ struct DevicePickerCoordinatorTests {
         client.enumerateDevicesOverrideForTesting = { [device] }
         let picker = DevicePickerCoordinator(client: client, pollInterval: 999)
 
-        client.onConnectionStateChange?(.connected)
+        client.sendConnectionState(.connected)
 
         #expect(picker.state == .picking([DevicePickerCandidate(device)]))
 
@@ -58,7 +58,7 @@ struct DevicePickerCoordinatorTests {
         client.enumerateDevicesOverrideForTesting = { [device] }
         let picker = DevicePickerCoordinator(client: client, pollInterval: 999)
 
-        client.onConnectionStateChange?(.connected)
+        client.sendConnectionState(.connected)
 
         #expect(picker.state == .picking([DevicePickerCandidate(device)]))
         picker.select("bus:20:3")
@@ -73,7 +73,7 @@ struct DevicePickerCoordinatorTests {
         client.enumerateDevicesOverrideForTesting = { [deviceA, deviceB] }
         let picker = DevicePickerCoordinator(client: client, pollInterval: 999)
 
-        client.onConnectionStateChange?(.connected)
+        client.sendConnectionState(.connected)
 
         guard case .picking(let candidates) = picker.state else {
             Issue.record("expected .picking, got \(picker.state)")
@@ -124,7 +124,7 @@ struct DevicePickerCoordinatorTests {
         let client = HelperClient()
         let picker = DevicePickerCoordinator(client: client, pollInterval: 999)
 
-        client.onConnectionStateChange?(.versionMismatch(reported: 1, expected: 2))
+        client.sendConnectionState(.versionMismatch(reported: 1, expected: 2))
 
         guard case .connectionUnavailable(let reason) = picker.state else {
             Issue.record("expected .connectionUnavailable, got \(picker.state)")
@@ -139,7 +139,7 @@ struct DevicePickerCoordinatorTests {
         let client = HelperClient()
         let picker = DevicePickerCoordinator(client: client, pollInterval: 999)
 
-        client.onConnectionStateChange?(.disconnected)
+        client.sendConnectionState(.disconnected)
 
         #expect(picker.state == .connectionUnavailable(reason: nil))
     }
@@ -149,7 +149,7 @@ struct DevicePickerCoordinatorTests {
         let client = HelperClient()
         let picker = DevicePickerCoordinator(client: client, pollInterval: 999)
 
-        client.onConnectionStateChange?(.connecting)
+        client.sendConnectionState(.connecting)
 
         #expect(picker.state == .connectionUnavailable(reason: nil))
     }
@@ -160,10 +160,10 @@ struct DevicePickerCoordinatorTests {
         client.enumerateDevicesOverrideForTesting = { [] }
         let picker = DevicePickerCoordinator(client: client, pollInterval: 999)
 
-        client.onConnectionStateChange?(.disconnected)
+        client.sendConnectionState(.disconnected)
         #expect(picker.state == .connectionUnavailable(reason: nil))
 
-        client.onConnectionStateChange?(.connected)
+        client.sendConnectionState(.connected)
         #expect(picker.state == .discovering)
     }
 
@@ -173,7 +173,7 @@ struct DevicePickerCoordinatorTests {
         let picker = DevicePickerCoordinator(client: client, pollInterval: 999)
         picker.select("device-1")
 
-        client.onConnectionStateChange?(.disconnected)
+        client.sendConnectionState(.disconnected)
 
         #expect(picker.state == .selected("device-1"))
     }

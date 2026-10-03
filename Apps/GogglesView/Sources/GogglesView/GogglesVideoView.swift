@@ -159,6 +159,7 @@ struct GogglesVideoView: NSViewRepresentable {
 
     func makeNSView(context: Context) -> SampleBufferHostView {
         let view = SampleBufferHostView()
+        view.displayLayer.freezeState = session.freezeState
         if isSecondary {
             session.addConsumer(view.displayLayer)
         } else {
