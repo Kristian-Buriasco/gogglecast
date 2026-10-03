@@ -308,3 +308,27 @@ reach the goggles' own OSD. Next: repeat the capture with a drone linked
 (idle, then sticks moving) and diff against capture A; if still empty, stop
 the telemetry phase and mark flight-log/overlay items in the roadmap as
 blocked.
+
+## Probe results (2026-10-03): DUML mesh over IF4
+
+Following the lab notes (`dji-goggles3-videoout/FINDINGS.md`): the goggles'
+vendor interface IF4 speaks DUML and relays it across the mesh, independent
+of the RNDIS video interfaces. `Tools/telemetry-probe/telem_probe.py` sent ~50
+read-only get/query commands to 10 addresses (no drone linked or unknown).
+
+- Replying modules: goggles 0xBC/0x3C/0x1C/0x1F, gnd 0x8E, radio 0x6E, RC
+  0x0E/0x2E. Nothing answered at the air unit (0x09/0x29) or any flight
+  controller address.
+- Useful static data: version strings, device info and build dates, RTC clock,
+  RC firmware info (`06:79`), country code (`07:19`).
+- Possibly live: `0D:02 smart_battery_get_dynamic_info` from 0x1C returned a
+  payload ending in `0x64` (100), plausibly the goggles' battery percentage;
+  layout not verified.
+- Most other queries were rejected (`0xE0`); link SNR (`07:29`) and
+  `00:97 link_monitor_request` were rejected by the goggles, so live link and
+  flight telemetry needs either a subscription/registration step or a linked
+  air unit.
+
+Next: repeat with a drone linked; try subscription-style commands (`02:EB`,
+`04:12`, `03:5B`, `51:2B app_conn_product_info`) and the app registration
+sequence from the DJI Fly symbol table.
