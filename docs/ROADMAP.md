@@ -4,6 +4,19 @@ Shipped in 0.1: live view, multi-goggles picker, 60 fps stall fix, recording,
 instant replay, capture window, MPEG-TS/UDP out, stats + latency overlay,
 screenshots, orientation, global hotkeys, diagnostics, auto-open, back-to-picker.
 
+## Status (2026-10-03)
+
+Built since 0.1 (most not yet exercised on real hardware): screenshots, hotkeys
+(rebindable), overlay (resolution, fps, latency, goggles battery), crop/zoom/
+pan/grid/color/freeze, mini window, recording extras (split, loop, auto-delete,
+markers, burn-in logo/text mode), clip gallery with passthrough trim and share,
+presets, per-goggles profiles, update checker, window memory, onboarding,
+checklist, self-test, diagnostics, event hooks (script/webhook), outputs (UDP
+TS, RTMP, HLS web viewer, SRT, NDI-unverified), data collection, multi-goggles
+windows, accessibility labels. Not built: Italian localization, low-latency
+investigation, OBS virtual camera and notarization (need the Developer
+Program), flight telemetry (not exposed; see telemetry-research.md).
+
 Each item below is its own design + build cycle. Order reflects dependencies
 and what unblocks the most value; the phases are not time estimates.
 

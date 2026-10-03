@@ -179,3 +179,9 @@ struct ProfileSettingsSection: View {
     }
 }
 #endif
+
+/// Serial of the goggles whose window is active, for the Settings profile section.
+final class ProfileContext: ObservableObject {
+    static let shared = ProfileContext()
+    @Published var serial: String?
+}

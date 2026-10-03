@@ -11,6 +11,11 @@
 	     app entitlements file; see GogglesView-with-extension-install
 	     .entitlements for the Task-4.1-testing variant (usable only once
 	     a paid membership is active). -->
+	<!-- Lets the hardened-runtime app dlopen user-installed libsrt/libndi
+	     (SRT/NDI output, loaded only if present). Needs no provisioning
+	     profile. -->
+	<key>com.apple.security.cs.disable-library-validation</key>
+	<true/>
 	<key>com.apple.security.application-groups</key>
 	<array>
 		<string>group.com.kburiasco.gogglesview</string>

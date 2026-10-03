@@ -17,6 +17,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @ObservedObject var viewModel: SettingsViewModel
+    @ObservedObject private var profileContext = ProfileContext.shared
 
     enum Tab: String, CaseIterable, Identifiable {
         case general = "General", display = "Display", capture = "Capture", streaming = "Streaming"
@@ -49,7 +50,7 @@ struct SettingsView: View {
                         Divider()
                         PresetsSettingsSection()
                         Divider()
-                        ProfileSettingsSection(deviceSerial: nil) // TODO wire: coordinator.deviceInfo?.serial
+                        ProfileSettingsSection(deviceSerial: profileContext.serial)
                         Divider()
                         UpdateSettingsSection()
                         Divider()

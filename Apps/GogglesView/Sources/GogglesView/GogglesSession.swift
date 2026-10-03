@@ -140,7 +140,11 @@ final class GogglesSession: NSObject, RegistrableSession, NSWindowDelegate {
 
         coordinator.$deviceInfo
             .compactMap { $0 }
-            .sink { [weak self] info in self?.updateLabel(product: info.product, serial: info.serial) }
+            .sink { [weak self] info in
+                self?.updateLabel(product: info.product, serial: info.serial)
+                if ProfileContext.shared.serial == nil || self?.window.isKeyWindow == true { ProfileContext.shared.serial = info.serial }
+                ProfileStore.shared.applyIfEnabled(serial: info.serial)
+            }
             .store(in: &cancellables)
     }
 
@@ -215,6 +219,7 @@ final class GogglesSession: NSObject, RegistrableSession, NSWindowDelegate {
     }
 
     func windowDidBecomeKey(_ notification: Notification) {
+        if let serial = coordinator.deviceInfo?.serial { ProfileContext.shared.serial = serial }
         onBecameKey?(self)
     }
 }
