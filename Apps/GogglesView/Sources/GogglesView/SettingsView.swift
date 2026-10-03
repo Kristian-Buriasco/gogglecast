@@ -45,6 +45,8 @@ struct SettingsView: View {
                         Divider()
                         AutoOpenSettingsSection()
                         Divider()
+                        EventHooksSettingsSection()
+                        Divider()
                         PresetsSettingsSection()
                         Divider()
                         UpdateSettingsSection()
@@ -61,6 +63,8 @@ struct SettingsView: View {
                         osdSection
                         Divider()
                         captureWindowSection
+                        Divider()
+                        MiniWindowSettingsSection()
                         Divider()
                         OrientationSettingsSection()
                         Divider()

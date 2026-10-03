@@ -49,6 +49,7 @@ struct GogglesConnectionView: View {
         do {
             let url = try Screenshot.save(frame)
             screenshotNote = "Saved \(url.lastPathComponent)"
+            NotificationCenter.default.post(name: .gogglesScreenshotSaved, object: nil, userInfo: ["path": url.path])
         } catch {
             screenshotNote = "Screenshot failed"
         }
@@ -75,6 +76,7 @@ struct GogglesConnectionView: View {
             FreezeControl()
             DataCollectControl(session: session, batteryPercent: coordinator.batteryPercent)
             ReplayControl(session: session)
+            MiniWindowControl(session: session)
             NetworkStreamControl(session: session)
             if let note = screenshotNote {
                 Text(note).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
@@ -116,14 +118,21 @@ struct GogglesConnectionView: View {
 
     private func startRecording() {
         session.addConsumer(recorder)
-        do { try recorder.start() } catch { session.removeConsumer(recorder) }
+        let url = Recorder.defaultURL()
+        do {
+            try recorder.start(to: url)
+            NotificationCenter.default.post(name: .gogglesRecordingStarted, object: nil, userInfo: ["path": url.path])
+        } catch { session.removeConsumer(recorder) }
     }
 
     private func stopRecording(wait: Bool) {
         guard recorder.isRecording else { return }
         session.removeConsumer(recorder)
         let sem = DispatchSemaphore(value: 0)
-        recorder.stop { _ in sem.signal() }
+        recorder.stop { url in
+            NotificationCenter.default.post(name: .gogglesRecordingStopped, object: nil, userInfo: url.map { ["path": $0.path] })
+            sem.signal()
+        }
         // On quit, block briefly so the .mov is finalized before exit.
         if wait { _ = sem.wait(timeout: .now() + 3) }
     }

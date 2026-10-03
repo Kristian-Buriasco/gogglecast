@@ -46,6 +46,7 @@ struct ReplayControl: View {
 
     private func save() {
         buffer.save { url in
+            if let url { NotificationCenter.default.post(name: .gogglesReplaySaved, object: nil, userInfo: ["path": url.path]) }
             show(url.map { "Saved \($0.lastPathComponent)" } ?? (buffer.lastError ?? "Save failed"))
         }
     }

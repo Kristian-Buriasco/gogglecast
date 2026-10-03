@@ -531,6 +531,7 @@ func launchMainWindow(
     // once at app launch (before the picker) -- not rebuilt here. Just
     // wire the Reconnect button it's been sitting without since launch.
     settingsWindowController.setReconnectHandler { coordinator.reconnect() }
+    EventHookInstaller.install(coordinator: coordinator)
     // Capture window for OBS Window Capture. Setting the handler also applies the saved
     // preference, so it opens at launch if enabled. The closure retains the controller.
     let captureWindowController = CaptureWindowController(session: session)
