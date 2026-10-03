@@ -33,7 +33,10 @@ final class SampleBufferHostView: NSView {
 
     private func commonInit() {
         wantsLayer = true
-        layer = displayLayer
+        layer = CALayer()
+        layer?.addSublayer(displayLayer)
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(orientationChanged), name: UserDefaults.didChangeNotification, object: nil)
         // Preserve 1920x1080 aspect rather than stretching to fill an
         // arbitrary host-window size (brief point 5: "matches expected
         // 1920x1080 aspect/orientation").
@@ -62,8 +65,20 @@ final class SampleBufferHostView: NSView {
         onFailedToDecode?(error ?? DecodeSessionError.sampleBufferCreationFailed(-1))
     }
 
+    @objc private func orientationChanged() { needsLayout = true }
+
     override func layout() {
         super.layout()
+        let r = OrientationPrefs.rotation
+        let w = bounds.width, h = bounds.height
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        displayLayer.setAffineTransform(.identity)
+        displayLayer.bounds = OrientationPrefs.swapsAxes(r) ? CGRect(x: 0, y: 0, width: h, height: w) : CGRect(x: 0, y: 0, width: w, height: h)
+        displayLayer.position = CGPoint(x: w / 2, y: h / 2)
+        displayLayer.setAffineTransform(OrientationPrefs.transform(rotation: r, flipH: OrientationPrefs.flipH, flipV: OrientationPrefs.flipV))
+        CATransaction.commit()
+        return
         // The backing layer doesn't auto-follow the view's frame the way a
         // normal `CALayer` sublayer would via autoresizing masks -- since
         // `displayLayer` IS `self.layer`, AppKit already keeps its

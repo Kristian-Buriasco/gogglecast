@@ -55,3 +55,15 @@ struct RecorderTests {
                                  drops: false, latencyMs: 12.4, showLatency: true) == ["12 ms"])
     }
 }
+
+@Suite struct OrientationTests {
+    @Test func transforms() {
+        let id = OrientationPrefs.transform(rotation: 0, flipH: false, flipV: false)
+        #expect(id.isIdentity)
+        let r180 = OrientationPrefs.transform(rotation: 180, flipH: false, flipV: false)
+        #expect(abs(r180.a + 1) < 1e-9 && abs(r180.d + 1) < 1e-9)
+        let fh = OrientationPrefs.transform(rotation: 0, flipH: true, flipV: false)
+        #expect(fh.a == -1 && fh.d == 1)
+        #expect(OrientationPrefs.swapsAxes(90) && OrientationPrefs.swapsAxes(270) && !OrientationPrefs.swapsAxes(180))
+    }
+}

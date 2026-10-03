@@ -185,6 +185,8 @@ func pollFirstAvailableDeviceId(client: HelperClient, timeout: TimeInterval = 15
     attempt()
 }
 
+var cursorAutoHider: CursorAutoHider?
+
 final class PickerSelectionObserver {
     private var cancellable: AnyObject?
 
@@ -338,6 +340,8 @@ if args.contains("--run") || !args.dropFirst().contains(where: { $0.hasPrefix("-
     let windowMenu = NSMenu(title: "Window")
     windowMenu.addItem(withTitle: "Minimize", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
     windowMenu.addItem(withTitle: "Zoom", action: #selector(NSWindow.performZoom(_:)), keyEquivalent: "")
+    let fullScreenItem = windowMenu.addItem(withTitle: "Enter Full Screen", action: #selector(NSWindow.toggleFullScreen(_:)), keyEquivalent: "f")
+    fullScreenItem.keyEquivalentModifierMask = [.control, .command]
     windowMenu.addItem(.separator())
     windowMenu.addItem(withTitle: "Bring All to Front", action: #selector(NSApplication.arrangeInFront(_:)), keyEquivalent: "")
     windowMenuItem.submenu = windowMenu
@@ -526,6 +530,7 @@ func launchMainWindow(
     // AppKit supplies the actual fullscreen transition, title-bar button,
     // and menu/keyboard shortcut for free once it's set.
     window.collectionBehavior.insert(.fullScreenPrimary)
+    cursorAutoHider = CursorAutoHider(window: window)
     window.center()
     // Task 3.6: closing the window (red titlebar button) hides it instead
     // of destroying it -- the real "show/hide window" affordance this

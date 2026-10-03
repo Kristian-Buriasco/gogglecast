@@ -50,6 +50,8 @@ struct SettingsView: View {
                         osdSection
                         Divider()
                         captureWindowSection
+                        Divider()
+                        OrientationSettingsSection()
                     case .capture:
                         recordingSection
                         Divider()
