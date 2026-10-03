@@ -20,11 +20,14 @@ struct SettingsView: View {
     @ObservedObject private var profileContext = ProfileContext.shared
 
     enum Tab: String, CaseIterable, Identifiable {
-        case general = "General", display = "Display", capture = "Capture", streaming = "Streaming"
+        case general = "General", display = "Display", recording = "Recording", streaming = "Streaming", advanced = "Advanced"
         var id: String { rawValue }
     }
 
-    @State private var tab: Tab = .general
+    @AppStorage("settingsTab") private var tabRaw = Tab.general.rawValue
+    private var tab: Binding<Tab> {
+        Binding(get: { Tab(rawValue: tabRaw) ?? .general }, set: { tabRaw = $0.rawValue })
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -32,7 +35,7 @@ struct SettingsView: View {
                 .font(.title2.bold())
                 .padding(.top, 6)
 
-            Picker("", selection: $tab) {
+            Picker("", selection: tab) {
                 ForEach(Tab.allCases) { Text($0.rawValue).tag($0) }
             }
             .pickerStyle(.segmented)
@@ -40,47 +43,35 @@ struct SettingsView: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
-                    switch tab {
+                    switch tab.wrappedValue {
                     case .general:
                         launchAtLoginSection
                         Divider()
                         AutoOpenSettingsSection()
-                        Divider()
-                        EventHooksSettingsSection()
                         Divider()
                         PresetsSettingsSection()
                         Divider()
                         ProfileSettingsSection(deviceSerial: profileContext.serial)
                         Divider()
                         UpdateSettingsSection()
-                        Divider()
-                        helperStatusSection
-                        Divider()
-                        connectionSection
-                        Divider()
-                        DiagnosticsSettingsSection()
-                        Divider()
-                        OnboardingSettingsSection()
-                        SelfTestSettingsSection()
                     case .display:
                         osdSection
+                        Divider()
+                        FramingSettingsSection()
+                        Divider()
+                        OrientationSettingsSection()
                         Divider()
                         captureWindowSection
                         Divider()
                         MiniWindowSettingsSection()
-                        Divider()
-                        OrientationSettingsSection()
-                        Divider()
-                        FramingSettingsSection()
-                    case .capture:
+                    case .recording:
                         recordingSection
                         RecordingExtrasSettingsSection()
                         Divider()
+                        ReplaySettingsSection()
+                        Divider()
                         BurnInSettingsSection()
                         GallerySettingsRow()
-                        Divider()
-                        ReplaySettingsSection()
-                        GlobalHotkeysSettingsSection()
                     case .streaming:
                         NetworkStreamSettingsSection()
                         Divider()
@@ -91,13 +82,26 @@ struct SettingsView: View {
                         SRTSettingsSection()
                         Divider()
                         NDISettingsSection()
+                    case .advanced:
+                        GlobalHotkeysSettingsSection()
+                        Divider()
+                        EventHooksSettingsSection()
+                        Divider()
+                        helperStatusSection
+                        Divider()
+                        connectionSection
+                        Divider()
+                        DiagnosticsSettingsSection()
+                        Divider()
+                        OnboardingSettingsSection()
+                        SelfTestSettingsSection()
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .padding(22)
-        .frame(width: 420, height: 520, alignment: .top)
+        .frame(width: 460, height: 560, alignment: .top)
         .background(AppChrome.backgroundColor)
         .foregroundStyle(.white)
         .onAppear { viewModel.refresh() }
