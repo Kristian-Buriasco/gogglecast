@@ -63,6 +63,12 @@ struct GogglesConnectionView: View {
             if let err = recorder.lastError {
                 Text(err).font(.caption2).foregroundStyle(.red).lineLimit(1)
             }
+            Button { RecordingPrefs.openFolder() } label: {
+                Image(systemName: "folder").foregroundStyle(Color.secondary)
+            }
+            .buttonStyle(.plain)
+            .help("Open the recordings folder")
+            .accessibilityIdentifier("openRecordingsButton")
             ReplayControl(session: session)
             NetworkStreamControl(session: session)
             if let note = screenshotNote {

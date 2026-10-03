@@ -145,6 +145,7 @@ struct SettingsView: View {
                     .font(.caption).foregroundStyle(.secondary)
                     .lineLimit(1).truncationMode(.middle)
                 Spacer()
+                Button("Open") { RecordingPrefs.openFolder() }
                 Button("Choose…") {
                     let panel = NSOpenPanel()
                     panel.canChooseFiles = false

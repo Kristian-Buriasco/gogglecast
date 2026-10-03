@@ -1,4 +1,5 @@
 import AVFoundation
+import AppKit
 import CoreMedia
 import Foundation
 
@@ -175,6 +176,12 @@ enum RecordingPrefs {
         let raw = UserDefaults.standard.string(forKey: prefixKey) ?? ""
         let cleaned = raw.replacingOccurrences(of: "/", with: "-").trimmingCharacters(in: .whitespaces)
         return cleaned.isEmpty ? "GogglesView" : cleaned
+    }
+
+    /// Opens the recordings folder in Finder, creating it first if needed.
+    static func openFolder() {
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        NSWorkspace.shared.open(directory)
     }
 
     static var autoStart: Bool { UserDefaults.standard.bool(forKey: autoStartKey) }
