@@ -12,6 +12,9 @@ final class Recorder: ObservableObject, SampleBufferRendering {
     @Published private(set) var isRecording = false
     @Published private(set) var elapsed: TimeInterval = 0
     @Published private(set) var lastError: String?
+    @Published private(set) var markers: [RecordingMarker] = []
+
+    init() { RecordingExtras.runLaunchCleanupOnce() }
 
     private let lock = NSLock()
     private var url: URL?
@@ -20,6 +23,15 @@ final class Recorder: ObservableObject, SampleBufferRendering {
     private var startTime: CMTime?
     private var lastPTS: CMTime?
     private var armed = false
+    // Auto-split / loop state (guarded by `lock`).
+    private var baseURL: URL?
+    private var limits = RecordingExtras.SplitLimits()
+    private var part = 1
+    private var sessionStart: CMTime?
+    private var segmentBytes: Int64 = 0
+    private var sessionElapsed: TimeInterval = 0
+    private var finished: [(url: URL, duration: TimeInterval)] = []
+    private var pendingMarkers: [RecordingMarker] = []
 
     // MARK: - Pure helpers (unit-tested)
 
@@ -67,10 +79,12 @@ final class Recorder: ObservableObject, SampleBufferRendering {
         lock.lock()
         guard !armed else { lock.unlock(); return }
         self.url = url
+        baseURL = url; part = 1; limits = RecordingExtras.currentLimits()
+        sessionStart = nil; segmentBytes = 0; sessionElapsed = 0; finished = []; pendingMarkers = []
         armed = true
         startTime = nil; lastPTS = nil
         lock.unlock()
-        DispatchQueue.main.async { self.lastError = nil; self.elapsed = 0; self.isRecording = true }
+        DispatchQueue.main.async { self.lastError = nil; self.elapsed = 0; self.markers = []; self.isRecording = true }
     }
 
     /// Finalizes the file; `completion` gets the URL, or nil if nothing was written.
@@ -78,9 +92,12 @@ final class Recorder: ObservableObject, SampleBufferRendering {
         lock.lock()
         let w = writer, i = input, u = url
         let wasArmed = armed
-        writer = nil; input = nil; url = nil; armed = false; startTime = nil; lastPTS = nil
+        let base = baseURL, marks = pendingMarkers
+        writer = nil; input = nil; url = nil; baseURL = nil; armed = false; startTime = nil; lastPTS = nil
+        sessionStart = nil; pendingMarkers = []
         lock.unlock()
         guard wasArmed else { completion?(nil); return }
+        if let base, !marks.isEmpty { Recorder.writeMarkers(marks, for: base) }
         DispatchQueue.main.async { self.isRecording = false }
         guard let w, w.status == .writing else { completion?(nil); return }
         i?.markAsFinished()
@@ -99,6 +116,14 @@ final class Recorder: ObservableObject, SampleBufferRendering {
         defer { lock.unlock() }
         guard armed else { return }
 
+        let samplePTS = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
+        if let w = writer, let start = startTime, Recorder.isKeyframe(sampleBuffer),
+           RecordingExtras.shouldSplit(
+               elapsed: CMTimeGetSeconds(Recorder.normalized(samplePTS, relativeTo: start)),
+               bytes: segmentBytes, limits: limits) {
+            rotate(finishing: w)
+        }
+
         if writer == nil {
             guard Recorder.isKeyframe(sampleBuffer), let url,
                   let fmt = CMSampleBufferGetFormatDescription(sampleBuffer) else { return }
@@ -111,7 +136,9 @@ final class Recorder: ObservableObject, SampleBufferRendering {
                 guard w.startWriting() else { return fail(w.error?.localizedDescription ?? "startWriting failed") }
                 w.startSession(atSourceTime: .zero)
                 writer = w; input = inp
-                startTime = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
+                startTime = samplePTS
+                lastPTS = nil; segmentBytes = 0
+                if sessionStart == nil { sessionStart = samplePTS }
             } catch {
                 return fail(error.localizedDescription)
             }
@@ -141,14 +168,59 @@ final class Recorder: ObservableObject, SampleBufferRendering {
                                               sampleBufferOut: &retimed)
         guard let retimed else { return }
         if input.append(retimed) {
-            let secs = CMTimeGetSeconds(CMSampleBufferGetPresentationTimeStamp(retimed))
-            DispatchQueue.main.async { self.elapsed = max(0, secs) }
+            segmentBytes += Int64(CMSampleBufferGetTotalSampleSize(sampleBuffer))
+            let secs = max(0, CMTimeGetSeconds(CMTimeSubtract(samplePTS, sessionStart ?? start)))
+            sessionElapsed = secs
+            DispatchQueue.main.async { self.elapsed = secs }
         } else {
             fail(writer.error?.localizedDescription ?? "append failed")
         }
     }
 
     func flush() {}
+
+    /// Finalizes the current segment and points `url` at the next part; the same
+    /// keyframe then opens the new file in `enqueue`. Caller holds `lock`.
+    private func rotate(finishing w: AVAssetWriter) {
+        let done = url, duration = lastPTS.map { CMTimeGetSeconds($0) } ?? 0
+        input?.markAsFinished()
+        writer = nil; input = nil; startTime = nil; lastPTS = nil
+        if let done { finished.append((done, duration)) }
+        part += 1
+        if let baseURL { url = RecordingExtras.partURL(base: baseURL, part: part) }
+        var doomed: [URL] = []
+        if let keep = limits.loopKeepSeconds {
+            let n = RecordingExtras.segmentsToDelete(durations: finished.map(\.duration), keepSeconds: keep)
+            doomed = finished.prefix(n).map(\.url)
+            finished.removeFirst(n)
+        }
+        w.finishWriting { [weak self] in
+            if w.status != .completed {
+                DispatchQueue.main.async { self?.lastError = w.error?.localizedDescription }
+            }
+            // Only files this session created are ever in `finished`.
+            for u in doomed { try? FileManager.default.removeItem(at: u) }
+        }
+    }
+
+    // MARK: - Markers
+
+    /// Adds a marker at the current recording time (no-op when not recording).
+    func addMarker(label: String) {
+        let text = label.trimmingCharacters(in: .whitespacesAndNewlines)
+        lock.lock()
+        guard armed, let base = baseURL, !text.isEmpty else { lock.unlock(); return }
+        pendingMarkers.append(RecordingMarker(t: (sessionElapsed * 1000).rounded() / 1000, label: text))
+        let all = pendingMarkers
+        lock.unlock()
+        Recorder.writeMarkers(all, for: base)
+        DispatchQueue.main.async { self.markers = all }
+    }
+
+    private static func writeMarkers(_ marks: [RecordingMarker], for recording: URL) {
+        guard let data = RecordingMarkers.encode(marks) else { return }
+        try? data.write(to: RecordingMarkers.sidecarURL(for: recording), options: .atomic)
+    }
 
     private func fail(_ message: String) {
         DispatchQueue.main.async { self.lastError = message }

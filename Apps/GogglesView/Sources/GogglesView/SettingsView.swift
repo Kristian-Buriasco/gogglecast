@@ -63,6 +63,8 @@ struct SettingsView: View {
                         FramingSettingsSection()
                     case .capture:
                         recordingSection
+                        RecordingExtrasSettingsSection()
+                        GallerySettingsRow()
                         Divider()
                         ReplaySettingsSection()
                         GlobalHotkeysSettingsSection()

@@ -71,6 +71,7 @@ struct GogglesConnectionView: View {
             .buttonStyle(.plain)
             .help("Open the recordings folder")
             .accessibilityIdentifier("openRecordingsButton")
+            GalleryButton()
             FreezeControl()
             DataCollectControl(session: session, batteryPercent: coordinator.batteryPercent)
             ReplayControl(session: session)
@@ -86,6 +87,7 @@ struct GogglesConnectionView: View {
             .keyboardShortcut("s", modifiers: [.command, .shift])
             .help("Save a screenshot to ~/Pictures/GogglesView (⇧⌘S)")
             .accessibilityIdentifier("screenshotButton")
+            MarkerControl(recorder: recorder)
             Button {
                 recorder.isRecording ? stopRecording(wait: false) : startRecording()
             } label: {
