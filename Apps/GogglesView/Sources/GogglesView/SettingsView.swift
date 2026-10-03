@@ -78,6 +78,10 @@ struct SettingsView: View {
                         GlobalHotkeysSettingsSection()
                     case .streaming:
                         NetworkStreamSettingsSection()
+                        Divider()
+                        RTMPSettingsSection()
+                        Divider()
+                        WebViewerSettingsSection()
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
