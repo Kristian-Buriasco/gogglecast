@@ -146,6 +146,9 @@ private struct DevicePickerCandidateRow: View {
                     .frame(width: 40)
 
                 VStack(alignment: .leading, spacing: 3) {
+                    if let nick = ProfileStore.shared.nickname(for: candidate.serial) {
+                        Text(nick).font(.headline).foregroundStyle(.white)
+                    }
                     Text(candidate.product ?? "DJI Goggles 3")
                         .font(.headline)
                         .foregroundStyle(.primary)
@@ -166,6 +169,13 @@ private struct DevicePickerCandidateRow: View {
             .contentShape(RoundedRectangle(cornerRadius: 10))
         }
         .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(AccessibilityLabels.pickerRow(
+            product: candidate.product, serial: candidate.serial,
+            nickname: ProfileStore.shared.nickname(for: candidate.serial),
+            usbID: candidate.usbIDText, bus: Int(candidate.bus), address: Int(candidate.address)))
+        .accessibilityHint("Connects to these goggles")
+        .accessibilityAddTraits(.isButton)
         .accessibilityIdentifier("picker-candidate-\(candidate.id)")
     }
 }

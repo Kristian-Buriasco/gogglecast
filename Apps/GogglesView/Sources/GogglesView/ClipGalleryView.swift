@@ -104,6 +104,8 @@ struct GalleryButton: View {
     var body: some View {
         Button { ClipGalleryWindowController.shared.show() } label: { Image(systemName: "film.stack") }
             .help("Clip gallery (⇧⌘G)")
+            .accessibilityLabel("Clip gallery")
+            .accessibilityIdentifier("galleryButton")
             .keyboardShortcut("g", modifiers: [.command, .shift])
     }
 }

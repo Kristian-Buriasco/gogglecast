@@ -71,6 +71,7 @@ struct GogglesConnectionView: View {
             }
             .buttonStyle(.plain)
             .help("Open the recordings folder")
+            .accessibilityLabel("Open recordings folder")
             .accessibilityIdentifier("openRecordingsButton")
             GalleryButton()
             FreezeControl()
@@ -90,6 +91,7 @@ struct GogglesConnectionView: View {
             .disabled(!isLive)
             .keyboardShortcut("s", modifiers: [.command, .shift])
             .help("Save a screenshot to ~/Pictures/GogglesView (⇧⌘S)")
+            .accessibilityLabel("Take screenshot")
             .accessibilityIdentifier("screenshotButton")
             MarkerControl(recorder: recorder)
             Button {
@@ -102,6 +104,8 @@ struct GogglesConnectionView: View {
             .disabled(!isLive && !recorder.isRecording)
             .keyboardShortcut("r", modifiers: [.command, .shift])
             .help(recorder.isRecording ? "Stop recording (⇧⌘R)" : "Record to ~/Movies/GogglesView (⇧⌘R)")
+            .accessibilityLabel(recorder.isRecording ? "Stop recording" : "Start recording")
+            .accessibilityValue(AccessibilityLabels.recordState(isRecording: recorder.isRecording, elapsed: recorder.isRecording ? Self.formatElapsed(recorder.elapsed) : nil))
             .accessibilityIdentifier("recordButton")
         }
         .onChange(of: isLive) { live in
@@ -262,6 +266,7 @@ struct GogglesConnectionView: View {
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
                 .help("Back to the goggles picker")
+                .accessibilityHint("Returns to the goggles picker")
                 .accessibilityIdentifier("backButton")
             }
             Button {
@@ -274,6 +279,7 @@ struct GogglesConnectionView: View {
             .foregroundStyle(.secondary)
             .disabled(onOpenSettings == nil)
             .help(onOpenSettings == nil ? "Settings isn't available in this build." : "Open Settings")
+            .accessibilityHint("Opens the Settings window")
             .accessibilityIdentifier("settingsButton")
 
             Spacer()

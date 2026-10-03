@@ -49,6 +49,8 @@ struct SettingsView: View {
                         Divider()
                         PresetsSettingsSection()
                         Divider()
+                        ProfileSettingsSection(deviceSerial: nil) // TODO wire: coordinator.deviceInfo?.serial
+                        Divider()
                         UpdateSettingsSection()
                         Divider()
                         helperStatusSection

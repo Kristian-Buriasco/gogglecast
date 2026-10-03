@@ -191,6 +191,8 @@ struct FreezeControl: View {
         .buttonStyle(.plain)
         .keyboardShortcut("f", modifiers: [.shift, .command])
         .help(state.isFrozen ? "Resume video (⇧⌘F)" : "Freeze video (⇧⌘F); recording and streaming continue")
+        .accessibilityLabel(state.isFrozen ? "Resume video" : "Freeze video")
+        .accessibilityHint("Recording and streaming continue while frozen")
         .accessibilityIdentifier("freezeButton")
     }
 }

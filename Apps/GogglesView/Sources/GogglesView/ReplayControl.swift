@@ -19,6 +19,9 @@ struct ReplayControl: View {
                         .keyboardShortcut("p", modifiers: [.command, .shift])
                         .help("Save last \(seconds)s (\(Int(buffer.bufferedSeconds))s buffered)")
                         .disabled(buffer.bufferedSeconds < 1)
+                        .accessibilityLabel("Save instant replay")
+                        .accessibilityValue("\(Int(buffer.bufferedSeconds)) seconds buffered")
+                        .accessibilityIdentifier("replayButton")
                     if let toast { Text(toast).font(.caption).lineLimit(1) }
                 }
             }

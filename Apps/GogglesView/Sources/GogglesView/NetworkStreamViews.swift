@@ -19,6 +19,9 @@ struct NetworkStreamControl: View {
         }
         .help(streamer.lastError ?? (streamer.isStreaming
               ? "Streaming to udp://\(NetStreamPrefs.host):\(NetStreamPrefs.port)" : "Start network stream"))
+        .accessibilityLabel("Network stream")
+        .accessibilityValue(streamer.lastError ?? (streamer.isStreaming ? String(format: "Streaming, %.1f megabits per second", mbps) : "Stopped"))
+        .accessibilityIdentifier("networkStreamButton")
         .onReceive(tick) { _ in
             mbps = Double(streamer.bytesSent &- lastBytes) * 8 / 1_000_000
             lastBytes = streamer.bytesSent

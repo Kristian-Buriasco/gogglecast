@@ -34,6 +34,10 @@ struct CompactDeviceIdentity: View {
 
     var body: some View {
         HStack(spacing: 6) {
+            if let nick = ProfileStore.shared.nickname(for: info?.serial) {
+                Text(nick).font(.subheadline.bold()).foregroundStyle(.white)
+                Text("·").foregroundStyle(.secondary)
+            }
             Text(info?.product ?? "DJI Goggles 3")
                 .font(.subheadline.bold())
                 .foregroundStyle(.white)

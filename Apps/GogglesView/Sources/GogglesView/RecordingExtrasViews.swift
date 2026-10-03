@@ -24,6 +24,7 @@ struct MarkerControl: View {
         .fixedSize()
         .disabled(!recorder.isRecording)
         .help("Add a marker to the recording (saved to a .markers.json sidecar)")
+        .accessibilityLabel("Add recording marker")
         .accessibilityIdentifier("markerButton")
         .alert("Add marker", isPresented: $showCustom) {
             TextField("Label", text: $custom)

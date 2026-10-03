@@ -201,7 +201,9 @@ struct StatusPill: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 5)
         .background(.thinMaterial, in: Capsule())
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Status")
+        .accessibilityValue(text)
         .accessibilityIdentifier("statusPill")
     }
 }
