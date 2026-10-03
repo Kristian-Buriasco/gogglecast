@@ -38,7 +38,9 @@ and what unblocks the most value; the phases are not time estimates.
   single `launchMainWindow` flow (see
   `docs/superpowers/specs/2026-08-29-multi-device-picker-design.md`).
 
-## Phase 3 — Telemetry and flight data
+## Phase 3 — Telemetry and flight data (largely blocked)
+
+Status 2026-10-03: only the goggles' battery % is available (shipped). IF4 DUML registration and the per-frame SEI were investigated and expose no flight/link data (see `docs/telemetry-research.md`). Items 2-4 below stay blocked unless a DJI Fly mobile-mode capture shows another source.
 
 Capture A (2026-10-03) showed only a 1 Hz heartbeat and undecodable per-frame SEI on this transport; repeat with a drone linked before building on it. Capture plan in `docs/telemetry-research.md`
 (`gvcli --dump-telemetry`, no drone vs drone linked vs moving sticks, etc.),

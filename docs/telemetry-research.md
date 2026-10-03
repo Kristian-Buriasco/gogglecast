@@ -375,3 +375,26 @@ over IF4 even after app registration. Confirmed available: goggles battery %
 mode (different framing, `55 CC`, see `usb_mobile_protocol.md`) to see whether
 telemetry rides there, (b) accept battery-only. Per-frame video SEI (25 bytes)
 is still undecoded.
+
+## Per-frame SEI (type 240, 25 bytes) decoded: encoder stats (2026-10-03)
+
+Collected with the in-app "Collect data" toggle (3,631 frames, 126 s, drone
+linked, no markers). Findings from the byte statistics:
+
+| bytes | behaviour | interpretation |
+|---|---|---|
+| 0-1 | u16 LE, mostly +1 per frame, occasional resets | frame counter |
+| 2 | slow drift 19-67, uncorrelated with frame size | unknown smooth value (QP/rate-control-like?) |
+| 4, 9, 10 | uniform random | checksum/hash or scrambled field |
+| 6, 12 | correlation 0.97 / 0.99 with frame byte size | frame length components |
+| 8, 24 | 2-value flags | state bits |
+| 3, 5, 7, 11, 13-23 | constant | padding / fixed config |
+
+No byte tracks a drone quantity by shape; the block looks like per-frame
+encoder metadata. Without ground-truth markers (the log had none) byte 2 is the
+only unexplained smooth field.
+
+Overall conclusion for telemetry over this connection: battery % (goggles) is
+the only live reading; flight/link data is not exposed. Remaining research
+options (low priority): capture a real DJI Fly session in mobile mode, or use
+marker-annotated collections to identify byte 2.
