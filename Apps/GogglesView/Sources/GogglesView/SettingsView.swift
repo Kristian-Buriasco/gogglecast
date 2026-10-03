@@ -19,6 +19,7 @@ struct SettingsView: View {
     @ObservedObject var viewModel: SettingsViewModel
 
     var body: some View {
+        ScrollView {
         VStack(alignment: .leading, spacing: 20) {
             Text("Settings")
                 .font(.title2.bold())
@@ -36,10 +37,15 @@ struct SettingsView: View {
 
             captureWindowSection
 
+            ReplaySettingsSection()
+
+            NetworkStreamSettingsSection()
+
             Spacer(minLength: 0)
         }
         .padding(22)
-        .frame(width: 380, height: 810, alignment: .top)
+        }
+        .frame(width: 400, height: 680, alignment: .top)
         .background(AppChrome.backgroundColor)
         .foregroundStyle(.white)
         .onAppear { viewModel.refresh() }
