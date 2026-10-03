@@ -358,3 +358,20 @@ unit `WA520 AC` 0x09/0x29, RC 0x0E/0x2E, wifi 0x1B, link 0x6E, ground 0x8E,
 Productizing: a poller in the helper (it already owns the USB device handle;
 claim IF4 as well) could publish battery % over XPC for the overlay. Link
 quality and flight data need the registration/subscription sequence.
+
+## Registration experiment (2026-10-03, drone linked)
+
+`Tools/telemetry-probe/telem_register.py` registered as the app (`00:88` APP
+announcement from 0x02 and, for comparison, 0x2A), answered the goggles' "who is
+the app" queries, and sent 1 Hz heartbeats and a camera-topic subscription.
+
+Result: **no telemetry appeared.** The only new traffic was the goggles asking
+`3C>2A 00:88` (query, 1 Hz) which we answer. Everything else was baseline:
+`BC>2A 00:81` heartbeat (1 Hz) and `0E>0A 09:43` (2 Hz, payload constant `02`).
+
+Conclusion: in OTG-computer mode the goggles do not relay flight/link telemetry
+over IF4 even after app registration. Confirmed available: goggles battery %
+(shipped). Remaining options: (a) capture a real DJI Fly session in mobile
+mode (different framing, `55 CC`, see `usb_mobile_protocol.md`) to see whether
+telemetry rides there, (b) accept battery-only. Per-frame video SEI (25 bytes)
+is still undecoded.
