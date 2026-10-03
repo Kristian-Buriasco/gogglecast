@@ -11,13 +11,12 @@ for l in open(os.path.expanduser('~/PycharmProjects/dji-goggles3-videoout/duml-c
     m = re.match(r'\|\s*0x([0-9A-Fa-f]{2})\s*\|\s*0x([0-9A-Fa-f]{2})\s*\|\s*\d+\s*\|\s*`([^`]+)`', l)
     if m: rows.append((int(m.group(1),16), int(m.group(2),16), m.group(3)))
 cmds = [r for r in rows if re.search(r'get|request|query|info|status|state|monitor|version|snr|frequency', r[2], re.I) and not EXCLUDE.search(r[2])]
-targets = [0xBC, 0x3C, 0x1C, 0x1F, 0x09, 0x29, 0x0E, 0x2E, 0x6E, 0x8E]
 
 dev = usb.core.find(idVendor=DJI_VID, idProduct=DJI_PID)
 if dev is None: sys.exit("goggles not found")
 usb.util.claim_interface(dev, IFACE)
-out = open(os.path.expanduser('~/telem/probe.jsonl'), 'w')
-print(len(cmds), "commands x", len(targets), "targets")
+out = open(os.path.expanduser('~/telem/probe2.jsonl'), 'w')
+print(len(cmds), "commands")
 
 def drain(seconds):
     buf = bytearray(); end = time.time() + seconds
@@ -26,6 +25,20 @@ def drain(seconds):
         except usb.core.USBError: pass
     return duml.parse_stream(buf)[0]
 
+# discover: get_version to all 256 addresses
+targets = []
+for a in range(256):
+    try:
+        dev.write(EP_OUT, duml.build(SENDER, a, seq=0x1000 + a, cmd_type=0x40, cmd_set=0, cmd_id=1, payload=b""), timeout=500)
+    except usb.core.USBError as e:
+        print(f"write to {a:02X} failed: {e}", flush=True)
+        try: dev.clear_halt(EP_OUT)
+        except usb.core.USBError: pass
+        continue
+    for p in drain(0.08):
+        if p.cmd_set == 0 and p.cmd_id == 1 and p.sender == a and a not in targets:
+            targets.append(a); print(f"found {a:02X}", bytes(p.payload)[2:22], flush=True)
+print("targets:", [f"{t:02X}" for t in targets], flush=True)
 # passive listen
 passive = drain(4)
 print("passive frames:", [(f"{p.cmd_set:02X}:{p.cmd_id:02X}", p.sender, p.receiver) for p in passive][:6])
@@ -45,6 +58,6 @@ for tgt in targets:
                 rec = {"to": f"{tgt:02X}", "cmd": f"{cs:02X}:{ci:02X}", "name": name, "from": f"{p.sender:02X}",
                        "payload": bytes(p.payload).hex(), "type": f"{p.cmd_type:02X}"}
                 out.write(json.dumps(rec) + "\n"); out.flush()
-                print(rec["to"], rec["cmd"], name, "->", rec["from"], rec["payload"][:60])
+                print(rec["to"], rec["cmd"], name, "->", rec["from"], rec["payload"][:60], flush=True)
 print("done; replies:", answered)
 usb.util.release_interface(dev, IFACE)

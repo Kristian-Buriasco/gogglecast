@@ -333,3 +333,28 @@ read-only get/query commands to 10 addresses (no drone linked or unknown).
 Next: repeat with a drone linked; try subscription-style commands (`02:EB`,
 `04:12`, `03:5B`, `51:2B app_conn_product_info`) and the app registration
 sequence from the DJI Fly symbol table.
+
+## Probe round 2 (drone linked): first live reading
+
+16 modules answer on IF4 with the drone linked (goggles 0x3C/0xBC/0x1F, air
+unit `WA520 AC` 0x09/0x29, RC 0x0E/0x2E, wifi 0x1B, link 0x6E, ground 0x8E,
+`bsp001` 0x59, CPLD 0x7C, 0x1C, 0x2A, 0x5C, 0x9C). 838 replies total.
+
+- **Battery percentage (confirmed):** `0D:02 smart_battery_get_dynamic_info`
+  to module 0x59 returns a 33-byte payload whose byte 21 is the percentage:
+  `0x5B` = 91, exactly the goggles' reading at the time. Module 0x1C returns
+  the same layout with `0x64` (100); likely a different battery (unknown,
+  possibly the drone side or a not-fitted pack reporting full).
+- `07:07 get_ssid` from 0x1B: the goggles' own wifi SSID (`DJI-GOGGLES3-...`),
+  `07:0C get_mac`, `07:44 get_frequency`.
+- `09:21 ofdm_get_sdr_conf` from the air unit and RC: 32-byte radio link
+  configuration (layout unknown; same structure from both).
+- `07:29 request_snr` (link SNR) is answered with `0xE4` (different from the
+  usual `0xE0` reject) by 0x1B: it exists but wants a payload or a precondition.
+- No flight-controller (cmd set 0x03) module answers through the goggles: no
+  GPS, altitude, attitude, or drone battery by polling. Those probably arrive as
+  pushes after the app registration handshake DJI Fly performs.
+
+Productizing: a poller in the helper (it already owns the USB device handle;
+claim IF4 as well) could publish battery % over XPC for the overlay. Link
+quality and flight data need the registration/subscription sequence.
