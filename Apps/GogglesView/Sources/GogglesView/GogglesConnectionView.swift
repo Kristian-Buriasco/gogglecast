@@ -21,6 +21,8 @@ struct GogglesConnectionView: View {
     /// Settings window to open (none currently; kept optional rather than
     /// forcing every future harness/test host of this view to supply one).
     var onOpenSettings: (() -> Void)?
+    /// Returns to the goggles picker (stops streaming); nil hides the button.
+    var onBack: (() -> Void)?
     /// User feedback (round 3): the previous fixed `AppChrome.titleBarHeight`-
     /// based centering did not actually line up with the real traffic
     /// lights on screen. `main.swift` now measures the real live window
@@ -237,6 +239,16 @@ struct GogglesConnectionView: View {
     /// so it's enabled whenever a real handler is actually available.
     private var footerBar: some View {
         HStack(alignment: .center) {
+            if let onBack {
+                Button(action: onBack) {
+                    Label("Devices", systemImage: "chevron.left")
+                        .font(.caption)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .help("Back to the goggles picker")
+                .accessibilityIdentifier("backButton")
+            }
             Button {
                 onOpenSettings?()
             } label: {

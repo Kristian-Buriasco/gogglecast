@@ -138,6 +138,13 @@ public final class DevicePickerCoordinator: ObservableObject {
         startPolling()
     }
 
+    /// For a picker created after the client is already connected (back from
+    /// the main view): no connection-state callback will fire, so start from
+    /// the current state.
+    public func resumeIfConnected() {
+        handleConnectionStateChange(client.connectionState)
+    }
+
     deinit {
         pollTimer?.invalidate()
     }

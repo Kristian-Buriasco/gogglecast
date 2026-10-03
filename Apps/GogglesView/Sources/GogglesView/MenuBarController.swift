@@ -88,6 +88,12 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         }
     }
 
+    /// Removes the status item; the controller is unusable afterwards.
+    func tearDown() {
+        uiStateCancellable = nil
+        NSStatusBar.system.removeStatusItem(statusItem)
+    }
+
     // MARK: - NSMenuDelegate
 
     /// Refresh the two dynamic lines (state text, show/hide title) right

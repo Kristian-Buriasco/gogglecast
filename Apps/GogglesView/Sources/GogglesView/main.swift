@@ -157,6 +157,9 @@ if args.contains("--install-camera-extension") {
 /// see that function's doc comment.
 var mainWindowRetainedObjects: [Any] = []
 
+/// Stops streaming and closes everything `launchMainWindow` created (back to picker).
+var mainWindowTeardown: (() -> Void)?
+
 /// Bridges `DevicePickerCoordinator.$state`'s Combine publisher to a plain
 /// closure fired exactly once, the first time `state` becomes `.selected`.
 /// A small dedicated type (not an inline `Combine.sink` at the call site)
@@ -349,53 +352,57 @@ if args.contains("--run") || !args.dropFirst().contains(where: { $0.hasPrefix("-
     app.mainMenu = mainMenu
     app.windowsMenu = windowMenu
 
-    let picker = DevicePickerCoordinator(client: client)
-    let pickerHostingController = NSHostingController(rootView: DevicePickerView(
-        picker: picker,
-        onOpenSettings: { settingsWindowController.show() }
-    ))
-    pickerHostingController.sizingOptions = []
-    let pickerWindow = NSWindow(contentViewController: pickerHostingController)
-    pickerWindow.title = "GogglesView"
-    // User feedback ("its too small the window"): the picker now always
-    // shows (no auto-select) and its rows carry full device-identity
-    // detail, so it needs real room -- bumped from the original 640x360
-    // (sized for a single-line "connect your goggles" message) to
-    // something that comfortably fits a few detailed candidate cards.
-    pickerWindow.setContentSize(NSSize(width: 720, height: 520))
-    pickerWindow.styleMask = [.titled, .closable, .resizable, .miniaturizable]
-    applyCustomTitleBarChrome(to: pickerWindow)
-    pickerWindow.center()
-    pickerWindow.makeKeyAndOrderFront(nil)
-
     let pickerDelegate = LiveViewAppDelegate()
-    app.delegate = pickerDelegate
+    var pickerRetained: [Any] = []
 
-    var didLaunchMain = false
-    var pickerCancellable: AnyObject?
-    let observer = PickerSelectionObserver(picker: picker) { deviceId in
-        guard !didLaunchMain else { return }
-        didLaunchMain = true
-        // MEDIUM 7 fix (review round 2): order the main window into
-        // existence BEFORE closing the picker window, not after -- the
-        // previous order (`pickerWindow.close()` then
-        // `launchMainWindow(...)`) relied on undocumented AppKit run-loop
-        // ordering to avoid `applicationShouldTerminateAfterLastWindowClosed`
-        // (still answering `true` via `pickerDelegate` at that instant)
-        // quitting the app the moment the picker window -- briefly the
-        // ONLY window -- closed. Building the main window first means at
-        // least one window is always on screen; `pickerWindow.close()`
-        // below never sees a zero-window state at all, regardless of
-        // delegate timing.
-        let coordinator = launchMainWindow(
-            deviceId: deviceId, client: client, app: app,
-            settingsWindowController: settingsWindowController
-        )
-        activeCoordinator = coordinator
-        reconnectMenuItem.isEnabled = true
-        pickerWindow.close()
+    // Mutually recursive: the picker launches the main window, whose "Devices"
+    // button presents a fresh picker again. The new picker window is shown
+    // before the main window closes so the app never has zero windows.
+    func presentPicker() {
+        let picker = DevicePickerCoordinator(client: client)
+        let pickerHostingController = NSHostingController(rootView: DevicePickerView(
+            picker: picker,
+            onOpenSettings: { settingsWindowController.show() }
+        ))
+        pickerHostingController.sizingOptions = []
+        let pickerWindow = NSWindow(contentViewController: pickerHostingController)
+        pickerWindow.title = "GogglesView"
+        pickerWindow.setContentSize(NSSize(width: 720, height: 520))
+        pickerWindow.styleMask = [.titled, .closable, .resizable, .miniaturizable]
+        applyCustomTitleBarChrome(to: pickerWindow)
+        pickerWindow.center()
+        pickerWindow.makeKeyAndOrderFront(nil)
+        app.delegate = pickerDelegate
+
+        var didLaunchMain = false
+        let observer = PickerSelectionObserver(picker: picker) { deviceId in
+            guard !didLaunchMain else { return }
+            didLaunchMain = true
+            // Order the main window in BEFORE closing the picker so the app
+            // never sees a zero-window state (the picker delegate quits on
+            // last window closed).
+            let coordinator = launchMainWindow(
+                deviceId: deviceId, client: client, app: app,
+                settingsWindowController: settingsWindowController,
+                onBack: { goBackToPicker() }
+            )
+            activeCoordinator = coordinator
+            reconnectMenuItem.isEnabled = true
+            pickerWindow.close()
+        }
+        pickerRetained = [observer, pickerWindow, pickerHostingController, picker]
+        picker.resumeIfConnected()
     }
-    pickerCancellable = observer
+
+    func goBackToPicker() {
+        presentPicker()
+        mainWindowTeardown?()
+        mainWindowTeardown = nil
+        activeCoordinator = nil
+        reconnectMenuItem.isEnabled = false
+    }
+
+    presentPicker()
 
     client.connect()
     app.activate(ignoringOtherApps: true)
@@ -406,7 +413,7 @@ if args.contains("--run") || !args.dropFirst().contains(where: { $0.hasPrefix("-
     // spinning, it never calls `app.run()` itself). `observer` is kept
     // alive via `withExtendedLifetime` for the same reason every other
     // menu-bar/delegate object in this file needs an explicit owner.
-    withExtendedLifetime((observer, pickerCancellable, pickerDelegate, settingsWindowController, settingsMenuTarget, reconnectMenuTarget)) {
+    withExtendedLifetime((pickerDelegate, settingsWindowController, settingsMenuTarget, reconnectMenuTarget)) {
         app.run()
     }
     exit(0)
@@ -428,7 +435,8 @@ if args.contains("--run") || !args.dropFirst().contains(where: { $0.hasPrefix("-
 @discardableResult
 func launchMainWindow(
     deviceId: String, client: HelperClient, app: NSApplication,
-    settingsWindowController: SettingsWindowController
+    settingsWindowController: SettingsWindowController,
+    onBack: (() -> Void)? = nil
 ) -> GogglesConnectionCoordinator {
     let coordinator = GogglesConnectionCoordinator(client: client, deviceId: deviceId)
     let session = DecodeSession()
@@ -462,7 +470,8 @@ func launchMainWindow(
     let hostingController = NSHostingController(rootView: GogglesConnectionView(
         coordinator: coordinator,
         session: session,
-        onOpenSettings: { settingsWindowController.show() }
+        onOpenSettings: { settingsWindowController.show() },
+        onBack: onBack
     ))
     // Real bug found during Task 3.5's window-sizing complaint while
     // verifying the decode fix live: `NSHostingController`'s default
@@ -556,6 +565,7 @@ func launchMainWindow(
         coordinator: coordinator,
         session: session,
         onOpenSettings: { settingsWindowController.show() },
+        onBack: onBack,
         pillBandHeight: AppChrome.measuredPillBandHeight(for: window)
     )
 
@@ -615,6 +625,16 @@ func launchMainWindow(
     // in a top-level array instead (see `mainWindowRetainedObjects`'s doc
     // comment).
     mainWindowRetainedObjects = [menuBarController, hideOnCloseDelegate, delegate]
+    mainWindowTeardown = {
+        client.stopStreaming(deviceId: deviceId)
+        captureWindowController.hide()
+        settingsWindowController.setCaptureWindowHandler { _, _ in }
+        settingsWindowController.setReconnectHandler {}
+        menuBarController.tearDown()
+        window.delegate = nil
+        window.close()
+        mainWindowRetainedObjects = []
+    }
     return coordinator
 }
 if args.contains("--force-state") {
