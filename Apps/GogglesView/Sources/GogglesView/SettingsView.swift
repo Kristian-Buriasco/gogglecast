@@ -39,7 +39,7 @@ struct SettingsView: View {
             Spacer(minLength: 0)
         }
         .padding(22)
-        .frame(width: 380, height: 780, alignment: .top)
+        .frame(width: 380, height: 810, alignment: .top)
         .background(AppChrome.backgroundColor)
         .foregroundStyle(.white)
         .onAppear { viewModel.refresh() }
@@ -96,6 +96,7 @@ struct SettingsView: View {
     @AppStorage(OSDPrefs.showBitrateKey) private var osdBitrate = true
     @AppStorage(OSDPrefs.showResolutionKey) private var osdResolution = true
     @AppStorage(OSDPrefs.showDropsKey) private var osdDrops = false
+    @AppStorage(OSDPrefs.showLatencyKey) private var osdLatency = true
 
     private var osdSection: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -105,6 +106,7 @@ struct SettingsView: View {
                 Toggle("Resolution", isOn: $osdResolution)
                 Toggle("Framerate", isOn: $osdFps)
                 Toggle("Bitrate", isOn: $osdBitrate)
+                Toggle("Latency (helper to screen)", isOn: $osdLatency)
                 Toggle("Dropped frames", isOn: $osdDrops)
             }
             .padding(.leading, 16)

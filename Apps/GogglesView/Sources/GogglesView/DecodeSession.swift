@@ -54,6 +54,11 @@ final class DecodeSession: ObservableObject {
     }
     /// Real stream size from the SPS, nil until the first parameter set.
     @Published private(set) var dimensions: CMVideoDimensions?
+    /// Smoothed delay from the helper stamping a NAL to it being handed to the
+    /// display layer (XPC + queueing). Excludes goggles-internal and display time.
+    @Published private(set) var latencyMs: Double?
+    private var latencyEMA: Double?
+    private var lastLatencyPublish: UInt64 = 0
     private(set) var consecutiveFailures = 0
     private(set) var teardownCount = 0
 
@@ -175,10 +180,30 @@ final class DecodeSession: ObservableObject {
         )
         try DecodeSession.markDisplayImmediately(sampleBuffer)
         renderer?.enqueue(sampleBuffer)
+        recordLatency(hostTime: hostTime)
         consumerLock.lock()
         let extras = extraConsumers.compactMap { $0.value }
         consumerLock.unlock()
         for consumer in extras { consumer.enqueue(sampleBuffer) }
+    }
+
+    // MARK: - Latency
+
+    static func milliseconds(fromTicks ticks: UInt64, numer: UInt32, denom: UInt32) -> Double {
+        Double(ticks) * Double(numer) / Double(denom) / 1_000_000
+    }
+
+    private func recordLatency(hostTime: UInt64) {
+        var tb = mach_timebase_info(numer: 0, denom: 0)
+        mach_timebase_info(&tb)
+        let now = mach_absolute_time()
+        guard now >= hostTime else { return }
+        let ms = DecodeSession.milliseconds(fromTicks: now - hostTime, numer: tb.numer, denom: tb.denom)
+        latencyEMA = latencyEMA.map { $0 * 0.9 + ms * 0.1 } ?? ms
+        let sinceLast = DecodeSession.milliseconds(fromTicks: now &- lastLatencyPublish, numer: tb.numer, denom: tb.denom)
+        guard sinceLast >= 500, let value = latencyEMA else { return }
+        lastLatencyPublish = now
+        DispatchQueue.main.async { self.latencyMs = value }
     }
 
     // MARK: - CMSampleBuffer construction
