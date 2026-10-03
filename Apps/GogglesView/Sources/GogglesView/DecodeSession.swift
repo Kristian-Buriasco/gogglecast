@@ -44,6 +44,12 @@ final class DecodeSession {
 
     private let formatCache = ParameterSetFormatDescriptionCache()
     private weak var renderer: SampleBufferRendering?
+    private var extraConsumers: [WeakConsumer] = []
+    private let consumerLock = NSLock()
+
+    private struct WeakConsumer {
+        weak var value: SampleBufferRendering?
+    }
     private(set) var consecutiveFailures = 0
     private(set) var teardownCount = 0
 
@@ -66,6 +72,22 @@ final class DecodeSession {
     /// `NSView` exists).
     func attach(renderer: SampleBufferRendering) {
         self.renderer = renderer
+    }
+
+    /// Adds an extra sample-buffer consumer (second display window,
+    /// recorder) that receives every slice alongside the primary renderer.
+    /// Held weakly, same as the primary.
+    func addConsumer(_ consumer: SampleBufferRendering) {
+        consumerLock.lock()
+        defer { consumerLock.unlock() }
+        extraConsumers.removeAll { $0.value == nil || $0.value === consumer }
+        extraConsumers.append(WeakConsumer(value: consumer))
+    }
+
+    func removeConsumer(_ consumer: SampleBufferRendering) {
+        consumerLock.lock()
+        defer { consumerLock.unlock() }
+        extraConsumers.removeAll { $0.value == nil || $0.value === consumer }
     }
 
     /// `true` once a parameter set has been decoded and cached -- i.e.
@@ -137,6 +159,10 @@ final class DecodeSession {
         )
         try DecodeSession.markDisplayImmediately(sampleBuffer)
         renderer?.enqueue(sampleBuffer)
+        consumerLock.lock()
+        let extras = extraConsumers.compactMap { $0.value }
+        consumerLock.unlock()
+        for consumer in extras { consumer.enqueue(sampleBuffer) }
     }
 
     // MARK: - CMSampleBuffer construction

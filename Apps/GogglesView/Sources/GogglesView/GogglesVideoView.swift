@@ -81,10 +81,17 @@ final class SampleBufferHostView: NSView {
 /// wires async decode-failure notifications back into the same session.
 struct GogglesVideoView: NSViewRepresentable {
     let session: DecodeSession
+    /// `true` for additional windows (e.g. the capture window): registers as
+    /// an extra consumer instead of replacing the primary renderer.
+    var isSecondary = false
 
     func makeNSView(context: Context) -> SampleBufferHostView {
         let view = SampleBufferHostView()
-        session.attach(renderer: view.displayLayer)
+        if isSecondary {
+            session.addConsumer(view.displayLayer)
+        } else {
+            session.attach(renderer: view.displayLayer)
+        }
         view.onFailedToDecode = { [weak session] error in
             session?.recordExternalFailure(error)
         }
