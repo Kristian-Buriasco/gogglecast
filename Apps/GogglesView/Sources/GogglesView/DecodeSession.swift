@@ -189,19 +189,19 @@ final class DecodeSession: ObservableObject {
 
     // MARK: - Latency
 
-    static func milliseconds(fromTicks ticks: UInt64, numer: UInt32, denom: UInt32) -> Double {
-        Double(ticks) * Double(numer) / Double(denom) / 1_000_000
+    static func milliseconds(fromNanoseconds ns: UInt64) -> Double {
+        Double(ns) / 1_000_000
     }
 
+    /// `hostTime` is `DispatchTime.now().uptimeNanoseconds` stamped by the
+    /// helper (nanoseconds, NOT mach ticks), same clock as in this process.
     private func recordLatency(hostTime: UInt64) {
-        var tb = mach_timebase_info(numer: 0, denom: 0)
-        mach_timebase_info(&tb)
-        let now = mach_absolute_time()
+        let now = DispatchTime.now().uptimeNanoseconds
         guard now >= hostTime else { return }
-        let ms = DecodeSession.milliseconds(fromTicks: now - hostTime, numer: tb.numer, denom: tb.denom)
+        let ms = DecodeSession.milliseconds(fromNanoseconds: now - hostTime)
         latencyEMA = latencyEMA.map { $0 * 0.9 + ms * 0.1 } ?? ms
-        let sinceLast = DecodeSession.milliseconds(fromTicks: now &- lastLatencyPublish, numer: tb.numer, denom: tb.denom)
-        guard sinceLast >= 500, let value = latencyEMA else { return }
+        guard DecodeSession.milliseconds(fromNanoseconds: now &- lastLatencyPublish) >= 500,
+              let value = latencyEMA else { return }
         lastLatencyPublish = now
         DispatchQueue.main.async { self.latencyMs = value }
     }
@@ -210,9 +210,7 @@ final class DecodeSession: ObservableObject {
 
     /// Wraps AVCC-converted bytes in a `CMBlockBuffer`, then a
     /// `CMSampleBuffer`, timestamped from the helper's `hostTime`
-    /// (`mach_absolute_time()` ticks, converted to a `CMTime` via
-    /// `mach_timebase_info` -- design §5.4: "stamps each emitted NAL with
-    /// `mach_absolute_time()`... forwards that").
+    /// (uptime nanoseconds).
     static func makeSampleBuffer(
         avccData: Data,
         formatDescription: CMVideoFormatDescription,
@@ -294,16 +292,10 @@ final class DecodeSession: ObservableObject {
         )
     }
 
-    /// Converts a `mach_absolute_time()` tick count to a `CMTime` in
-    /// nanoseconds via `mach_timebase_info` -- not a no-op on every Mac
-    /// (Intel's numer/denom is commonly 125/3, not 1/1).
+    /// The helper stamps frames with `DispatchTime.now().uptimeNanoseconds`,
+    /// so `hostTime` is already nanoseconds (not mach ticks).
     private static func presentationTime(forHostTime hostTime: UInt64) -> CMTime {
-        var timebase = mach_timebase_info(numer: 0, denom: 0)
-        mach_timebase_info(&timebase)
-        let numer = UInt64(timebase.numer)
-        let denom = UInt64(timebase.denom)
-        let nanos = denom > 0 ? (hostTime.multipliedReportingOverflow(by: numer).partialValue / denom) : hostTime
-        return CMTime(value: Int64(clamping: nanos), timescale: 1_000_000_000)
+        CMTime(value: Int64(clamping: hostTime), timescale: 1_000_000_000)
     }
 
     // MARK: - §7 error-policy bookkeeping

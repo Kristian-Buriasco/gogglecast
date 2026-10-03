@@ -46,8 +46,7 @@ struct RecorderTests {
 
 @Suite struct LatencyTests {
     @Test func tickConversion() {
-        // timebase 125/3 (Apple Silicon): 24 ticks = 1000 ns
-        #expect(abs(DecodeSession.milliseconds(fromTicks: 24_000_000, numer: 125, denom: 3) - 1000) < 0.001)
+        #expect(abs(DecodeSession.milliseconds(fromNanoseconds: 1_000_000_000) - 1000) < 0.001)
     }
     @Test func overlayShowsLatency() {
         let s = StreamStats(fps: 60, bitrateKbps: 1, drops: 0, cumulativeFrames: 1, cumulativeBytes: 1, cumulativeDrops: 0)

@@ -18,9 +18,12 @@ final class Recorder: ObservableObject, SampleBufferRendering {
     private var writer: AVAssetWriter?
     private var input: AVAssetWriterInput?
     private var startTime: CMTime?
+    private var lastPTS: CMTime?
     private var armed = false
 
     // MARK: - Pure helpers (unit-tested)
+
+    static let minFrameSpacing = CMTime(value: 2, timescale: 1000)
 
     static var defaultDirectory: URL {
         FileManager.default.homeDirectoryForCurrentUser
@@ -65,7 +68,7 @@ final class Recorder: ObservableObject, SampleBufferRendering {
         guard !armed else { lock.unlock(); return }
         self.url = url
         armed = true
-        startTime = nil
+        startTime = nil; lastPTS = nil
         lock.unlock()
         DispatchQueue.main.async { self.lastError = nil; self.elapsed = 0; self.isRecording = true }
     }
@@ -75,7 +78,7 @@ final class Recorder: ObservableObject, SampleBufferRendering {
         lock.lock()
         let w = writer, i = input, u = url
         let wasArmed = armed
-        writer = nil; input = nil; url = nil; armed = false; startTime = nil
+        writer = nil; input = nil; url = nil; armed = false; startTime = nil; lastPTS = nil
         lock.unlock()
         guard wasArmed else { completion?(nil); return }
         DispatchQueue.main.async { self.isRecording = false }
@@ -123,7 +126,11 @@ final class Recorder: ObservableObject, SampleBufferRendering {
         var timing = [CMSampleTimingInfo](repeating: .invalid, count: count)
         CMSampleBufferGetSampleTimingInfoArray(sampleBuffer, entryCount: count, arrayToFill: &timing, entriesNeededOut: &count)
         for k in timing.indices {
-            timing[k].presentationTimeStamp = Recorder.normalized(timing[k].presentationTimeStamp, relativeTo: start)
+            var pts = Recorder.normalized(timing[k].presentationTimeStamp, relativeTo: start)
+            // Frames arriving in a burst share a timestamp; keep PTS strictly increasing.
+            if let last = lastPTS, pts <= last + Recorder.minFrameSpacing { pts = last + Recorder.minFrameSpacing }
+            lastPTS = pts
+            timing[k].presentationTimeStamp = pts
             if timing[k].decodeTimeStamp.isValid {
                 timing[k].decodeTimeStamp = Recorder.normalized(timing[k].decodeTimeStamp, relativeTo: start)
             }

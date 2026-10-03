@@ -204,6 +204,46 @@ final class PickerSelectionObserver {
     }
 }
 
+if let idx = args.firstIndex(of: "--record-test") {
+    // Dev harness: records N seconds from the first connected goggles with the
+    // real DecodeSession + Recorder, prints the file path, exits.
+    let seconds = idx + 1 < args.count ? (Double(args[idx + 1]) ?? 10) : 10
+    let client = HelperClient()
+    let session = DecodeSession()
+    let recorder = Recorder()
+    session.addConsumer(recorder)
+    var firstHost: UInt64?
+    var firstApp: UInt64?
+    var seen = 0
+    client.onNALUnit = { data, nalType, isParameterSet, hostTime in
+        if !isParameterSet, seen < 80 {
+            let now = mach_absolute_time()
+            if firstHost == nil { firstHost = hostTime; firstApp = now }
+            var tb = mach_timebase_info(numer: 0, denom: 0); mach_timebase_info(&tb)
+            let hMs = Double(hostTime &- firstHost!) * Double(tb.numer) / Double(tb.denom) / 1e6
+            let aMs = Double(now &- firstApp!) * Double(tb.numer) / Double(tb.denom) / 1e6
+            print("[record-test] nal#\(seen) type=\(nalType) helperMs=\(Int(hMs)) appMs=\(Int(aMs))")
+            seen += 1
+        }
+        session.handle(nalData: data, nalType: nalType, isParameterSet: isParameterSet, hostTime: hostTime)
+    }
+    client.connect()
+    pollFirstAvailableDeviceId(client: client, timeout: 20) { deviceId in
+        guard let deviceId else { print("[record-test] no device found"); exit(2) }
+        client.startStreaming(deviceId: deviceId) { ok, error in
+            print("[record-test] startStreaming ok=\(ok) error=\(error.map { String(describing: $0) } ?? "nil")")
+            guard ok else { exit(3) }
+            do { try recorder.start() } catch { print("[record-test] start failed: \(error)"); exit(4) }
+            DispatchQueue.main.asyncAfter(deadline: .now() + seconds) {
+                recorder.stop { url in
+                    print("[record-test] file: \(url?.path ?? "nil") lastError=\(recorder.lastError ?? "nil")")
+                    client.stopStreaming(deviceId: deviceId) { exit(url == nil ? 5 : 0) }
+                }
+            }
+        }
+    }
+    RunLoop.main.run()
+}
 if args.contains("--live-view") {
     // Task 3.3's hardware-verification harness: not the real SwiftUI app
     // shell (Task 3.4/3.6's job -- see GogglesVideoView.swift's doc
