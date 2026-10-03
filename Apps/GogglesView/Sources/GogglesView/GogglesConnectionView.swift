@@ -100,6 +100,12 @@ struct GogglesConnectionView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
             stopRecording(wait: true)
         }
+        .onReceive(NotificationCenter.default.publisher(for: .gogglesToggleRecording)) { _ in
+            if recorder.isRecording { stopRecording(wait: false) } else if isLive { startRecording() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .gogglesScreenshot)) { _ in
+            if isLive { takeScreenshot() }
+        }
     }
 
     private func startRecording() {

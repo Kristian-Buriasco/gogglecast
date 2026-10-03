@@ -27,6 +27,9 @@ struct ReplayControl: View {
         .onDisappear { session.removeConsumer(buffer); buffer.clear() }
         .onChange(of: enabled) { _, _ in sync() }
         .onChange(of: seconds) { _, _ in buffer.setSeconds(clamped) }
+        .onReceive(NotificationCenter.default.publisher(for: .gogglesSaveReplay)) { _ in
+            if enabled && buffer.bufferedSeconds >= 1 { save() }
+        }
     }
 
     private var clamped: Int { min(max(seconds, ReplayPrefs.secondsRange.lowerBound), ReplayPrefs.secondsRange.upperBound) }

@@ -581,6 +581,7 @@ func launchMainWindow(
     // must not quit a daily-driver menu-bar app out from under the user.
     let delegate = RealAppDelegate()
     app.delegate = delegate
+    GlobalHotkeys.shared.apply()
 
     // The client is already connected by this point -- reaching
     // `launchMainWindow` required a successful `enumerateDevices` round

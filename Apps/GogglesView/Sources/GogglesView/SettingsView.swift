@@ -46,6 +46,8 @@ struct SettingsView: View {
                         helperStatusSection
                         Divider()
                         connectionSection
+                        Divider()
+                        DiagnosticsSettingsSection()
                     case .display:
                         osdSection
                         Divider()
@@ -56,6 +58,7 @@ struct SettingsView: View {
                         recordingSection
                         Divider()
                         ReplaySettingsSection()
+                        GlobalHotkeysSettingsSection()
                     case .streaming:
                         NetworkStreamSettingsSection()
                     }
