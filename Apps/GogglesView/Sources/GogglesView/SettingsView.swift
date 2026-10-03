@@ -45,6 +45,10 @@ struct SettingsView: View {
                         Divider()
                         AutoOpenSettingsSection()
                         Divider()
+                        PresetsSettingsSection()
+                        Divider()
+                        UpdateSettingsSection()
+                        Divider()
                         helperStatusSection
                         Divider()
                         connectionSection

@@ -613,6 +613,7 @@ func launchMainWindow(
     window.collectionBehavior.insert(.fullScreenPrimary)
     cursorAutoHider = CursorAutoHider(window: window)
     window.center()
+    WindowMemory.attach(to: window, name: "main", restoreSize: true, contentAspect: 16.0 / 9.0)
     // Task 3.6: closing the window (red titlebar button) hides it instead
     // of destroying it -- the real "show/hide window" affordance this
     // task's menu bar item exposes, and the reason this app is no longer a
@@ -664,6 +665,7 @@ func launchMainWindow(
     let delegate = RealAppDelegate()
     app.delegate = delegate
     GlobalHotkeys.shared.apply()
+    UpdateChecker.shared.checkOnLaunchIfDue()
 
     // The client is already connected by this point -- reaching
     // `launchMainWindow` required a successful `enumerateDevices` round

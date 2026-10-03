@@ -57,6 +57,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         // = false` alone already guarantees).
         window.isReleasedWhenClosed = false
         window.center()
+        WindowMemory.attach(to: window, name: "settings", restoreSize: false)
         self.window = window
         super.init()
         window.delegate = self
