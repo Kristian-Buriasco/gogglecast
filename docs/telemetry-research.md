@@ -282,3 +282,29 @@ Don't arm the motors, and keep the props off for everything above.
   `0x03`)? Is it routed to `0x2A`, to `0x02`, or broadcast?
 - Is any payload encrypted (the cmd_type low nibble)?
 - Do the ack-tail or type-0x05 channels accept host DUML (which would fix the I-frame request)?
+
+## Capture A results (2026-10-03, first real capture)
+
+Run: `gvcli stream --dump-telemetry` for ~35 s, video at 55-60 fps, 8.3 Mbps.
+Whether a drone was linked during this run was not recorded; repeat with a
+drone linked and sticks moving before drawing final conclusions.
+
+- 376 type-0x01 packets plus one type-0x00 (~10 Hz).
+- 338 of the 376 are 34-byte window-state packets (flow control only), no DUML.
+- 38 (1 Hz) carry one DUML frame: `1b>02 cmd 07:94`, set "wifi", src `wifi_gnd`,
+  31-byte payload that is identical every time and contains the goggles' serial
+  as ASCII. A heartbeat, not telemetry.
+- No signal quality, battery, GPS, or attitude messages appeared.
+- Each video frame carries a 25-byte proprietary SEI (payload type 240). Byte 0
+  is a counter; bytes 4, 9, 10 look high-entropy (checksum/timestamp?); bytes
+  2, 6, 12 vary slowly; the rest is mostly constant. Without ground truth
+  (known camera/OSD values per frame) it cannot be decoded; likely camera
+  metadata, not flight telemetry.
+
+Conclusion so far: this RNDIS/UDP:9003 transport appears to expose video plus a
+heartbeat only. Real flight telemetry, if available at all, may live on the
+other USB "mobile" transport described in `usb_mobile_protocol.md`, or only
+reach the goggles' own OSD. Next: repeat the capture with a drone linked
+(idle, then sticks moving) and diff against capture A; if still empty, stop
+the telemetry phase and mark flight-log/overlay items in the roadmap as
+blocked.

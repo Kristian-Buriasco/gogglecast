@@ -40,7 +40,7 @@ and what unblocks the most value; the phases are not time estimates.
 
 ## Phase 3 — Telemetry and flight data
 
-Blocked on real data: run the capture plan in `docs/telemetry-research.md`
+Capture A (2026-10-03) showed only a 1 Hz heartbeat and undecodable per-frame SEI on this transport; repeat with a drone linked before building on it. Capture plan in `docs/telemetry-research.md`
 (`gvcli --dump-telemetry`, no drone vs drone linked vs moving sticks, etc.),
 then decode. Until a capture exists everything below is speculative.
 
