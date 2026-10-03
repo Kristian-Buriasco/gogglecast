@@ -86,6 +86,10 @@ struct SettingsView: View {
                         RTMPSettingsSection()
                         Divider()
                         WebViewerSettingsSection()
+                        Divider()
+                        SRTSettingsSection()
+                        Divider()
+                        NDISettingsSection()
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)

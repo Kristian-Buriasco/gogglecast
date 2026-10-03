@@ -84,6 +84,8 @@ struct GogglesConnectionView: View {
             NetworkStreamControl(session: session)
             RTMPStreamControl(session: session)
             WebViewerControl(session: session)
+            SRTStreamControl(session: session)
+            NDIStreamControl(session: session)
             if let note = screenshotNote {
                 Text(note).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
             }
