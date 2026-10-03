@@ -18,34 +18,51 @@ import SwiftUI
 struct SettingsView: View {
     @ObservedObject var viewModel: SettingsViewModel
 
+    enum Tab: String, CaseIterable, Identifiable {
+        case general = "General", display = "Display", capture = "Capture", streaming = "Streaming"
+        var id: String { rawValue }
+    }
+
+    @State private var tab: Tab = .general
+
     var body: some View {
-        ScrollView {
-        VStack(alignment: .leading, spacing: 20) {
+        VStack(alignment: .leading, spacing: 14) {
             Text("Settings")
                 .font(.title2.bold())
                 .padding(.top, 6)
 
-            launchAtLoginSection
-            Divider()
-            helperStatusSection
-            Divider()
-            connectionSection
-            Divider()
-            osdSection
+            Picker("", selection: $tab) {
+                ForEach(Tab.allCases) { Text($0.rawValue).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
 
-            recordingSection
-
-            captureWindowSection
-
-            ReplaySettingsSection()
-
-            NetworkStreamSettingsSection()
-
-            Spacer(minLength: 0)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    switch tab {
+                    case .general:
+                        launchAtLoginSection
+                        Divider()
+                        helperStatusSection
+                        Divider()
+                        connectionSection
+                    case .display:
+                        osdSection
+                        Divider()
+                        captureWindowSection
+                    case .capture:
+                        recordingSection
+                        Divider()
+                        ReplaySettingsSection()
+                    case .streaming:
+                        NetworkStreamSettingsSection()
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
         }
         .padding(22)
-        }
-        .frame(width: 400, height: 680, alignment: .top)
+        .frame(width: 420, height: 520, alignment: .top)
         .background(AppChrome.backgroundColor)
         .foregroundStyle(.white)
         .onAppear { viewModel.refresh() }
