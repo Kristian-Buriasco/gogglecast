@@ -1,6 +1,7 @@
 import Testing
 import Foundation
 import CoreMedia
+import GogglesXPC
 @testable import GogglesView
 
 struct RecorderTests {
@@ -19,5 +20,17 @@ struct RecorderTests {
         let t = CMTime(value: 5500, timescale: 1000)
         #expect(CMTimeGetSeconds(Recorder.normalized(start, relativeTo: start)) == 0)
         #expect(CMTimeGetSeconds(Recorder.normalized(t, relativeTo: start)) == 0.5)
+    }
+}
+
+@Suite struct OSDOverlayTests {
+    @Test func linesRespectToggles() {
+        let s = StreamStats(fps: 59, bitrateKbps: 12345, drops: 0,
+                            cumulativeFrames: 1, cumulativeBytes: 1, cumulativeDrops: 3)
+        #expect(OSDOverlay.lines(stats: s, fps: true, bitrate: true, resolution: false, drops: false)
+                == ["59 fps", "12.3 Mbps"])
+        #expect(OSDOverlay.lines(stats: s, fps: false, bitrate: false, resolution: false, drops: true)
+                == ["3 dropped"])
+        #expect(OSDOverlay.lines(stats: s, fps: false, bitrate: false, resolution: false, drops: false).isEmpty)
     }
 }

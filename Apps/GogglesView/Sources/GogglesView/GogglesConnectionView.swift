@@ -249,6 +249,9 @@ struct GogglesConnectionView: View {
         ZStack {
             GogglesVideoView(session: session)
                 .opacity(videoOpacity)
+            OSDOverlay(stats: coordinator.stats)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .opacity(videoOpacity)
             overlay
         }
     }

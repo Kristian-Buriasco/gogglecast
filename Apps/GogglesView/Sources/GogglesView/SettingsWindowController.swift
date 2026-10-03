@@ -44,7 +44,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         // not a resizable document window; matches the fixed
         // `.frame(width:height:)` `SettingsView` sets on itself.
         window.styleMask = [.titled, .closable, .miniaturizable]
-        window.setContentSize(NSSize(width: 380, height: 600))
+        window.setContentSize(NSSize(width: 380, height: 780))
         // Survive being closed (red button / Cmd+W) instead of being
         // deallocated -- `show()` reuses the same window/view
         // model on the next open, same "hide, don't destroy" pattern

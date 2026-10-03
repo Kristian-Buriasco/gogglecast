@@ -30,6 +30,8 @@ struct SettingsView: View {
             Divider()
             connectionSection
             Divider()
+            osdSection
+
             recordingSection
 
             captureWindowSection
@@ -37,7 +39,7 @@ struct SettingsView: View {
             Spacer(minLength: 0)
         }
         .padding(22)
-        .frame(width: 380, height: 600, alignment: .top)
+        .frame(width: 380, height: 780, alignment: .top)
         .background(AppChrome.backgroundColor)
         .foregroundStyle(.white)
         .onAppear { viewModel.refresh() }
@@ -88,6 +90,27 @@ struct SettingsView: View {
     @AppStorage(RecordingPrefs.containerKey) private var recordingContainer = RecordingPrefs.Container.mov.rawValue
     @AppStorage(RecordingPrefs.prefixKey) private var recordingPrefix = ""
     @AppStorage(RecordingPrefs.autoStartKey) private var recordingAutoStart = false
+
+    @AppStorage(OSDPrefs.enabledKey) private var osdEnabled = false
+    @AppStorage(OSDPrefs.showFpsKey) private var osdFps = true
+    @AppStorage(OSDPrefs.showBitrateKey) private var osdBitrate = true
+    @AppStorage(OSDPrefs.showResolutionKey) private var osdResolution = true
+    @AppStorage(OSDPrefs.showDropsKey) private var osdDrops = false
+
+    private var osdSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("On-screen display").font(.headline)
+            Toggle("Show stats over the video", isOn: $osdEnabled)
+            Group {
+                Toggle("Resolution", isOn: $osdResolution)
+                Toggle("Framerate", isOn: $osdFps)
+                Toggle("Bitrate", isOn: $osdBitrate)
+                Toggle("Dropped frames", isOn: $osdDrops)
+            }
+            .padding(.leading, 16)
+            .disabled(!osdEnabled)
+        }
+    }
 
     private var recordingSection: some View {
         VStack(alignment: .leading, spacing: 8) {
