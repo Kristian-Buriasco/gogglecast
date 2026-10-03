@@ -474,6 +474,7 @@ if args.contains("--run") || !args.dropFirst().contains(where: { $0.hasPrefix("-
     }
 
     presentPicker()
+    OnboardingWindow.showIfFirstRun()  // after the picker so it opens on top
 
     client.connect()
     app.activate(ignoringOtherApps: true)

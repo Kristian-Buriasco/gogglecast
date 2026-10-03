@@ -71,6 +71,7 @@ struct GogglesConnectionView: View {
             .buttonStyle(.plain)
             .help("Open the recordings folder")
             .accessibilityIdentifier("openRecordingsButton")
+            FreezeControl()
             ReplayControl(session: session)
             NetworkStreamControl(session: session)
             if let note = screenshotNote {

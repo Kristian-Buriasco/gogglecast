@@ -61,10 +61,22 @@ struct DevicePickerView: View {
     @ViewBuilder
     private var content: some View {
         switch picker.state {
-        case .discovering, .selected:
+        case .selected:
             Label("Connect your Goggles 3 with USB-C", systemImage: "cable.connector")
                 .foregroundStyle(.white)
                 .accessibilityIdentifier("picker-discovering")
+
+        case .discovering:
+            // 0 devices, helper connected: show the diagnostic checklist.
+            VStack(alignment: .leading, spacing: 12) {
+                Label("Connect your Goggles 3 with USB-C", systemImage: "cable.connector")
+                    .font(.title3.bold())
+                    .foregroundStyle(.white)
+                SetupChecklistView(items: SetupChecklist.items(
+                    registration: .init(HelperRegistration.status), reachability: .connected, devicesFound: 0))
+            }
+            .frame(maxWidth: 460, alignment: .leading)
+            .accessibilityIdentifier("picker-discovering")
 
         case .picking(let candidates):
             VStack(alignment: .leading, spacing: 14) {
@@ -100,6 +112,11 @@ struct DevicePickerView: View {
                 Button("Set up") {
                     try? HelperRegistration.register()
                 }
+                SetupChecklistView(items: SetupChecklist.items(
+                    registration: .init(HelperRegistration.status),
+                    reachability: reason == nil ? .disconnected : .versionMismatch, devicesFound: nil))
+                    .frame(maxWidth: 460, alignment: .leading)
+                    .foregroundStyle(.white)
             }
             .accessibilityIdentifier("picker-connectionUnavailable")
         }

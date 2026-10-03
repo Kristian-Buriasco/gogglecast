@@ -50,12 +50,17 @@ struct SettingsView: View {
                         connectionSection
                         Divider()
                         DiagnosticsSettingsSection()
+                        Divider()
+                        OnboardingSettingsSection()
+                        SelfTestSettingsSection()
                     case .display:
                         osdSection
                         Divider()
                         captureWindowSection
                         Divider()
                         OrientationSettingsSection()
+                        Divider()
+                        FramingSettingsSection()
                     case .capture:
                         recordingSection
                         Divider()

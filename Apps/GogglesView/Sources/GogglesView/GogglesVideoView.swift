@@ -19,7 +19,7 @@ import AppKit
 /// assignment) for hosting a display layer without an extra passthrough
 /// `CALayer` in between.
 final class SampleBufferHostView: NSView {
-    let displayLayer = AVSampleBufferDisplayLayer()
+    let displayLayer = FreezableDisplayLayer()
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -34,7 +34,12 @@ final class SampleBufferHostView: NSView {
     private func commonInit() {
         wantsLayer = true
         layer = CALayer()
-        layer?.addSublayer(displayLayer)
+        clipLayer.addSublayer(displayLayer)
+        layer?.addSublayer(clipLayer)
+        gridLayer.strokeColor = NSColor.white.withAlphaComponent(0.6).cgColor
+        gridLayer.fillColor = nil
+        gridLayer.lineWidth = 1
+        layer?.addSublayer(gridLayer)
         NotificationCenter.default.addObserver(
             self, selector: #selector(orientationChanged), name: UserDefaults.didChangeNotification, object: nil)
         // Preserve 1920x1080 aspect rather than stretching to fill an
@@ -67,25 +72,77 @@ final class SampleBufferHostView: NSView {
 
     @objc private func orientationChanged() { needsLayout = true }
 
+    // MARK: Framing (crop / zoom / pan / grid / color)
+
+    /// Clips the picture to the crop window (aspect modes); `displayLayer` lives inside it.
+    private let clipLayer = CALayer()
+    private let gridLayer = CAShapeLayer()
+
     override func layout() {
         super.layout()
         let r = OrientationPrefs.rotation
-        let w = bounds.width, h = bounds.height
+        let aspect = FramingPrefs.aspect
+        let zoom = FramingPrefs.zoom
+        let crop = FramingGeometry.cropRect(in: bounds.size, ratio: aspect.ratio)
+        let w = crop.width, h = crop.height
         CATransaction.begin()
         CATransaction.setDisableActions(true)
+        clipLayer.masksToBounds = true
+        clipLayer.frame = crop
+        displayLayer.videoGravity = (aspect == .fit) ? .resizeAspect : .resizeAspectFill
         displayLayer.setAffineTransform(.identity)
         displayLayer.bounds = OrientationPrefs.swapsAxes(r) ? CGRect(x: 0, y: 0, width: h, height: w) : CGRect(x: 0, y: 0, width: w, height: h)
         displayLayer.position = CGPoint(x: w / 2, y: h / 2)
-        displayLayer.setAffineTransform(OrientationPrefs.transform(rotation: r, flipH: OrientationPrefs.flipH, flipV: OrientationPrefs.flipV))
+        // Orientation first, then zoom about the center, then pan (in view axes).
+        let dx = FramingGeometry.offset(pan: FramingPrefs.panX, zoom: zoom, extent: w)
+        let dy = FramingGeometry.offset(pan: FramingPrefs.panY, zoom: zoom, extent: h)
+        displayLayer.setAffineTransform(
+            OrientationPrefs.transform(rotation: r, flipH: OrientationPrefs.flipH, flipV: OrientationPrefs.flipV)
+                .concatenating(CGAffineTransform(scaleX: zoom, y: zoom))
+                .concatenating(CGAffineTransform(translationX: dx, y: dy)))
+        // Layer filters on an AVSampleBufferDisplayLayer are untested with live video.
+        displayLayer.filters = FramingPrefs.colorFilters()
+
+        let path = CGMutablePath()
+        for (a, b) in FramingGeometry.gridLines(in: crop, mode: FramingPrefs.grid) {
+            path.move(to: a); path.addLine(to: b)
+        }
+        gridLayer.frame = bounds
+        gridLayer.path = path
         CATransaction.commit()
-        return
-        // The backing layer doesn't auto-follow the view's frame the way a
-        // normal `CALayer` sublayer would via autoresizing masks -- since
-        // `displayLayer` IS `self.layer`, AppKit already keeps its
-        // `bounds`/`frame` synced with the view automatically; nothing
-        // further needed here. Kept as an explicit override (rather than
-        // omitted) so a future reviewer sees this was considered, not
-        // missed.
+    }
+
+    // MARK: Interaction
+
+    override var acceptsFirstResponder: Bool { true }
+
+    override func scrollWheel(with event: NSEvent) {
+        let step: CGFloat = event.hasPreciseScrollingDeltas ? 0.01 : 0.1
+        applyZoom(FramingPrefs.zoom + event.scrollingDeltaY * step)
+    }
+
+    override func magnify(with event: NSEvent) {
+        applyZoom(FramingPrefs.zoom * (1 + event.magnification))
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        if event.clickCount == 2 { FramingPrefs.resetView() } else { super.mouseDown(with: event) }
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        let zoom = FramingPrefs.zoom
+        guard zoom > 1 else { return }
+        let crop = FramingGeometry.cropRect(in: bounds.size, ratio: FramingPrefs.aspect.ratio)
+        let px = FramingGeometry.pan(FramingPrefs.panX, dragging: event.deltaX, zoom: zoom, extent: crop.width)
+        // AppKit deltaY is positive downward; layer space is y-up.
+        let py = FramingGeometry.pan(FramingPrefs.panY, dragging: -event.deltaY, zoom: zoom, extent: crop.height)
+        FramingPrefs.panX = px
+        FramingPrefs.panY = py
+    }
+
+    private func applyZoom(_ z: CGFloat) {
+        FramingPrefs.zoom = z
+        if FramingPrefs.zoom <= 1 { FramingPrefs.panX = 0; FramingPrefs.panY = 0 }
     }
 }
 
