@@ -5,8 +5,8 @@ import Foundation
 // subcommands (see task-1.7-brief.md):
 //
 //   gvcli info                                   -- device info only
-//   gvcli stream --out <path> [--stats]           -- live hardware
-//   gvcli replay <capture-file> [--out <path>] [--stats]  -- offline (.gvcap)
+//   gvcli stream --out <path> [--stats] [--dump-telemetry <path>] -- live hardware
+//   gvcli replay <capture-file> [--out <path>] [--stats] [--dump-telemetry <path>]  -- offline (.gvcap)
 // ─────────────────────────────────────────────────────────────────────────
 
 func printUsage() {
@@ -19,6 +19,7 @@ func printUsage() {
           bcdDevice, bus/address), and exit. No video pipeline.
 
       gvcli stream --out <path> [--stats] [--ack-mode frame|window]
+                   [--dump-telemetry <path>]
           Connect to real hardware over USB/RNDIS, run the full receive
           pipeline, and write raw Annex-B H.264 to <path> (a regular file
           or a FIFO -- opening a FIFO blocks until a reader attaches).
@@ -26,7 +27,7 @@ func printUsage() {
           --ack-mode window: EXPERIMENTAL cumulative receive-window acks
           (also selectable via GOGGLES_ACK_MODE=window). Default 'frame'.
 
-      gvcli replay <capture-file> [--out <path>] [--stats]
+      gvcli replay <capture-file> [--out <path>] [--stats] [--dump-telemetry <path>]
           Same pipeline, driven by a .gvcap capture file via MockTransport
           instead of live hardware. No root required. --out is optional;
           omit it to only exercise/measure the pipeline (e.g. --stats
@@ -36,6 +37,15 @@ func printUsage() {
     stderr with fps, bitrate, and drop-count (per-second and cumulative),
     plus a [proto] line: inbound packet counts by type, retransmitted video
     packets, and the goggles' own type-2 send window (gwin) / resend state.
+
+    --dump-telemetry <path> (stream and replay): appends every inbound
+    non-video packet (type 0x01 telemetry, the 0x00 handshake reply, any
+    0x03/unknown) to <path> as one JSON object per line: timestamp, type,
+    seq, full payload hex, and a best-effort DUML decode (addresses, cmd
+    set/id, payload hex, typed fields for a few legacy messages). With
+    --stats it also prints a [telem] line per second listing which DUML
+    src>dst set:id messages arrived. Research aid; see
+    docs/telemetry-research.md. Off by default.
     """
     print(usage)
 }

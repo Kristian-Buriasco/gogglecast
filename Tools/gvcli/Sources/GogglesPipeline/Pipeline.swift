@@ -185,7 +185,8 @@ public func runPipeline(
     stats: Bool,
     delegate: PipelineDelegate? = nil,
     handle: PipelineHandle = PipelineHandle(),
-    ackMode: AckMode = .fromEnvironment()
+    ackMode: AckMode = .fromEnvironment(),
+    telemetryDump: TelemetryDumpWriter? = nil
 ) async throws {
     let sink: OutputSink?
     if let outPath {
@@ -197,7 +198,10 @@ public func runPipeline(
     } else {
         sink = nil
     }
-    try await runPipeline(transport: transport, sink: sink, stats: stats, delegate: delegate, handle: handle, ackMode: ackMode)
+    try await runPipeline(
+        transport: transport, sink: sink, stats: stats, delegate: delegate, handle: handle,
+        ackMode: ackMode, telemetryDump: telemetryDump
+    )
 }
 
 /// Task 2.2: `GogglesHelper`'s entry point -- takes an already-constructed
@@ -212,7 +216,8 @@ public func runPipeline(
     stats: Bool,
     delegate: PipelineDelegate? = nil,
     handle: PipelineHandle = PipelineHandle(),
-    ackMode: AckMode = .fromEnvironment()
+    ackMode: AckMode = .fromEnvironment(),
+    telemetryDump: TelemetryDumpWriter? = nil
 ) async throws {
     handle.transport = transport
     handle.sink = sink
@@ -274,6 +279,10 @@ public func runPipeline(
         group.addTask {
             for await payload in transport.inbound {
                 await state.markRx()
+                // `--dump-telemetry` (research aid, off by default): every
+                // inbound non-video packet as a JSON line. See
+                // TelemetryDump.swift / docs/telemetry-research.md.
+                telemetryDump?.record(packet: payload)
                 guard let outer = WireProtocol.parseOuter(payload) else { continue }
                 WireProtocol.logUnknownPacketType(outer.pktType, context: "gvcli inbound")
                 await state.noteInbound(pktType: outer.pktType, seq: outer.seq, body: outer.body)
@@ -422,6 +431,9 @@ public func runPipeline(
                             ).utf8
                         ))
                         FileHandle.standardError.write(Data("[proto] t=\(String(format: "%4d", second))s \(proto)\n".utf8))
+                        if let telemetryDump {
+                            FileHandle.standardError.write(Data("[telem] t=\(String(format: "%4d", second))s \(telemetryDump.snapshotAndReset())\n".utf8))
+                        }
                     }
                     delegate?.pipelineDidUpdateStats(PipelineStats(
                         fps: fps,

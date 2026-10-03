@@ -16,6 +16,7 @@ func runReplayCommand(args: [String]) async throws {
     var outPath: String?
     var stats = false
     var capturePath: String?
+    var dumpTelemetryPath: String?
 
     var i = 0
     while i < args.count {
@@ -26,20 +27,26 @@ func runReplayCommand(args: [String]) async throws {
             outPath = args[i]
         case "--stats":
             stats = true
+        case "--dump-telemetry":
+            i += 1
+            guard i < args.count else { throw GVCLIError.message("--dump-telemetry requires a path argument") }
+            dumpTelemetryPath = args[i]
         default:
             if capturePath == nil, !args[i].hasPrefix("--") {
                 capturePath = args[i]
             } else {
-                throw GVCLIError.message("Unknown argument '\(args[i])' for 'replay'. Usage: gvcli replay <capture-file> [--out <path>] [--stats]")
+                throw GVCLIError.message("Unknown argument '\(args[i])' for 'replay'. Usage: gvcli replay <capture-file> [--out <path>] [--stats] [--dump-telemetry <path>]")
             }
         }
         i += 1
     }
     guard let capturePath else {
-        throw GVCLIError.message("'replay' requires a <capture-file> argument. Usage: gvcli replay <capture-file> [--out <path>] [--stats]")
+        throw GVCLIError.message("'replay' requires a <capture-file> argument. Usage: gvcli replay <capture-file> [--out <path>] [--stats] [--dump-telemetry <path>]")
     }
 
     FileHandle.standardError.write(Data("[gvcli] Replaying \(capturePath) via MockTransport (real-time pacing)...\n".utf8))
     let transport = try MockTransport(capturePath: URL(fileURLWithPath: capturePath), pacing: .realTime)
-    try await runPipeline(transport: transport, outPath: outPath, stats: stats)
+    let telemetryDump = try openTelemetryDump(dumpTelemetryPath)
+    defer { telemetryDump?.close() }
+    try await runPipeline(transport: transport, outPath: outPath, stats: stats, telemetryDump: telemetryDump)
 }
