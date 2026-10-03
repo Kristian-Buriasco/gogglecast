@@ -9,6 +9,7 @@ enum OSDPrefs {
     static let showResolutionKey = "osdShowResolution"
     static let showDropsKey = "osdShowDrops"
     static let showLatencyKey = "osdShowLatency"
+    static let showBatteryKey = "osdShowBattery"
 }
 
 /// Stats overlay drawn over the video in the main window only (never the
@@ -17,6 +18,7 @@ struct OSDOverlay: View {
     let stats: StreamStats?
     var resolution: String?
     var latencyMs: Double?
+    var batteryPercent: Int?
 
     @AppStorage(OSDPrefs.enabledKey) private var enabled = false
     @AppStorage(OSDPrefs.showFpsKey) private var showFps = true
@@ -24,10 +26,12 @@ struct OSDOverlay: View {
     @AppStorage(OSDPrefs.showResolutionKey) private var showResolution = true
     @AppStorage(OSDPrefs.showDropsKey) private var showDrops = false
     @AppStorage(OSDPrefs.showLatencyKey) private var showLatency = true
+    @AppStorage(OSDPrefs.showBatteryKey) private var showBattery = true
 
     static func lines(
         stats: StreamStats, resolution: String?, fps: Bool, bitrate: Bool, showResolution: Bool, drops: Bool,
-        latencyMs: Double? = nil, showLatency: Bool = false
+        latencyMs: Double? = nil, showLatency: Bool = false,
+        batteryPercent: Int? = nil, showBattery: Bool = false
     ) -> [String] {
         var out: [String] = []
         if showResolution, let resolution { out.append(resolution) }
@@ -35,6 +39,7 @@ struct OSDOverlay: View {
         if bitrate { out.append(String(format: "%.1f Mbps", stats.bitrateKbps / 1000)) }
         if showLatency, let latencyMs { out.append(String(format: "%.0f ms", latencyMs)) }
         if drops { out.append("\(stats.cumulativeDrops) dropped") }
+        if showBattery, let batteryPercent { out.append("Goggles \(batteryPercent)%") }
         return out
     }
 
@@ -42,7 +47,8 @@ struct OSDOverlay: View {
         if enabled, let stats {
             let lines = Self.lines(stats: stats, resolution: resolution, fps: showFps, bitrate: showBitrate,
                                    showResolution: showResolution, drops: showDrops,
-                                   latencyMs: latencyMs, showLatency: showLatency)
+                                   latencyMs: latencyMs, showLatency: showLatency,
+                                   batteryPercent: batteryPercent, showBattery: showBattery)
             if !lines.isEmpty {
                 VStack(alignment: .leading, spacing: 2) {
                     ForEach(lines, id: \.self) { Text($0) }

@@ -113,6 +113,10 @@ final class HelperService: NSObject, GogglesHelperProtocol {
         var currentStateValue: GogglesState = .noDevice
         var everReachedLive = false
 
+        var batteryPoller: BatteryPoller?
+        /// Last polled goggles battery %, -1 = unknown.
+        var batteryPercent = -1
+
         init(deviceId: String) {
             self.deviceId = deviceId
             self.claimTarget = deviceId
@@ -251,6 +255,7 @@ final class HelperService: NSObject, GogglesHelperProtocol {
             if let proxy = self.remoteClient(for: connection) {
                 proxy.deviceChanged(deviceId, device.currentDeviceInfoValue)
                 proxy.stateChanged(deviceId, device.currentStateValue.rawValue, detail: nil)
+                proxy.batteryChanged(deviceId, percent: device.batteryPercent)
             }
             if wasEmpty, device.pipelineTask == nil {
                 self.cancelDeviceRetry(device)
@@ -374,6 +379,7 @@ final class HelperService: NSObject, GogglesHelperProtocol {
                     self.fanOut(deviceId: deviceId) { $0.deviceChanged(deviceId, info) }
                     self.setState(device, .handshaking)
                     reply(true, nil)
+                    self.startBatteryPolling(device, transport: transport, generation: myGeneration)
                 }
                 let adapter = DevicePipelineDelegateAdapter(service: self, deviceId: deviceId)
                 let task = Task {
@@ -401,6 +407,7 @@ final class HelperService: NSObject, GogglesHelperProtocol {
                         // generation guard is the real, meaningful gate.
                         device.activeTransport = nil
                         device.currentDeviceInfoValue = nil
+                        self.stopBatteryPolling(device)
                         self.setState(device, .noDevice)
                         // Task 3.7, design §9.3 scenario 1/2: the
                         // pipeline just ended because the transport
@@ -562,6 +569,7 @@ final class HelperService: NSObject, GogglesHelperProtocol {
     /// rationale on why `activeTransport.close()` (not just clearing
     /// references) is what actually stops the running pipeline `Task`.
     private func teardownHardware(_ device: DeviceState) {
+        stopBatteryPolling(device)
         device.handle.releaseSynchronously()
         device.pipelineTask?.cancel()
         device.pipelineTask = nil
@@ -572,6 +580,32 @@ final class HelperService: NSObject, GogglesHelperProtocol {
             device.pendingClose = Task.detached {
                 transport.close()
             }
+        }
+    }
+
+    // MARK: - Battery polling (must only run on stateQueue)
+
+    private func startBatteryPolling(_ device: DeviceState, transport: RNDISTransport, generation: Int) {
+        device.batteryPoller?.stop()
+        let deviceId = device.deviceId
+        let poller = BatteryPoller(transport: transport, deviceId: deviceId) { [weak self, weak device] percent in
+            guard let self else { return }
+            self.stateQueue.async {
+                guard let device, device.pipelineGeneration == generation, device.batteryPoller != nil else { return }
+                device.batteryPercent = percent
+                self.fanOut(deviceId: deviceId) { $0.batteryChanged(deviceId, percent: percent) }
+            }
+        }
+        device.batteryPoller = poller
+        poller.start()
+    }
+
+    private func stopBatteryPolling(_ device: DeviceState) {
+        device.batteryPoller?.stop()
+        device.batteryPoller = nil
+        if device.batteryPercent != -1 {
+            device.batteryPercent = -1
+            fanOut(deviceId: device.deviceId) { $0.batteryChanged(device.deviceId, percent: -1) }
         }
     }
 

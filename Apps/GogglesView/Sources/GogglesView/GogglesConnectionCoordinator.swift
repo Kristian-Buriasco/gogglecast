@@ -36,6 +36,10 @@ public final class GogglesConnectionCoordinator: ObservableObject {
     @Published public private(set) var uiState: GogglesUIState = .noHelper(reason: nil)
     @Published public private(set) var deviceInfo: DeviceInfo?
     @Published public private(set) var stats: StreamStats?
+    /// Goggles battery %, `nil` when unknown.
+    @Published public private(set) var batteryPercent: Int?
+    /// Extra observer for the latest battery value (used by `--battery-test`).
+    public var onBatteryChanged: ((Int?) -> Void)?
     /// Task 3.5: when the current run of `.waitingForKeyframe` was entered --
     /// `WaitingForKeyframeCard`'s live "Waiting… m:ss" counter ticks from
     /// this via its own `TimelineView`, so no coordinator-owned repeating
@@ -171,6 +175,10 @@ public final class GogglesConnectionCoordinator: ObservableObject {
         client.onNALUnit = { [weak self] data, nalType, isParameterSet, hostTime in
             self?.handleActivitySignal()
             self?.onNALUnit?(data, nalType, isParameterSet, hostTime)
+        }
+        client.onBatteryChanged = { [weak self] percent in
+            self?.batteryPercent = percent
+            self?.onBatteryChanged?(percent)
         }
         client.onStats = { [weak self] stats in
             self?.stats = stats

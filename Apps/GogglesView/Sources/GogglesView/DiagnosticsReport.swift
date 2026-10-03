@@ -52,7 +52,7 @@ enum DiagnosticsReport {
     static let settingsKeys: [String] = [
         RecordingPrefs.folderKey, RecordingPrefs.containerKey, RecordingPrefs.prefixKey, RecordingPrefs.autoStartKey,
         OSDPrefs.enabledKey, OSDPrefs.showFpsKey, OSDPrefs.showBitrateKey, OSDPrefs.showResolutionKey,
-        OSDPrefs.showDropsKey, OSDPrefs.showLatencyKey,
+        OSDPrefs.showDropsKey, OSDPrefs.showLatencyKey, OSDPrefs.showBatteryKey,
         ReplayPrefs.enabledKey, ReplayPrefs.secondsKey,
         NetStreamPrefs.hostKey, NetStreamPrefs.portKey, NetStreamPrefs.autoStartKey,
         CaptureWindowPrefs.enabledKey, CaptureWindowPrefs.onTopKey,

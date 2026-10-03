@@ -244,6 +244,37 @@ if let idx = args.firstIndex(of: "--record-test") {
     }
     RunLoop.main.run()
 }
+if args.contains("--battery-test") {
+    // Dev harness: streams the first connected goggles until the helper
+    // reports a battery reading (unknown/-1 pushes are skipped), prints it, exits.
+    let client = HelperClient()
+    var done = false
+    client.connect()
+    pollFirstAvailableDeviceId(client: client, timeout: 20) { deviceId in
+        guard let deviceId else { print("[battery-test] no device found"); exit(2) }
+        func finish(_ code: Int32) {
+            guard !done else { return }
+            done = true
+            client.stopStreaming(deviceId: deviceId) { exit(code) }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3) { exit(code) }
+        }
+        client.onBatteryChanged = { percent in
+            guard let percent else { return }
+            print("[battery-test] percent=\(percent)")
+            finish(0)
+        }
+        client.startStreaming(deviceId: deviceId) { ok, error in
+            print("[battery-test] startStreaming ok=\(ok) error=\(error.map { String(describing: $0) } ?? "nil")")
+            guard ok else { exit(3) }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 25) {
+            guard !done else { return }
+            print("[battery-test] timed out waiting for a battery reading")
+            finish(1)
+        }
+    }
+    RunLoop.main.run()
+}
 if args.contains("--live-view") {
     // Task 3.3's hardware-verification harness: not the real SwiftUI app
     // shell (Task 3.4/3.6's job -- see GogglesVideoView.swift's doc

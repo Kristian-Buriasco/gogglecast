@@ -136,7 +136,7 @@ struct SecureCodingRoundTripTests {
         // Bumped 1 -> 2 for the multi-device picker design (device-ID
         // parameters added throughout GogglesHelperProtocol/
         // GogglesClientProtocol) -- see ProtocolVersion.swift's doc comment.
-        #expect(currentProtocolVersion == 2)
+        #expect(currentProtocolVersion == 3)
     }
 
     @Test("GogglesState rawValue matches design §6 ordering")

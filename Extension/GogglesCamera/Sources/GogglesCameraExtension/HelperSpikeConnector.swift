@@ -119,4 +119,6 @@ private final class ExportedSpikeClient: NSObject, GogglesClientProtocol {
     func stats(_ deviceId: String, _ stats: StreamStats) {
         owner?.handleStats(stats)
     }
+
+    func batteryChanged(_ deviceId: String, percent: Int) {}
 }

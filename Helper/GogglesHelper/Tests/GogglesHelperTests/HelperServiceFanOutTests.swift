@@ -48,6 +48,7 @@ private final class RecordingClient: NSObject, GogglesClientProtocol {
     func stateChanged(_ deviceId: String, _ state: Int, detail: String?) { record(deviceId) }
     func nalUnit(_ deviceId: String, _ data: Data, nalType: UInt8, isParameterSet: Bool, hostTime: UInt64) { record(deviceId) }
     func stats(_ deviceId: String, _ stats: StreamStats) { record(deviceId) }
+    func batteryChanged(_ deviceId: String, percent: Int) { record(deviceId) }
 }
 
 @Suite("HelperService fan-out scoping (real in-process NSXPCConnection, no hardware)")

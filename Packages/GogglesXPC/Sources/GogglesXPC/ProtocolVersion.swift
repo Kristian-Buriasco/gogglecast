@@ -26,4 +26,5 @@ import Foundation
 /// `deviceId` parameter too. This is a breaking wire-protocol change (every
 /// method signature changed), which is exactly what
 /// `currentProtocolVersion`'s doc comment says to bump for.
-public let currentProtocolVersion: Int = 2
+/// Bumped 2 -> 3: `GogglesClientProtocol` gained `batteryChanged`.
+public let currentProtocolVersion: Int = 3

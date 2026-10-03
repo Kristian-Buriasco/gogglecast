@@ -113,6 +113,8 @@ public final class HelperClient: NSObject {
     public var onDeviceChanged: ((DeviceInfo?) -> Void)?
     public var onHelperStateChanged: ((Int, String?) -> Void)?
     public var onStats: ((StreamStats) -> Void)?
+    /// Goggles battery percentage, `nil` when unknown (helper sends -1).
+    public var onBatteryChanged: ((Int?) -> Void)?
     /// Task 3.3: the raw per-NAL callback, verbatim from `GogglesClientProtocol.nalUnit`
     /// (one complete Annex-B start-code-prefixed NAL per call -- confirmed
     /// against `HelperService.pipeline(didEmitNAL:...)` /
@@ -552,6 +554,14 @@ public final class HelperClient: NSObject {
         let handler = onStats
         DispatchQueue.main.async { handler?(stats) }
     }
+
+    fileprivate func handleBatteryChanged(_ deviceId: String, percent: Int) {
+        guard isForCurrentDevice(deviceId) else { return }
+        Logging.client.info("batteryChanged: \(percent, privacy: .public)")
+        let value: Int? = (0...100).contains(percent) ? percent : nil
+        let handler = onBatteryChanged
+        DispatchQueue.main.async { handler?(value) }
+    }
 }
 
 /// The `GogglesClientProtocol` object actually handed to `NSXPCConnection`
@@ -579,5 +589,9 @@ private final class ExportedClient: NSObject, GogglesClientProtocol {
 
     func stats(_ deviceId: String, _ stats: StreamStats) {
         owner?.handleStats(deviceId, stats)
+    }
+
+    func batteryChanged(_ deviceId: String, percent: Int) {
+        owner?.handleBatteryChanged(deviceId, percent: percent)
     }
 }

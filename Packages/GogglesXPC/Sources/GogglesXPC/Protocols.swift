@@ -73,4 +73,7 @@ import Foundation
     /// real hardware (task brief context; see docs/parity-results.md).
     func nalUnit(_ deviceId: String, _ data: Data, nalType: UInt8, isParameterSet: Bool, hostTime: UInt64)
     func stats(_ deviceId: String, _ stats: StreamStats)
+    /// Goggles battery percentage (0...100) polled over IF4 DUML, or -1
+    /// when unknown (not yet read, query failing, device gone).
+    func batteryChanged(_ deviceId: String, percent: Int)
 }

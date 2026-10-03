@@ -272,6 +272,11 @@ public final class RNDISTransport: GogglesTransport {
     private var handle: OpaquePointer?
     private var claimedInterfaces: [Int32] = []
 
+    /// Serializes IF4 (DUML control channel) bulk I/O against `shutdown()`'s
+    /// interface release + `libusb_close`, so a poll in flight on another
+    /// queue can never touch a closed handle.
+    private let controlLock = NSLock()
+
     private let continuation: AsyncStream<Data>.Continuation
     private var eventThread: Thread?
 
@@ -497,6 +502,7 @@ public final class RNDISTransport: GogglesTransport {
         pooledTransfers.removeAll()
         transferBuffers.removeAll()
 
+        controlLock.lock()
         if let handle {
             for iface in claimedInterfaces {
                 libusb_release_interface(handle, iface)
@@ -508,6 +514,63 @@ public final class RNDISTransport: GogglesTransport {
         }
         handle = nil
         ctx = nil
+        claimedInterfaces.removeAll()
+        controlLock.unlock()
+    }
+
+    // MARK: - IF4 DUML control channel
+
+    /// Claims IF4 on this transport's already-open handle and returns a DUML
+    /// channel over it, or nil if the claim fails (video on IF0/IF1 is
+    /// unaffected either way). IF4 is released by `shutdown()` with the
+    /// other interfaces. Blocking; call off the video path.
+    public func openDUMLControlChannel() -> DUMLControlChannel? {
+        let iface = DUMLControlChannel.interfaceNumber
+        controlLock.lock()
+        guard let handle else {
+            controlLock.unlock()
+            return nil
+        }
+        if !claimedInterfaces.contains(iface) {
+            if libusb_kernel_driver_active(handle, iface) == 1 {
+                _ = libusb_detach_kernel_driver(handle, iface)
+            }
+            let rc = libusb_claim_interface(handle, iface)
+            guard rc == 0 else {
+                controlLock.unlock()
+                let name = libusb_error_name(rc).map { String(cString: $0) } ?? "?"
+                FileHandle.standardError.write(Data(("[RNDISTransport] IF4 claim failed (\(name)/\(rc)); DUML control channel unavailable\n").utf8))
+                return nil
+            }
+            claimedInterfaces.append(iface)
+        }
+        controlLock.unlock()
+
+        return DUMLControlChannel(
+            write: { [weak self] frame in
+                guard let self else { return false }
+                self.controlLock.lock()
+                defer { self.controlLock.unlock() }
+                guard let handle = self.handle else { return false }
+                var bytes = [UInt8](frame)
+                var transferred: Int32 = 0
+                let rc = libusb_bulk_transfer(handle, DUMLControlChannel.epBulkOut, &bytes, Int32(bytes.count), &transferred, 200)
+                return rc == 0
+            },
+            read: { [weak self] timeoutMs in
+                guard let self else { return nil }
+                self.controlLock.lock()
+                defer { self.controlLock.unlock() }
+                guard let handle = self.handle else { return nil }
+                var buffer = [UInt8](repeating: 0, count: 16384)
+                var transferred: Int32 = 0
+                let rc = libusb_bulk_transfer(handle, DUMLControlChannel.epBulkIn, &buffer, Int32(buffer.count), &transferred, timeoutMs)
+                if rc == 0 || rc == LIBUSB_ERROR_TIMEOUT.rawValue {
+                    return Data(buffer.prefix(Int(max(0, transferred))))
+                }
+                return nil
+            }
+        )
     }
 
     // MARK: - Bulk-IN transfer pool (§5.2)

@@ -127,6 +127,7 @@ struct SettingsView: View {
     @AppStorage(OSDPrefs.showResolutionKey) private var osdResolution = true
     @AppStorage(OSDPrefs.showDropsKey) private var osdDrops = false
     @AppStorage(OSDPrefs.showLatencyKey) private var osdLatency = true
+    @AppStorage(OSDPrefs.showBatteryKey) private var osdBattery = true
 
     private var osdSection: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -138,6 +139,7 @@ struct SettingsView: View {
                 Toggle("Bitrate", isOn: $osdBitrate)
                 Toggle("Latency (helper to screen)", isOn: $osdLatency)
                 Toggle("Dropped frames", isOn: $osdDrops)
+                Toggle("Goggles battery", isOn: $osdBattery)
             }
             .padding(.leading, 16)
             .disabled(!osdEnabled)

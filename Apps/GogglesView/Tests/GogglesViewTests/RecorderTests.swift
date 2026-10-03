@@ -53,6 +53,15 @@ struct RecorderTests {
         #expect(OSDOverlay.lines(stats: s, resolution: nil, fps: false, bitrate: false, showResolution: false,
                                  drops: false, latencyMs: 12.4, showLatency: true) == ["12 ms"])
     }
+    @Test func overlayShowsBattery() {
+        let s = StreamStats(fps: 60, bitrateKbps: 1, drops: 0, cumulativeFrames: 1, cumulativeBytes: 1, cumulativeDrops: 0)
+        #expect(OSDOverlay.lines(stats: s, resolution: nil, fps: false, bitrate: false, showResolution: false,
+                                 drops: false, batteryPercent: 91, showBattery: true) == ["Goggles 91%"])
+        #expect(OSDOverlay.lines(stats: s, resolution: nil, fps: false, bitrate: false, showResolution: false,
+                                 drops: false, batteryPercent: 91, showBattery: false).isEmpty)
+        #expect(OSDOverlay.lines(stats: s, resolution: nil, fps: false, bitrate: false, showResolution: false,
+                                 drops: false, batteryPercent: nil, showBattery: true).isEmpty)
+    }
 }
 
 @Suite struct OrientationTests {

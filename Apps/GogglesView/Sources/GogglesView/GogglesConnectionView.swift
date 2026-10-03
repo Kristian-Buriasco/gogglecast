@@ -304,7 +304,8 @@ struct GogglesConnectionView: View {
         ZStack {
             GogglesVideoView(session: session)
                 .opacity(videoOpacity)
-            OSDOverlay(stats: coordinator.stats, resolution: resolutionText, latencyMs: session.latencyMs)
+            OSDOverlay(stats: coordinator.stats, resolution: resolutionText, latencyMs: session.latencyMs,
+                       batteryPercent: coordinator.batteryPercent)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 .opacity(videoOpacity)
             overlay
