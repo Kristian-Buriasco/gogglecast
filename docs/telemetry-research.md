@@ -398,3 +398,21 @@ Overall conclusion for telemetry over this connection: battery % (goggles) is
 the only live reading; flight/link data is not exposed. Remaining research
 options (low priority): capture a real DJI Fly session in mobile mode, or use
 marker-annotated collections to identify byte 2.
+
+## Sweep after registration (Avata 2 linked, 2026-10-03)
+
+Registered as 0x2A (the OTG-computer address; replies to sender 0x02 never
+reach IF4), sent 1 Hz heartbeats, then swept `00:01 get_version` over all 256
+receiver addresses. The same 16 modules answered as before (goggles 0x3C/0xBC/
+0x1F, air unit `WA520 AC` 0x09/0x29, RC 0x0E/0x2E, wifi 0x1B, 0x1C, link 0x6E,
+bsp 0x59, ground 0x8E, CPLD 0x7C, 0x2A/0x5C/0x9C). No flight-controller address
+(type 0x03: 0x03, 0x23, ...) responds, so the Avata 2's FC is not reachable from
+OTG-computer mode even after registration.
+
+Open idea: the phone path uses the goggles as USB host (AOA accessory), where
+DJI Fly gets telemetry; a Mac cannot act as the accessory, so reproducing it
+needs a Linux gadget-capable board (the "Pi bridge" in the lab notes).
+
+Operational note: libusb (pyusb) sometimes lists no devices until the helper has
+opened the goggles once; kickstarting the helper, then stopping it, restores
+visibility.
