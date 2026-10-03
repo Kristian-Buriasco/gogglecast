@@ -70,6 +70,8 @@ final class DecodeSession: ObservableObject {
     /// -state while waiting for the first/next parameter set, not an
     /// error).
     var onDroppedSample: ((Error) -> Void)?
+    /// Raw NAL observer (research data collection); called before decoding.
+    var onRawNAL: ((Data, UInt8, Bool, UInt64) -> Void)?
     /// Fired once per teardown (the 30th consecutive failure).
     var onTeardown: (() -> Void)?
 
@@ -114,6 +116,7 @@ final class DecodeSession: ObservableObject {
     /// Entry point: call once per `HelperClient.onNALUnit` callback,
     /// verbatim arguments.
     func handle(nalData: Data, nalType: UInt8, isParameterSet: Bool, hostTime: UInt64) {
+        onRawNAL?(nalData, nalType, isParameterSet, hostTime)
         if isParameterSet {
             handleParameterSet(nalData)
             return

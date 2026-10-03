@@ -75,3 +75,18 @@ struct RecorderTests {
         #expect(OrientationPrefs.swapsAxes(90) && OrientationPrefs.swapsAxes(270) && !OrientationPrefs.swapsAxes(180))
     }
 }
+
+@Suite struct DataCollectorTests {
+    @Test func extractsSEI240() {
+        let payload = [UInt8](repeating: 0xAB, count: 25)
+        var au: [UInt8] = [0, 0, 0, 1, 0x06, 240, 25] + payload + [0x80]
+        au += [0, 0, 0, 1, 0x41, 0x11, 0x22]
+        let found = DataCollector.seiPayloads(in: Data(au))
+        #expect(found.count == 1)
+        #expect(found.first == Data(payload))
+    }
+    @Test func ignoresOtherSEI() {
+        let au: [UInt8] = [0, 0, 0, 1, 0x06, 5, 2, 1, 2, 0x80, 0, 0, 0, 1, 0x41, 0x11]
+        #expect(DataCollector.seiPayloads(in: Data(au)).isEmpty)
+    }
+}

@@ -72,6 +72,7 @@ struct GogglesConnectionView: View {
             .help("Open the recordings folder")
             .accessibilityIdentifier("openRecordingsButton")
             FreezeControl()
+            DataCollectControl(session: session, batteryPercent: coordinator.batteryPercent)
             ReplayControl(session: session)
             NetworkStreamControl(session: session)
             if let note = screenshotNote {
