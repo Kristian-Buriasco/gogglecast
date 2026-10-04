@@ -4,6 +4,21 @@ All notable changes to this project are documented here. Format based on [Keep a
 
 ## [Unreleased]
 
+### Added
+- Output: RTMP push, HLS web viewer, SRT (libsrt) and NDI (unverified), plus UDP MPEG-TS.
+- Clip gallery with passthrough trim and share; loop recorder, auto-split, auto-delete, markers; burn-in logo/text recording.
+- Framing (zoom/pan/crop/grid/color), freeze, mini window, per-goggles profiles, presets, onboarding, self-test.
+- Event hooks (script/webhook), multiple goggles in separate windows, accessibility labels, data collection tool.
+- Session log (per-second stats and events, CSV export), menu-bar mini-controls, benchmark/latency mode (`docs/latency.md`).
+- Automation: `gogglesview://` URL scheme and AppleScript suite (`docs/automation.md`).
+
+### Changed
+- Settings reorganized into General / Display / Recording / Streaming / Advanced tabs; the last tab is remembered.
+- Stream key, SRT passphrase, web viewer token, GitHub token and webhook URLs now live in the Keychain; existing values migrate automatically on launch.
+
+### Fixed
+- Recordings, replay clips and streams now start on a real keyframe.
+
 ## [0.1] - 2026-10-03
 
 ### Added

@@ -12,7 +12,7 @@ enum WebViewerPrefs {
         return (1...65535).contains(p) ? p : 8080
     }
     static var lan: Bool { UserDefaults.standard.bool(forKey: lanKey) }
-    static var token: String { UserDefaults.standard.string(forKey: tokenKey) ?? "" }
+    static var token: String { SecretStore.get(tokenKey) }
 
     /// `Name.local` (Bonjour) regardless of whether the system hostname carries a domain.
     static var localHostname: String {

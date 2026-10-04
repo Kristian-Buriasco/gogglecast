@@ -33,7 +33,7 @@ struct RTMPStreamControl: View {
 
 struct RTMPSettingsSection: View {
     @AppStorage(RTMPPrefs.urlKey) private var url = ""
-    @AppStorage(RTMPPrefs.streamKeyKey) private var key = ""
+    @KeychainSecret(RTMPPrefs.streamKeyKey) private var key
     @AppStorage(RTMPPrefs.autoStartKey) private var autoStart = false
 
     var body: some View {

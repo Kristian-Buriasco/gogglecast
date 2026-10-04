@@ -9,7 +9,7 @@ struct WebViewerControl: View {
     @AppStorage(WebViewerPrefs.enabledKey) private var enabled = false
     @AppStorage(WebViewerPrefs.portKey) private var port = 8080
     @AppStorage(WebViewerPrefs.lanKey) private var lan = false
-    @AppStorage(WebViewerPrefs.tokenKey) private var token = ""
+    @KeychainSecret(WebViewerPrefs.tokenKey) private var token
 
     var body: some View {
         Button { enabled.toggle() } label: {
@@ -40,7 +40,7 @@ struct WebViewerSettingsSection: View {
     @AppStorage(WebViewerPrefs.enabledKey) private var enabled = false
     @AppStorage(WebViewerPrefs.portKey) private var port = 8080
     @AppStorage(WebViewerPrefs.lanKey) private var lan = false
-    @AppStorage(WebViewerPrefs.tokenKey) private var token = ""
+    @KeychainSecret(WebViewerPrefs.tokenKey) private var token
 
     private var url: String {
         WebViewerPrefs.viewerURL(host: lan ? WebViewerPrefs.localHostname : "localhost",

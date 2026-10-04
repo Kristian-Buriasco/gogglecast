@@ -27,7 +27,7 @@ struct EventHooksSettingsSection: View {
                     }
                     TextField("Webhook URL (https://…)", text: Binding(
                         get: { webhooks[event] ?? "" },
-                        set: { webhooks[event] = $0; UserDefaults.standard.set($0, forKey: EventHookConfig.webhookKey(event)) }
+                        set: { webhooks[event] = $0; SecretStore.set($0, for: EventHookConfig.webhookKey(event)) }
                     )).textFieldStyle(.roundedBorder).font(.caption)
                     if let w = webhooks[event], !w.isEmpty, EventHookLogic.validWebhook(w) == nil {
                         Text("Must be an http(s) URL").font(.caption2).foregroundStyle(.red)

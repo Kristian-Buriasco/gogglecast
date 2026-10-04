@@ -17,7 +17,7 @@ enum SRTPrefs {
     static var host: String { clampHost(UserDefaults.standard.string(forKey: hostKey)) }
     static var port: Int { clampPort(UserDefaults.standard.integer(forKey: portKey)) }
     static var latencyMs: Int { clampLatency(UserDefaults.standard.object(forKey: latencyKey) as? Int) }
-    static var passphrase: String { UserDefaults.standard.string(forKey: passphraseKey) ?? "" }
+    static var passphrase: String { SecretStore.get(passphraseKey) }
 
     static func clampPort(_ p: Int) -> Int { (1...65535).contains(p) ? p : 9000 }
     static func clampLatency(_ l: Int?) -> Int { min(max(l ?? defaultLatency, 20), 8000) }

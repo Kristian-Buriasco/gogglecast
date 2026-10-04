@@ -38,7 +38,7 @@ struct SRTSettingsSection: View {
     @AppStorage(SRTPrefs.hostKey) private var host = "127.0.0.1"
     @AppStorage(SRTPrefs.portKey) private var port = 9000
     @AppStorage(SRTPrefs.latencyKey) private var latency = SRTPrefs.defaultLatency
-    @AppStorage(SRTPrefs.passphraseKey) private var passphrase = ""
+    @KeychainSecret(SRTPrefs.passphraseKey) private var passphrase
     @AppStorage(SRTPrefs.libraryPathKey) private var libPath = ""
 
     var body: some View {

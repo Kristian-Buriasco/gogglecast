@@ -63,7 +63,8 @@ final class UpdateChecker: ObservableObject {
         UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: UpdatePrefs.lastCheckKey)
         var req = URLRequest(url: UpdatePrefs.endpoint, timeoutInterval: 15)
         req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        if let t = UserDefaults.standard.string(forKey: UpdatePrefs.tokenKey), !t.isEmpty {
+        let t = SecretStore.get(UpdatePrefs.tokenKey)
+        if !t.isEmpty {
             req.setValue("Bearer \(t)", forHTTPHeaderField: "Authorization") // never logged
         }
         let current = Self.currentVersion

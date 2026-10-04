@@ -4,10 +4,10 @@ import Network
 
 enum RTMPPrefs {
     static let urlKey = "rtmpURL"
-    static let streamKeyKey = "rtmpStreamKey" // secret: UserDefaults for now, never logged
+    static let streamKeyKey = "rtmpStreamKey" // secret: stored via SecretStore (Keychain), never logged
     static let autoStartKey = "rtmpAutoStart"
     static var url: String { UserDefaults.standard.string(forKey: urlKey) ?? "" }
-    static var streamKey: String { UserDefaults.standard.string(forKey: streamKeyKey) ?? "" }
+    static var streamKey: String { SecretStore.get(streamKeyKey) }
 }
 
 // MARK: - Pure protocol pieces

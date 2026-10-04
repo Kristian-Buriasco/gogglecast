@@ -557,6 +557,7 @@ if args.contains("--run") || !args.dropFirst().contains(where: { $0.hasPrefix("-
     )
 
     GlobalHotkeys.shared.apply()
+    SecretStore.migrateFromDefaults()
     // gogglesview:// + AppleScript. Installed before app.run() so a URL that
     // cold-launches the app is still delivered.
     AutomationController.shared.install(

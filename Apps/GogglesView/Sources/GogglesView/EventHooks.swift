@@ -60,7 +60,7 @@ enum EventHookConfig {
     static func scriptKey(_ e: AppEvent) -> String { "hookScript.\(e.rawValue)" }
     static func webhookKey(_ e: AppEvent) -> String { "hookWebhook.\(e.rawValue)" }
     static func script(_ e: AppEvent) -> String { UserDefaults.standard.string(forKey: scriptKey(e)) ?? "" }
-    static func webhook(_ e: AppEvent) -> String { UserDefaults.standard.string(forKey: webhookKey(e)) ?? "" }
+    static func webhook(_ e: AppEvent) -> String { SecretStore.get(webhookKey(e)) }
     static var batteryThreshold: Int {
         let v = UserDefaults.standard.object(forKey: batteryKey) as? Int
         return min(max(v ?? defaultBattery, 1), 99)
