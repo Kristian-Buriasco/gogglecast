@@ -551,6 +551,7 @@ if args.contains("--run") || !args.dropFirst().contains(where: { $0.hasPrefix("-
     let menuBarController = MenuBarController(
         registry: registry,
         onOpenAnother: { presentPicker() },
+        onOpenSettings: { settingsWindowController.show() },
         onDisconnect: { disconnectSession($0) }
     )
 

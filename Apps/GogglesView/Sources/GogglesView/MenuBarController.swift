@@ -29,14 +29,18 @@ import GogglesXPC
 // ─────────────────────────────────────────────────────────────────────────
 
 /// Owns the app's single `NSStatusItem`. Multi-window: the glyph summarizes
-/// every open goggles window (`summaryCategory`), and the menu lists each
-/// session with its own Show/Hide, Reconnect and Disconnect items, plus
-/// "Open Another Goggles…". Created once at launch and kept alive for the
-/// app's lifetime (`NSStatusItem` does not keep itself alive).
+/// every open goggles window (`summaryCategory`, plus a red dot while any
+/// window records), and the menu lists each session with its mini-controls
+/// (`MenuBarMiniControls`: record, replay, screenshot, freeze, marker,
+/// show/hide, network stream) plus Reconnect and Disconnect, then
+/// "Open Another Goggles…", Settings… and Quit. Created once at launch and
+/// kept alive for the app's lifetime (`NSStatusItem` does not keep itself
+/// alive). Hidden (not removed) while "Show menu bar item" is off.
 final class MenuBarController: NSObject, NSMenuDelegate {
     private let statusItem: NSStatusItem
     private let registry: SessionRegistry<GogglesSession>
     private let onOpenAnother: () -> Void
+    private let onOpenSettings: (() -> Void)?
     private let onDisconnect: (String) -> Void
 
     /// `NSMenuItem.target` is weak, so the menu's closure targets live here;
@@ -44,46 +48,139 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     private var menuTargets: [MenuActionTarget] = []
     private var stateCancellables: [AnyCancellable] = []
     private var registryObserver: UUID?
+    private var notificationObservers: [NSObjectProtocol] = []
+    /// Items whose titles tick while the menu is open (fps, recording time).
+    private var liveTitles: [(NSMenuItem, () -> String?)] = []
+    private var liveTimer: Timer?
 
-    init(registry: SessionRegistry<GogglesSession>, onOpenAnother: @escaping () -> Void, onDisconnect: @escaping (String) -> Void) {
+    init(registry: SessionRegistry<GogglesSession>, onOpenAnother: @escaping () -> Void,
+         onOpenSettings: (() -> Void)? = nil, onDisconnect: @escaping (String) -> Void) {
         self.registry = registry
         self.onOpenAnother = onOpenAnother
+        self.onOpenSettings = onOpenSettings
         self.onDisconnect = onDisconnect
         self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         super.init()
 
         let menu = NSMenu()
         menu.delegate = self
+        menu.autoenablesItems = false
         statusItem.menu = menu
         rebuildMenu(menu)
 
         registryObserver = registry.addObserver { [weak self] in self?.resubscribe() }
+        let center = NotificationCenter.default
+        notificationObservers = [
+            center.addObserver(forName: .gogglesControlBoardChanged, object: nil, queue: .main) { [weak self] _ in
+                self?.resubscribe()
+            },
+            center.addObserver(forName: UserDefaults.didChangeNotification, object: nil, queue: .main) { [weak self] _ in
+                self?.applyVisibility()
+            },
+        ]
+        applyVisibility()
         resubscribe()
     }
 
     /// Removes the status item; the controller is unusable afterwards.
     func tearDown() {
         if let registryObserver { registry.removeObserver(registryObserver) }
+        notificationObservers.forEach { NotificationCenter.default.removeObserver($0) }
+        notificationObservers = []
+        stopLiveTimer()
         stateCancellables = []
         NSStatusBar.system.removeStatusItem(statusItem)
     }
 
+    private func applyVisibility() {
+        let show = MenuBarPrefs.show()
+        if statusItem.isVisible != show { statusItem.isVisible = show }
+    }
+
     private func resubscribe() {
-        stateCancellables = registry.all.map { session in
-            session.coordinator.$uiState.sink { [weak self] _ in
-                // `@Published` fires before the stored value changes; read
-                // the new values on the next turn.
-                DispatchQueue.main.async { self?.updateGlyph() }
-            }
+        // `@Published` fires before the stored value changes; read the new
+        // values on the next turn.
+        let refresh: (Any) -> Void = { [weak self] _ in DispatchQueue.main.async { self?.updateGlyph() } }
+        stateCancellables = registry.all.map { $0.coordinator.$uiState.sink(receiveValue: refresh) }
+        stateCancellables += registry.all.compactMap {
+            SessionControlBoard.shared.recorder(for: $0.decodeSession)?.$isRecording.sink(receiveValue: refresh)
         }
         updateGlyph()
+    }
+
+    // MARK: - Snapshot / actions
+
+    private func snapshot(for session: GogglesSession) -> MiniControlsSnapshot {
+        let coordinator = session.coordinator
+        let board = SessionControlBoard.shared
+        let recorder = board.recorder(for: session.decodeSession)
+        let streamer = board.streamer(for: session.decodeSession)
+        var isLive = false
+        if case .live = coordinator.uiState { isLive = true }
+        return MiniControlsSnapshot(
+            label: session.label,
+            statusText: MenuBarController.displayText(for: coordinator.uiState),
+            isLive: isLive,
+            fps: coordinator.stats?.fps,
+            batteryPercent: coordinator.batteryPercent,
+            isRecording: recorder?.isRecording ?? false,
+            recordingElapsed: recorder?.elapsed ?? 0,
+            isFrozen: session.decodeSession.freezeState.isFrozen,
+            isNetworkStreaming: streamer?.isStreaming ?? false,
+            networkStreamAvailable: streamer != nil,
+            replayEnabled: UserDefaults.standard.bool(forKey: ReplayPrefs.enabledKey),
+            isWindowVisible: session.window.isVisible
+        )
+    }
+
+    private func perform(_ action: MiniControlAction, on session: GogglesSession) {
+        if let hotkey = action.hotkeyAction {
+            // Same notification + per-window routing the global hotkeys use.
+            NotificationCenter.default.post(name: hotkey.notification, object: session.decodeSession)
+            return
+        }
+        switch action {
+        case .toggleFreeze:
+            session.decodeSession.freezeState.toggle()
+        case .showWindow:
+            session.toggleVisibility()
+        case .toggleNetworkStream:
+            NotificationCenter.default.post(name: .gogglesToggleNetworkStream, object: session.decodeSession)
+        case .addMarker:
+            SessionControlBoard.shared.recorder(for: session.decodeSession)?.addMarker(label: "Marker")
+        case .toggleRecording, .saveReplay, .screenshot:
+            break
+        }
     }
 
     // MARK: - NSMenuDelegate
 
     func menuNeedsUpdate(_ menu: NSMenu) {
+        guard menu === statusItem.menu else { return }
         rebuildMenu(menu)
         updateGlyph()
+    }
+
+    func menuWillOpen(_ menu: NSMenu) {
+        guard menu === statusItem.menu, liveTimer == nil else { return }
+        // `.common` so it also fires while the menu is tracking.
+        let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
+            self?.liveTitles.forEach { item, title in
+                if let title = title() { item.title = title }
+            }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        liveTimer = timer
+    }
+
+    func menuDidClose(_ menu: NSMenu) {
+        guard menu === statusItem.menu else { return }
+        stopLiveTimer()
+    }
+
+    private func stopLiveTimer() {
+        liveTimer?.invalidate()
+        liveTimer = nil
     }
 
     private func item(_ title: String, key: String = "", _ action: @escaping () -> Void) -> NSMenuItem {
@@ -97,6 +194,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     private func rebuildMenu(_ menu: NSMenu) {
         menu.removeAllItems()
         menuTargets = []
+        liveTitles = []
         let sessions = registry.all
         if sessions.isEmpty {
             let none = NSMenuItem(title: "No goggles open", action: nil, keyEquivalent: "")
@@ -104,20 +202,60 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             menu.addItem(none)
         }
         for session in sessions {
-            let state = session.coordinator.uiState
-            let header = NSMenuItem(title: "\(session.label) — \(MenuBarController.displayText(for: state))", action: nil, keyEquivalent: "")
-            header.image = MenuBarController.glyphImage(for: state.kind)
+            let snap = snapshot(for: session)
+            let header = NSMenuItem(title: MenuBarMiniControls.headerTitle(snap), action: nil, keyEquivalent: "")
+            header.image = MenuBarController.glyphImage(for: session.coordinator.uiState.kind)
+            liveTitles.append((header, { [weak self, weak session] in
+                guard let self, let session else { return nil }
+                return MenuBarMiniControls.headerTitle(self.snapshot(for: session))
+            }))
             let sub = NSMenu()
-            let deviceId = session.deviceId
-            sub.addItem(item(session.window.isVisible ? "Hide Window" : "Show Window") { [weak session] in session?.toggleVisibility() })
-            sub.addItem(item("Reconnect") { [weak session] in session?.coordinator.reconnect() })
+            sub.autoenablesItems = false
+            let info = NSMenuItem(title: MenuBarMiniControls.infoLine(snap), action: nil, keyEquivalent: "")
+            info.isEnabled = false
+            liveTitles.append((info, { [weak self, weak session] in
+                guard let self, let session else { return nil }
+                return MenuBarMiniControls.infoLine(self.snapshot(for: session))
+            }))
+            sub.addItem(info)
             sub.addItem(.separator())
+            for control in MenuBarMiniControls.items(snap) {
+                let action = control.action
+                let menuItem = item(control.title) { [weak self, weak session] in
+                    guard let self, let session else { return }
+                    self.perform(action, on: session)
+                }
+                menuItem.isEnabled = control.isEnabled
+                menuItem.state = control.isOn ? .on : .off
+                if action == .addMarker, control.isEnabled {
+                    // Same preset labels as the window's marker menu.
+                    let labels = NSMenu()
+                    for label in RecordingMarkers.defaultLabels {
+                        labels.addItem(item(label) { [weak session] in
+                            guard let session else { return }
+                            SessionControlBoard.shared.recorder(for: session.decodeSession)?.addMarker(label: label)
+                        })
+                    }
+                    menuItem.submenu = labels
+                }
+                sub.addItem(menuItem)
+                if action == .addMarker { sub.addItem(.separator()) }
+            }
+            let deviceId = session.deviceId
+            sub.addItem(.separator())
+            sub.addItem(item("Reconnect") { [weak session] in session?.coordinator.reconnect() })
             sub.addItem(item("Disconnect") { [weak self] in self?.onDisconnect(deviceId) })
             header.submenu = sub
             menu.addItem(header)
         }
         menu.addItem(.separator())
         menu.addItem(item("Open Another Goggles…") { [weak self] in self?.onOpenAnother() })
+        if let onOpenSettings {
+            menu.addItem(item("Settings…") {
+                NSApp.activate(ignoringOtherApps: true)
+                onOpenSettings()
+            })
+        }
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "Quit GogglesView", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
     }
@@ -125,14 +263,31 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     // MARK: - Glyph
 
     private func updateGlyph() {
-        let kinds = registry.all.map { $0.coordinator.uiState.kind }
-        let category = MenuBarController.summaryCategory(kinds)
-        statusItem.button?.image = MenuBarController.glyphImage(for: category)
-        let summary = registry.all
+        let sessions = registry.all
+        let category = MenuBarController.summaryCategory(sessions.map { $0.coordinator.uiState.kind })
+        let recording = MenuBarMiniControls.anyRecording(sessions.map(snapshot(for:)))
+        let base = MenuBarController.glyphImage(for: category)
+        statusItem.button?.image = recording ? MenuBarController.recordingBadged(base) : base
+        var summary = sessions
             .map { "\($0.label): \(MenuBarController.displayText(for: $0.coordinator.uiState))" }
             .joined(separator: "; ")
+        if recording { summary += " (recording)" }
         statusItem.button?.image?.accessibilityDescription = "GogglesView: \(summary.isEmpty ? "no goggles open" : summary)"
         statusItem.button?.toolTip = summary.isEmpty ? "GogglesView" : summary
+    }
+
+    /// The status glyph with a red recording dot in its top-right corner.
+    static func recordingBadged(_ base: NSImage?) -> NSImage? {
+        guard let base else { return nil }
+        let image = NSImage(size: base.size, flipped: false) { rect in
+            base.draw(in: rect)
+            let d = max(4, rect.width * 0.42)
+            NSColor.systemRed.setFill()
+            NSBezierPath(ovalIn: NSRect(x: rect.maxX - d, y: rect.maxY - d, width: d, height: d)).fill()
+            return true
+        }
+        image.isTemplate = false
+        return image
     }
 
     /// Worst-wins summary over every open window: any error -> error, else any
@@ -213,4 +368,17 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         return image
     }
 }
+
+#if canImport(SwiftUI)
+import SwiftUI
+
+/// Settings > General toggle for the status item.
+struct MenuBarItemSettingsToggle: View {
+    @AppStorage(MenuBarPrefs.showKey) private var show = true
+    var body: some View {
+        Toggle("Show menu bar item", isOn: $show)
+            .accessibilityIdentifier("showMenuBarItemToggle")
+    }
+}
+#endif
 #endif

@@ -26,7 +26,14 @@ struct NetworkStreamControl: View {
             mbps = Double(streamer.bytesSent &- lastBytes) * 8 / 1_000_000
             lastBytes = streamer.bytesSent
         }
-        .onAppear { if autoStart { start() } }
+        .onAppear {
+            SessionControlBoard.shared.register(streamer: streamer, for: session)
+            if autoStart { start() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .gogglesToggleNetworkStream)) { n in
+            guard GlobalHotkeyRouting.shouldHandle(n, session: session) else { return }
+            toggle()
+        }
         .onDisappear { stop() }
     }
 
