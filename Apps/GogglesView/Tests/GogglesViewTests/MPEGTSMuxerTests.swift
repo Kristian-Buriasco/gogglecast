@@ -100,9 +100,16 @@ struct MPEGTSMuxerTests {
         let avcc = Self.avcc([[0x65, 1], [0x65, 2, 3]])
         let key = [UInt8](MPEGTSMuxer.annexB(avcc: avcc, isKeyframe: true, parameterSets: [Self.sps, Self.pps]))
         let sc: [UInt8] = [0, 0, 0, 1]
-        #expect(key == sc + [0x09, 0xF0] + sc + [UInt8](Self.sps) + sc + [UInt8](Self.pps) + sc + [0x65, 1] + sc + [0x65, 2, 3])
+        let aud: [UInt8] = [0x09, 0xF0]
+        let sps = [UInt8](Self.sps), pps = [UInt8](Self.pps)
+        let s1: [UInt8] = [0x65, 1], s2: [UInt8] = [0x65, 2, 3]
+        var expectedKey: [UInt8] = sc + aud
+        for part in [sps, pps, s1, s2] { expectedKey += sc + part }
+        #expect(key == expectedKey)
         let non = [UInt8](MPEGTSMuxer.annexB(avcc: avcc, isKeyframe: false, parameterSets: [Self.sps]))
-        #expect(non == sc + [0x09, 0xF0] + sc + [0x65, 1] + sc + [0x65, 2, 3])
+        var expectedNon: [UInt8] = sc + aud
+        for part in [s1, s2] { expectedNon += sc + part }
+        #expect(non == expectedNon)
     }
 
     @Test("PSI repeats at least every 100 ms")

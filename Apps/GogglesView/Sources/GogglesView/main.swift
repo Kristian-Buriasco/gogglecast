@@ -488,6 +488,7 @@ if args.contains("--run") || !args.dropFirst().contains(where: { $0.hasPrefix("-
         )
         if !didRunFirstSessionSetup {
             didRunFirstSessionSetup = true
+            UpdateInstaller.finishPendingHelperUpdate()
             UpdateChecker.shared.checkOnLaunchIfDue()
         }
         app.activate(ignoringOtherApps: true)

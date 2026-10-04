@@ -51,7 +51,7 @@ provisioning/signing/notarization flow.
 
 This machine *does* have one valid (non-expired) codesigning identity
 (`security find-identity -v -p codesigning` → 1 valid identity, "Apple Development:
-kburiasco@gmail.com (S222VMFC76)", Team ID `U8LK2QA3FL`) and Xcode-beta.app is installed
+<Apple ID> (<cert id>)", Team ID `U8LK2QA3FL`) and Xcode-beta.app is installed
 — so `build-stub-bundle.sh` no longer falls back to ad-hoc signing on this machine (see
 that script's own updated comments). That's necessary but not sufficient, per the above.
 

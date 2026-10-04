@@ -133,4 +133,9 @@ final class SessionControlBoard {
     func streamer(for session: AnyObject) -> NetworkStreamer? { entries[ObjectIdentifier(session)]?.streamer }
 
     func unregister(_ session: AnyObject) { entries[ObjectIdentifier(session)] = nil }
+
+    /// True while any window is recording or streaming; auto-updates wait on this.
+    var anyRecording: Bool {
+        entries.values.contains { $0.recorder?.isRecording == true || $0.streamer?.isStreaming == true }
+    }
 }

@@ -22,6 +22,15 @@ struct SettingsView: View {
     enum Tab: String, CaseIterable, Identifiable {
         case general = "General", display = "Display", recording = "Recording", streaming = "Streaming", advanced = "Advanced"
         var id: String { rawValue }
+        var icon: String {
+            switch self {
+            case .general: return "gearshape"
+            case .display: return "display"
+            case .recording: return "record.circle"
+            case .streaming: return "antenna.radiowaves.left.and.right"
+            case .advanced: return "wrench.and.screwdriver"
+            }
+        }
     }
 
     @AppStorage("settingsTab") private var tabRaw = Tab.general.rawValue
@@ -30,86 +39,101 @@ struct SettingsView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("Settings")
-                .font(.title2.bold())
-                .padding(.top, 6)
-
-            Picker("", selection: tab) {
-                ForEach(Tab.allCases) { Text($0.rawValue).tag($0) }
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-
+        HStack(spacing: 0) {
+            sidebar
+            Divider().opacity(0.4)
             ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: 16) {
+                    Text(tab.wrappedValue.rawValue)
+                        .font(.title2.bold())
+                        .padding(.bottom, 2)
                     switch tab.wrappedValue {
                     case .general:
-                        launchAtLoginSection
-                        Divider()
-                        AutoOpenSettingsSection()
-                        Divider()
-                        PresetsSettingsSection()
-                        Divider()
-                        ProfileSettingsSection(deviceSerial: profileContext.serial)
-                        Divider()
-                        UpdateSettingsSection()
-                        MenuBarItemSettingsToggle()
+                        card { launchAtLoginSection }
+                        card { AutoOpenSettingsSection() }
+                        card { PresetsSettingsSection() }
+                        card { ProfileSettingsSection(deviceSerial: profileContext.serial) }
+                        card { UpdateSettingsSection() }
+                        card { MenuBarItemSettingsToggle() }
                     case .display:
-                        osdSection
-                        Divider()
-                        FramingSettingsSection()
-                        Divider()
-                        OrientationSettingsSection()
-                        Divider()
-                        captureWindowSection
-                        Divider()
-                        MiniWindowSettingsSection()
+                        card { osdSection }
+                        card { FramingSettingsSection() }
+                        card { OrientationSettingsSection() }
+                        card { captureWindowSection }
+                        card { MiniWindowSettingsSection() }
                     case .recording:
-                        recordingSection
-                        RecordingExtrasSettingsSection()
-                        Divider()
-                        ReplaySettingsSection()
-                        Divider()
-                        BurnInSettingsSection()
-                        GallerySettingsRow()
+                        card { recordingSection }
+                        card { RecordingExtrasSettingsSection() }
+                        card { ReplaySettingsSection() }
+                        card { BurnInSettingsSection() }
+                        card { GallerySettingsRow() }
                     case .streaming:
-                        NetworkStreamSettingsSection()
-                        Divider()
-                        RTMPSettingsSection()
-                        Divider()
-                        WebViewerSettingsSection()
-                        Divider()
-                        SRTSettingsSection()
-                        Divider()
-                        NDISettingsSection()
+                        card { NetworkStreamSettingsSection() }
+                        card { RTMPSettingsSection() }
+                        card { WebViewerSettingsSection() }
+                        card { SRTSettingsSection() }
+                        card { NDISettingsSection() }
                     case .advanced:
-                        GlobalHotkeysSettingsSection()
-                        Divider()
-                        EventHooksSettingsSection()
-                        AutomationSettingsSection()
-                        Divider()
-                        SessionLogSettingsSection()
-                        helperStatusSection
-                        Divider()
-                        connectionSection
-                        Divider()
-                        DiagnosticsSettingsSection()
-                        Divider()
-                        OnboardingSettingsSection()
-                        SelfTestSettingsSection()
-                        BenchmarkSettingsSection()
+                        card { GlobalHotkeysSettingsSection() }
+                        card { EventHooksSettingsSection() }
+                        card { AutomationSettingsSection() }
+                        card { SessionLogSettingsSection() }
+                        card { helperStatusSection }
+                        card { connectionSection }
+                        card { DiagnosticsSettingsSection() }
+                        card { OnboardingSettingsSection() }
+                        card { SelfTestSettingsSection() }
+                        card { BenchmarkSettingsSection() }
+
                     }
                 }
+                .padding(.horizontal, 24)
+                .padding(.top, 34)
+                .padding(.bottom, 24)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .padding(22)
-        .frame(width: 460, height: 560, alignment: .top)
+        .frame(width: 780, height: 580, alignment: .topLeading)
         .background(AppChrome.backgroundColor)
         .foregroundStyle(.white)
         .onAppear { viewModel.refresh() }
         .onDisappear { viewModel.stopPolling() }
+    }
+
+    private var sidebar: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Tab.allCases) { t in
+                Button { tab.wrappedValue = t } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: t.icon).frame(width: 20)
+                        Text(t.rawValue)
+                        Spacer()
+                    }
+                    .padding(.horizontal, 10).padding(.vertical, 7)
+                    .background(RoundedRectangle(cornerRadius: 8)
+                        .fill(tab.wrappedValue == t ? Color.white.opacity(0.12) : Color.clear))
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(tab.wrappedValue == t ? .isSelected : [])
+            }
+            Spacer()
+            Text("GogglesView \(UpdateChecker.currentVersion)")
+                .font(.caption2).foregroundStyle(.secondary)
+                .padding(.horizontal, 10)
+        }
+        .padding(.top, 40).padding(.horizontal, 12).padding(.bottom, 16)
+        .frame(width: 180)
+        .background(Color.white.opacity(0.03))
+    }
+
+    /// One settings group: a rounded card with generous padding.
+    private func card<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 12) { content() }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 12).fill(Color.white.opacity(0.06)))
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.08)))
     }
 
     private var launchAtLoginSection: some View {
