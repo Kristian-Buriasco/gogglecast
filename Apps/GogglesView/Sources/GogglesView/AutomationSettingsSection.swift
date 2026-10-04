@@ -11,7 +11,6 @@ struct AutomationSettingsSection: View {
     @State private var copied = false
 
     var body: some View {
-        Divider()
         VStack(alignment: .leading, spacing: 8) {
             Text("Automation").font(.headline)
             Toggle("Allow automation (URL scheme and AppleScript)", isOn: $enabled)

@@ -40,6 +40,7 @@ final class UpdateChecker: ObservableObject {
     static let shared = UpdateChecker()
     @Published private(set) var result: UpdateCheckResult?
     @Published private(set) var checking = false
+    @Published private(set) var latestAsset: UpdateAsset?
 
     static var currentVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0"
@@ -71,43 +72,78 @@ final class UpdateChecker: ObservableObject {
         URLSession.shared.dataTask(with: req) { data, resp, _ in
             let status = (resp as? HTTPURLResponse)?.statusCode ?? 0
             let r = data.map { Self.interpret(status: status, data: $0, current: current) } ?? .failed
-            DispatchQueue.main.async { self.result = r; self.checking = false }
+            let asset = data.flatMap { UpdateAsset.from(releaseJSON: $0) }
+            DispatchQueue.main.async {
+                self.result = r; self.latestAsset = asset; self.checking = false
+                if case .available(let tag, _) = r, let asset, UserDefaults.standard.bool(forKey: UpdatePrefs2.autoInstallKey) {
+                    UpdateInstaller.shared.stage(asset: asset, version: tag)
+                }
+            }
         }.resume()
     }
 
     /// Launch hook: at most once per 24 h, and only when the user opted in.
     func checkOnLaunchIfDue(now: Date = Date()) {
         let d = UserDefaults.standard
-        guard d.bool(forKey: UpdatePrefs.enabledKey) else { return }
+        let on = d.object(forKey: UpdatePrefs.enabledKey) as? Bool ?? true
+        guard on || d.bool(forKey: UpdatePrefs2.autoInstallKey) else { return }
         let last = d.double(forKey: UpdatePrefs.lastCheckKey)
         if now.timeIntervalSince1970 - last >= 24 * 3600 { check() }
     }
 }
 
 struct UpdateSettingsSection: View {
-    @AppStorage(UpdatePrefs.enabledKey) private var enabled = false
+    @AppStorage(UpdatePrefs.enabledKey) private var enabled = true
+    @AppStorage(UpdatePrefs2.autoInstallKey) private var autoInstall = false
     @ObservedObject private var checker = UpdateChecker.shared
+    @ObservedObject private var installer = UpdateInstaller.shared
 
     private var status: String {
+        if case .failed(let m) = installer.state { return m }
+        if case .downloading = installer.state { return "Downloading and verifying the update…" }
         switch checker.result {
-        case nil: return "Current version \(UpdateChecker.currentVersion)."
-        case .upToDate(let t): return "You're up to date (latest: \(t))."
-        case .available(let t, _): return "Update available: \(t) (you have \(UpdateChecker.currentVersion))."
-        case .failed: return "Couldn't check for updates"
+        case nil: return "Version \(UpdateChecker.currentVersion)"
+        case .upToDate: return "You're up to date (version \(UpdateChecker.currentVersion))."
+        case .available(let t, _): return "\(t) is available. You have \(UpdateChecker.currentVersion)."
+        case .failed: return "Couldn't check for updates."
         }
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 10) {
             Text("Updates").font(.headline)
-            Toggle("Check for updates daily at launch", isOn: $enabled)
-            HStack {
-                Button("Check now") { checker.check() }.disabled(checker.checking)
+            Text(status).font(.callout).foregroundStyle(.secondary)
+            HStack(spacing: 10) {
+                primaryButton
                 if case .available(_, let url) = checker.result {
-                    Button("View release") { NSWorkspace.shared.open(url) }
+                    Button("Release notes") { NSWorkspace.shared.open(url) }
                 }
             }
-            Text(status).font(.caption).foregroundStyle(.secondary)
+            Toggle("Check for updates daily", isOn: $enabled)
+            Toggle("Install updates automatically", isOn: $autoInstall)
+            Text("Updates are downloaded from this project's GitHub releases, checked against their SHA-256 and code signature, and applied when you quit (or when you choose Install & Restart). Never while recording or streaming.")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+    }
+
+    @ViewBuilder private var primaryButton: some View {
+        switch installer.state {
+        case .staged(let v):
+            Button("Install \(v) & Restart") {
+                if installer.isRecordingNow() { return }
+                installer.installAndRestart()
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(installer.isRecordingNow())
+        case .downloading:
+            ProgressView().controlSize(.small)
+        default:
+            if case .available(let tag, _) = checker.result, let asset = checker.latestAsset {
+                Button("Download \(tag)") { installer.stage(asset: asset, version: tag) }
+                    .buttonStyle(.borderedProminent)
+            } else {
+                Button("Check Now") { checker.check() }.disabled(checker.checking)
+            }
         }
     }
 }
