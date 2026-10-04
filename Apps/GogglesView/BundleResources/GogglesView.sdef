@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE dictionary SYSTEM "file://localhost/System/Library/DTDs/sdef.dtd">
+<!-- GogglesView AppleScript suite. Implemented in
+     Sources/GogglesView/AppleScript.swift (NSScriptCommand subclasses + KVC on
+     NSApplication). Copied into Contents/Resources by build-stub-bundle.sh.
+     Every command honours Settings > Advanced > "Allow automation". -->
+<dictionary title="GogglesView Terminology" xmlns:xi="http://www.w3.org/2003/XInclude">
+    <xi:include href="file:///System/Library/ScriptingDefinitions/CocoaStandard.sdef" xpointer="xpointer(/dictionary/suite)"/>
+
+    <suite name="GogglesView Suite" code="GgVw" description="Control GogglesView goggles windows.">
+
+        <command name="start recording" code="GgVwStRc" description="Start recording the frontmost (or given) goggles window.">
+            <cocoa class="GVStartRecordingCommand"/>
+            <parameter name="device" code="gDev" type="text" optional="yes" description="Serial of the goggles to target.">
+                <cocoa key="device"/>
+            </parameter>
+        </command>
+
+        <command name="stop recording" code="GgVwSpRc" description="Stop recording.">
+            <cocoa class="GVStopRecordingCommand"/>
+            <parameter name="device" code="gDev" type="text" optional="yes" description="Serial of the goggles to target.">
+                <cocoa key="device"/>
+            </parameter>
+        </command>
+
+        <command name="save replay" code="GgVwSvRp" description="Save the instant-replay buffer to a clip.">
+            <cocoa class="GVSaveReplayCommand"/>
+            <parameter name="device" code="gDev" type="text" optional="yes" description="Serial of the goggles to target.">
+                <cocoa key="device"/>
+            </parameter>
+        </command>
+
+        <command name="take screenshot" code="GgVwShot" description="Save a screenshot of the live view.">
+            <cocoa class="GVTakeScreenshotCommand"/>
+            <parameter name="device" code="gDev" type="text" optional="yes" description="Serial of the goggles to target.">
+                <cocoa key="device"/>
+            </parameter>
+        </command>
+
+        <command name="toggle freeze" code="GgVwFrz " description="Freeze or unfreeze the live view.">
+            <cocoa class="GVToggleFreezeCommand"/>
+            <parameter name="device" code="gDev" type="text" optional="yes" description="Serial of the goggles to target.">
+                <cocoa key="device"/>
+            </parameter>
+        </command>
+
+        <command name="add marker" code="GgVwMark" description="Add a chapter marker to the current recording.">
+            <cocoa class="GVAddMarkerCommand"/>
+            <parameter name="label" code="gLbl" type="text" optional="yes" description="Marker label (plain text, max 64 characters).">
+                <cocoa key="label"/>
+            </parameter>
+            <parameter name="device" code="gDev" type="text" optional="yes" description="Serial of the goggles to target.">
+                <cocoa key="device"/>
+            </parameter>
+        </command>
+
+        <class-extension extends="application" description="GogglesView status (frontmost goggles window).">
+            <property name="goggles count" code="gCnt" type="integer" access="r" description="Number of open goggles windows.">
+                <cocoa key="gvGogglesCount"/>
+            </property>
+            <property name="recording" code="gRec" type="boolean" access="r" description="Whether the frontmost goggles window is recording.">
+                <cocoa key="gvRecording"/>
+            </property>
+            <property name="battery" code="gBat" access="r" description="Goggles battery percent, or missing value.">
+                <type type="integer"/>
+                <type type="missing value"/>
+                <cocoa key="gvBattery"/>
+            </property>
+            <property name="fps" code="gFps" access="r" description="Current decoded frames per second, or missing value.">
+                <type type="real"/>
+                <type type="missing value"/>
+                <cocoa key="gvFPS"/>
+            </property>
+        </class-extension>
+    </suite>
+</dictionary>

@@ -43,6 +43,10 @@ Tests: `Packages/swift-test-clt.sh <package dir>` (see the script for why it exi
 
 Entitlements live in `Apps/GogglesView/BundleResources/`. `GogglesView.entitlements` is the default. `GogglesView-with-extension-install.entitlements` adds the system-extension install entitlement for the future OBS virtual camera; it needs a paid Apple Developer Program membership (the app fails to launch with AMFI -413 otherwise), so it is opt-in via `GOGGLESVIEW_WITH_EXTENSION_INSTALL=1` and not used in normal builds. See `docs/dev-setup.md`.
 
+## Automation
+
+Shortcuts, Stream Deck, Raycast, `open "gogglesview://record/toggle"` and AppleScript can drive recording, replay, screenshots, freeze, markers and the UDP stream. See `docs/automation.md`. Toggle in Settings > Advanced > Automation.
+
 ## Troubleshooting
 
 - Goggles not detected: try another USB-C port and a known data cable; confirm "OTG Wired Connection to Computer" is on (unplug before toggling); confirm the helper is approved in Login Items & Extensions.
