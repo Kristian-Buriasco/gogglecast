@@ -47,6 +47,12 @@ Entitlements live in `Apps/GogglesView/BundleResources/`. `GogglesView.entitleme
 
 Shortcuts, Stream Deck, Raycast, `open "gogglesview://record/toggle"` and AppleScript can drive recording, replay, screenshots, freeze, markers and the UDP stream. See `docs/automation.md`. Toggle in Settings > Advanced > Automation.
 
+## License
+
+GPL-3.0-or-later. See `LICENSE` and `THIRD_PARTY_NOTICES.md`.
+
+GogglesView is an independent project, not affiliated with or endorsed by DJI. "DJI" and "Goggles 3" are trademarks of their owners; the protocol was reverse-engineered for interoperability.
+
 ## Troubleshooting
 
 - Goggles not detected: try another USB-C port and a known data cable; confirm "OTG Wired Connection to Computer" is on (unplug before toggling); confirm the helper is approved in Login Items & Extensions.
