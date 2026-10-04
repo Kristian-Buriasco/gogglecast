@@ -97,6 +97,7 @@ struct SettingsView: View {
                         Divider()
                         OnboardingSettingsSection()
                         SelfTestSettingsSection()
+                        BenchmarkSettingsSection()
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)

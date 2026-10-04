@@ -368,6 +368,7 @@ if args.contains("--run") || !args.dropFirst().contains(where: { $0.hasPrefix("-
     }
 
     GlobalHotkeyRouting.targetProvider = { sessionForCommand()?.decodeSession }
+    BenchmarkRouting.targetProvider = { sessionForCommand().map(BenchmarkTarget.init(session:)) }
 
     let mainMenu = NSMenu()
     let appMenuItem = NSMenuItem()

@@ -95,6 +95,15 @@ final class DecodeSession: ObservableObject {
         return (renderer as? AVSampleBufferDisplayLayer)?.sampleBufferRenderer.displayedPixelBuffer()
     }
 
+    /// Cumulative counters of the primary display layer's renderer (benchmark); nil if unavailable. Completes on main.
+    func loadRendererCounters(_ completion: @escaping (BenchmarkRendererCounters?) -> Void) {
+        guard #available(macOS 14.4, *), let layer = renderer as? AVSampleBufferDisplayLayer else { return completion(nil) }
+        layer.sampleBufferRenderer.loadVideoPerformanceMetrics { m in
+            let counters = m.map { BenchmarkRendererCounters(totalFrames: $0.totalNumberOfFrames, droppedFrames: $0.numberOfDroppedFrames, corruptedFrames: $0.numberOfCorruptedFrames, optimizedCompositingFrames: $0.numberOfFramesDisplayedUsingOptimizedCompositing) }
+            DispatchQueue.main.async { completion(counters) }
+        }
+    }
+
     /// Adds an extra sample-buffer consumer (second display window,
     /// recorder) that receives every slice alongside the primary renderer.
     /// Held weakly, same as the primary.
