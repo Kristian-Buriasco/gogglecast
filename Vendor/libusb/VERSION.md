@@ -16,13 +16,13 @@ tar xjf libusb-1.0.27.tar.bz2
 cd libusb-1.0.27
 
 mkdir build-arm64 && cd build-arm64
-CC="clang -arch arm64" ../configure --host=aarch64-apple-darwin \
+CC="clang -arch arm64 -mmacosx-version-min=14.0" ac_cv_func_pipe2=no ../configure --host=aarch64-apple-darwin \
     --enable-static --disable-shared --prefix="$PWD/../../out-arm64"
 make -j8 && make install
 cd ..
 
 mkdir build-x86_64 && cd build-x86_64
-CC="clang -arch x86_64" ../configure --host=x86_64-apple-darwin \
+CC="clang -arch x86_64 -mmacosx-version-min=14.0" ac_cv_func_pipe2=no ../configure --host=x86_64-apple-darwin \
     --enable-static --disable-shared --prefix="$PWD/../../out-x86_64"
 make -j8 && make install
 cd ..
@@ -38,3 +38,5 @@ archive + module map, not an XCFramework.
 libusb ships CMake support only from 1.0.28 onward; 1.0.27 was built via the bundled
 autotools `configure` script instead (autoconf/automake themselves are not installed on
 this machine, but the release tarball's pre-generated `configure` doesn't need them).
+
+Rebuilt 2026-10-04 with `-mmacosx-version-min=14.0` and `ac_cv_func_pipe2=no`: the first build used a newer SDK whose `pipe2` made the archive fail to link on older SDKs (macOS 15 and earlier).
