@@ -31,5 +31,4 @@ Fixtures/*.gvcap
 dist/
 
 # Local tooling
-.claude/
 dist/
