@@ -4,6 +4,12 @@ All notable changes to this project are documented here. Format based on [Keep a
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-04
+
+### Fixed
+- Rebuilt the bundled libusb for macOS 14 so the helper no longer depends on `pipe2`, which is missing on macOS 14/15 (0.2 could fail to start the helper there).
+- Fixed compile errors on older Swift toolchains; CI now builds and tests on GitHub.
+
 ## [0.2] - 2026-10-04
 
 ### Added
