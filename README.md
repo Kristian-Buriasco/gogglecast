@@ -1,6 +1,10 @@
 # GogglesView
 
-A free, native macOS app that shows the live video feed from DJI Goggles 3 on a Mac over USB-C. The protocol is reverse-engineered; no CosmoStreamer dongle is needed.
+A free, native macOS app that shows the live video feed from DJI Goggles 3 on a Mac over USB-C. The protocol is reverse-engineered; no extra hardware or dongle is needed.
+
+> Independent project, not affiliated with or endorsed by DJI. "DJI" and "Goggles 3" are trademarks of their owners. Use at your own risk.
+
+**[Download the latest release](https://github.com/Kristian-Buriasco/gogglecast/releases/latest)** (DMG, Apple Silicon, not notarized).
 
 ## Features
 
@@ -10,7 +14,13 @@ A free, native macOS app that shows the live video feed from DJI Goggles 3 on a 
 - Recording of the raw stream to `.mov` or `.mp4` (no re-encode), saved to `~/Movies/GogglesView`. Optional auto-start when the stream goes live.
 - Chrome-less capture window, for use as an OBS Window Capture source. Optional "keep on top".
 - Stats overlay (resolution, framerate, bitrate, dropped frames), each field toggled in Settings.
-- Menu bar item (the app runs as a menu bar app, `LSUIElement`).
+- Instant replay buffer, loop recorder, auto-split, markers, clip gallery with passthrough trim and share, optional burn-in logo/text recording.
+- Streaming out: UDP MPEG-TS, RTMP (Twitch/YouTube), SRT, local web viewer (HLS), NDI (experimental).
+- Framing (zoom/pan/crop/grid/color), freeze, mini window, rotate/flip, per-goggles profiles and presets.
+- Several goggles at once, each in its own window.
+- Menu bar controls, global hotkeys, event hooks, `gogglesview://` URL scheme and AppleScript.
+- Session log, benchmark/latency report, diagnostics, onboarding and self-test.
+- Secrets (stream key, tokens, webhooks) kept in the Keychain.
 
 ## Requirements
 
@@ -21,7 +31,7 @@ A free, native macOS app that shows the live video feed from DJI Goggles 3 on a 
 
 ## Install and first run
 
-There are no prebuilt, notarized releases. Build from source (below) or use `scripts/make-dmg.sh` to produce a DMG.
+Download the DMG from the Releases page, or build from source (below) / use `scripts/make-dmg.sh`. Releases are dev-signed, not notarized.
 
 1. Copy `GogglesView.app` to `/Applications`. The build is signed with an Apple Development certificate (or ad-hoc), not notarized, so on first launch right-click the app and choose Open.
 2. On first launch the app registers a privileged helper daemon (`GogglesHelper`) via `SMAppService`. macOS requires one-time approval: System Settings > General > Login Items & Extensions, enable GogglesView. The helper owns the USB device; the app talks to it over XPC.
@@ -42,6 +52,10 @@ The script builds the helper and app in release mode and assembles the bundle. I
 Tests: `Packages/swift-test-clt.sh <package dir>` (see the script for why it exists on a Command Line Tools-only machine).
 
 Entitlements live in `Apps/GogglesView/BundleResources/`. `GogglesView.entitlements` is the default. `GogglesView-with-extension-install.entitlements` adds the system-extension install entitlement for the future OBS virtual camera; it needs a paid Apple Developer Program membership (the app fails to launch with AMFI -413 otherwise), so it is opt-in via `GOGGLESVIEW_WITH_EXTENSION_INSTALL=1` and not used in normal builds. See `docs/dev-setup.md`.
+
+## Status
+
+Core live view, recording and the 60 fps path are hardware-tested. Many newer features (RTMP/SRT/NDI outputs, multi-window, trim, hooks, burn-in) are unit-tested but have had limited testing on real goggles; please file issues.
 
 ## Automation
 
@@ -68,3 +82,7 @@ Shortcuts, Stream Deck, Raycast, `open "gogglesview://record/toggle"` and AppleS
 - `Extension/GogglesCamera`: unfinished CMIO camera extension spike.
 
 More detail: `docs/design.md`, `docs/dev-setup.md`, `docs/parity-results.md`.
+
+## License
+
+GPL-3.0, see `LICENSE`. Third-party components are listed in `THIRD_PARTY_NOTICES.md`. Contributions: `CONTRIBUTING.md`. Security: `SECURITY.md`.

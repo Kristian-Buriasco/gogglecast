@@ -29,3 +29,7 @@ Fixtures/*.gvcap
 
 # DMG build output (scripts/make-dmg.sh)
 dist/
+
+# Local tooling
+.claude/
+dist/

@@ -51,7 +51,7 @@ provisioning/signing/notarization flow.
 
 This machine *does* have one valid (non-expired) codesigning identity
 (`security find-identity -v -p codesigning` → 1 valid identity, "Apple Development:
-kburiasco@gmail.com (S222VMFC76)", Team ID `U8LK2QA3FL`) and Xcode-beta.app is installed
+<Apple ID> (<cert id>)", Team ID `U8LK2QA3FL`) and Xcode-beta.app is installed
 — so `build-stub-bundle.sh` no longer falls back to ad-hoc signing on this machine (see
 that script's own updated comments). That's necessary but not sufficient, per the above.
 
@@ -72,8 +72,8 @@ helper daemon (Task 2.2, `Helper/GogglesHelper`).
 - CLT-only toolchain works for all of this (`swift build`, `swiftc`,
   `codesign`) — no `xcodebuild`/`.xcodeproj` needed.
 - Team ID on this machine: **`U8LK2QA3FL`** (from an "Apple Development:
-  kburiasco@gmail.com" cert, Apple-ID-linked display name embeds
-  `S222VMFC76`, which is *not* the Team ID — `codesign -dv`'s
+  <Apple ID>" cert, Apple-ID-linked display name embeds
+  `<cert id>`, which is *not* the Team ID — `codesign -dv`'s
   `TeamIdentifier=` field is the real one, `U8LK2QA3FL`).
 - `build-stub-bundle.sh` auto-selects the first valid (non-expired)
   codesigning identity from `security find-identity -v -p codesigning`, or
