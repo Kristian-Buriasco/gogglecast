@@ -154,8 +154,6 @@ struct SessionLogSettingsSection: View {
                 Button("Open logs folder") { NSWorkspace.shared.open(SessionLogsWindowController.ensuredDirectory()) }
                 Button("Session logs…") { SessionLogsWindowController.shared.show() }
             }
-            // Separates this section from the next one in the Advanced tab.
-            Divider().padding(.top, 6)
         }
     }
 }

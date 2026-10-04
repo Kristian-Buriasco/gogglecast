@@ -25,7 +25,7 @@ import Foundation
 //
 // Task 4.1: prefixed with the real Team ID (`U8LK2QA3FL`, confirmed via
 // `codesign -dv`'s `TeamIdentifier=` field against the "Apple Development:
-// kburiasco@gmail.com" cert -- see docs/dev-setup.md) now that the
+// <Apple ID>" cert -- see docs/dev-setup.md) now that the
 // mach-lookup spike needs it. This is exactly what design.md §4.1 Change 2
 // already committed to; nothing about the app<->helper connection's own
 // behavior changes, only the string both sides dial. `com.kburiasco.gogglesview.helper.plist`

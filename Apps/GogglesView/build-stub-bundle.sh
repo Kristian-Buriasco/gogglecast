@@ -27,7 +27,7 @@
 #     `security find-identity -v -p codesigning` is used, or ad-hoc
 #     (`--sign -`, "TeamIdentifier=not set") if there are none. As of Task
 #     4.1 this machine has exactly one valid identity ("Apple Development:
-#     kburiasco@gmail.com (S222VMFC76)", Team ID U8LK2QA3FL) -- Task 2.3's
+#     <Apple ID> (<cert id>)", Team ID U8LK2QA3FL) -- Task 2.3's
 #     original "0 valid identities" state (see that task's report) no
 #     longer holds on this machine.
 #

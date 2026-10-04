@@ -219,8 +219,10 @@ enum RTMPFLV {
     /// RTMP video message body for AVC (codec id 7): frame/codec byte, packet type, 24-bit composition time.
     static func videoTag(keyframe: Bool, sequenceHeader: Bool, compositionTime: Int32 = 0, data: [UInt8]) -> [UInt8] {
         let ct = UInt32(bitPattern: compositionTime)
-        return [(keyframe ? 0x10 : 0x20) | 7, sequenceHeader ? 0 : 1,
-                UInt8(ct >> 16 & 0xFF), UInt8(ct >> 8 & 0xFF), UInt8(ct & 0xFF)] + data
+        let flags: UInt8 = (keyframe ? 0x10 : 0x20) | 7
+        let header: [UInt8] = [flags, sequenceHeader ? 0 : 1,
+                               UInt8(ct >> 16 & 0xFF), UInt8(ct >> 8 & 0xFF), UInt8(ct & 0xFF)]
+        return header + data
     }
 
     static func onMetaData(width: Int, height: Int, fps: Double) -> [UInt8] {
