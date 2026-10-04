@@ -54,6 +54,7 @@ struct SettingsView: View {
                         ProfileSettingsSection(deviceSerial: profileContext.serial)
                         Divider()
                         UpdateSettingsSection()
+                        MenuBarItemSettingsToggle()
                     case .display:
                         osdSection
                         Divider()

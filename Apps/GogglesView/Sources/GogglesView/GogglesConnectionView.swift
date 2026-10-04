@@ -114,6 +114,7 @@ struct GogglesConnectionView: View {
             .accessibilityValue(AccessibilityLabels.recordState(isRecording: recorder.isRecording, elapsed: recorder.isRecording ? Self.formatElapsed(recorder.elapsed) : nil))
             .accessibilityIdentifier("recordButton")
         }
+        .onAppear { SessionControlBoard.shared.register(recorder: recorder, for: session) }
         .onChange(of: isLive) { live in
             if live && RecordingPrefs.autoStart && !recorder.isRecording { startRecording() }
         }
