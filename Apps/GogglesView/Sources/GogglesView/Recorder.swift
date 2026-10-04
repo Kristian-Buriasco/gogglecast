@@ -246,7 +246,10 @@ final class Recorder: ObservableObject, SampleBufferRendering {
         let all = pendingMarkers
         lock.unlock()
         Recorder.writeMarkers(all, for: base)
-        DispatchQueue.main.async { self.markers = all }
+        DispatchQueue.main.async {
+            self.markers = all
+            NotificationCenter.default.post(name: .gogglesMarkerAdded, object: nil, userInfo: ["label": text])
+        }
     }
 
     private static func writeMarkers(_ marks: [RecordingMarker], for recording: URL) {

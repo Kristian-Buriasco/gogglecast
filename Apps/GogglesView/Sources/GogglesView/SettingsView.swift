@@ -87,6 +87,7 @@ struct SettingsView: View {
                         Divider()
                         EventHooksSettingsSection()
                         Divider()
+                        SessionLogSettingsSection()
                         helperStatusSection
                         Divider()
                         connectionSection

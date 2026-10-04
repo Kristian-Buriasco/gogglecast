@@ -137,6 +137,7 @@ final class GogglesSession: NSObject, RegistrableSession, NSWindowDelegate {
         cursorAutoHider = CursorAutoHider(window: window)
 
         EventHookInstaller.install(coordinator: coordinator)
+        SessionLogger.attach(coordinator: coordinator, decodeSession: decodeSession).store(in: &cancellables)
 
         coordinator.$deviceInfo
             .compactMap { $0 }
