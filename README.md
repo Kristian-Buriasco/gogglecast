@@ -2,8 +2,6 @@
 
 A free, native macOS app that shows the live video feed from DJI Goggles 3 on a Mac over USB-C. The protocol is reverse-engineered; no extra hardware or dongle is needed.
 
-> Independent project, not affiliated with or endorsed by DJI. "DJI" and "Goggles 3" are trademarks of their owners. Use at your own risk.
-
 **[Download the latest release](https://github.com/Kristian-Buriasco/gogglecast/releases/latest)** (DMG, Apple Silicon, not notarized).
 
 ## Features
@@ -61,6 +59,12 @@ Core live view, recording and the 60 fps path are hardware-tested. Many newer fe
 
 Shortcuts, Stream Deck, Raycast, `open "gogglesview://record/toggle"` and AppleScript can drive recording, replay, screenshots, freeze, markers and the UDP stream. See `docs/automation.md`. Toggle in Settings > Advanced > Automation.
 
+## License
+
+GPL-3.0-or-later. See `LICENSE` and `THIRD_PARTY_NOTICES.md`.
+
+GogglesView is an independent project, not affiliated with or endorsed by DJI. "DJI" and "Goggles 3" are trademarks of their owners; the protocol was reverse-engineered for interoperability. Use at your own risk. Contributions: `CONTRIBUTING.md`. Security: `SECURITY.md`.
+
 ## Troubleshooting
 
 - Goggles not detected: try another USB-C port and a known data cable; confirm "OTG Wired Connection to Computer" is on (unplug before toggling); confirm the helper is approved in Login Items & Extensions.
@@ -82,7 +86,3 @@ Shortcuts, Stream Deck, Raycast, `open "gogglesview://record/toggle"` and AppleS
 - `Extension/GogglesCamera`: unfinished CMIO camera extension spike.
 
 More detail: `docs/design.md`, `docs/dev-setup.md`, `docs/parity-results.md`.
-
-## License
-
-GPL-3.0, see `LICENSE`. Third-party components are listed in `THIRD_PARTY_NOTICES.md`. Contributions: `CONTRIBUTING.md`. Security: `SECURITY.md`.

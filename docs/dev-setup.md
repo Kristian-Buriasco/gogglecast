@@ -71,10 +71,8 @@ helper daemon (Task 2.2, `Helper/GogglesHelper`).
 
 - CLT-only toolchain works for all of this (`swift build`, `swiftc`,
   `codesign`) — no `xcodebuild`/`.xcodeproj` needed.
-- Team ID on this machine: **`U8LK2QA3FL`** (from an "Apple Development:
-  <Apple ID>" cert, Apple-ID-linked display name embeds
-  `<cert id>`, which is *not* the Team ID — `codesign -dv`'s
-  `TeamIdentifier=` field is the real one, `U8LK2QA3FL`).
+- Team ID on this machine: your own, shown by `codesign -dv`'s `TeamIdentifier=` field. The
+  ID embedded in the certificate's display name is *not* the Team ID.
 - `build-stub-bundle.sh` auto-selects the first valid (non-expired)
   codesigning identity from `security find-identity -v -p codesigning`, or
   falls back to ad-hoc (`--sign -`) if none is valid. Override with
