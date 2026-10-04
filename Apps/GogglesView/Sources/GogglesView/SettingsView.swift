@@ -87,6 +87,7 @@ struct SettingsView: View {
                         GlobalHotkeysSettingsSection()
                         Divider()
                         EventHooksSettingsSection()
+                        AutomationSettingsSection()
                         Divider()
                         SessionLogSettingsSection()
                         helperStatusSection

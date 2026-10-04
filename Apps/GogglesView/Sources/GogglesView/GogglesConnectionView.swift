@@ -132,6 +132,22 @@ struct GogglesConnectionView: View {
             guard GlobalHotkeyRouting.shouldHandle(n, session: session) else { return }
             if isLive { takeScreenshot() }
         }
+        // Automation (URL scheme / AppleScript): same paths as the buttons.
+        .onReceive(NotificationCenter.default.publisher(for: .gogglesStartRecording)) { n in
+            guard GlobalHotkeyRouting.shouldHandle(n, session: session) else { return }
+            if !recorder.isRecording && isLive { startRecording() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .gogglesStopRecording)) { n in
+            guard GlobalHotkeyRouting.shouldHandle(n, session: session) else { return }
+            stopRecording(wait: false)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .gogglesAddMarker)) { n in
+            guard GlobalHotkeyRouting.shouldHandle(n, session: session) else { return }
+            recorder.addMarker(label: n.userInfo?["label"] as? String ?? AutomationURLParser.defaultMarkerLabel)
+        }
+        .onChange(of: recorder.isRecording) { _, recording in
+            AutomationRecordingState.shared.set(recording, for: session)
+        }
     }
 
     private func startRecording() {

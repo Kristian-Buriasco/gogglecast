@@ -35,6 +35,15 @@ struct NetworkStreamControl: View {
             toggle()
         }
         .onDisappear { stop() }
+        // Automation: host/port always come from Settings, never the caller.
+        .onReceive(NotificationCenter.default.publisher(for: .gogglesNetworkStreamStart)) { n in
+            guard GlobalHotkeyRouting.shouldHandle(n, session: session), !streamer.isStreaming else { return }
+            start()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .gogglesNetworkStreamStop)) { n in
+            guard GlobalHotkeyRouting.shouldHandle(n, session: session), streamer.isStreaming else { return }
+            stop()
+        }
     }
 
     private func toggle() { streamer.isStreaming ? stop() : start() }

@@ -557,6 +557,13 @@ if args.contains("--run") || !args.dropFirst().contains(where: { $0.hasPrefix("-
     )
 
     GlobalHotkeys.shared.apply()
+    // gogglesview:// + AppleScript. Installed before app.run() so a URL that
+    // cold-launches the app is still delivered.
+    AutomationController.shared.install(
+        sessions: { registry.all },
+        frontmost: { sessionForCommand() },
+        showWithoutSession: { presentPicker() }
+    )
     presentPicker()
     OnboardingWindow.showIfFirstRun()  // after the picker so it opens on top
 

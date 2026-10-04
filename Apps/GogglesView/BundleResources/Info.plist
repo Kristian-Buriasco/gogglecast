@@ -20,5 +20,20 @@
 	<string>14.0</string>
 	<key>LSUIElement</key>
 	<true/>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.kburiasco.gogglesview.automation</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>gogglesview</string>
+			</array>
+		</dict>
+	</array>
+	<key>NSAppleScriptEnabled</key>
+	<true/>
+	<key>OSAScriptingDefinition</key>
+	<string>GogglesView.sdef</string>
 </dict>
 </plist>

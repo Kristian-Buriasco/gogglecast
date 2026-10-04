@@ -109,6 +109,10 @@ cp "$SCRIPT_DIR/BundleResources/com.kburiasco.gogglesview.helper.plist" \
 cp "$SCRIPT_DIR/BundleResources/com.kburiasco.gogglesview.autoopen.plist" \
    "$APP_BUNDLE/Contents/Library/LaunchAgents/com.kburiasco.gogglesview.autoopen.plist"
 
+# AppleScript dictionary (Info.plist OSAScriptingDefinition -> Resources/).
+mkdir -p "$APP_BUNDLE/Contents/Resources"
+cp "$SCRIPT_DIR/BundleResources/GogglesView.sdef" "$APP_BUNDLE/Contents/Resources/GogglesView.sdef"
+
 cp "$APP_BIN" "$APP_BUNDLE/Contents/MacOS/GogglesView"
 cp "$HELPER_BIN" "$APP_BUNDLE/Contents/MacOS/GogglesHelper"
 
