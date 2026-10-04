@@ -1,5 +1,12 @@
 # GogglesView
 
+[![CI](https://github.com/Kristian-Buriasco/gogglecast/actions/workflows/ci.yml/badge.svg)](https://github.com/Kristian-Buriasco/gogglecast/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/Kristian-Buriasco/gogglecast)](https://github.com/Kristian-Buriasco/gogglecast/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/Kristian-Buriasco/gogglecast/total)](https://github.com/Kristian-Buriasco/gogglecast/releases)
+[![License: GPL-3.0](https://img.shields.io/github/license/Kristian-Buriasco/gogglecast)](LICENSE)
+![Platform: macOS 14+](https://img.shields.io/badge/macOS-14%2B-blue)
+![Apple Silicon](https://img.shields.io/badge/Apple%20Silicon-tested-lightgrey)
+
 A free, native macOS app that shows the live video feed from DJI Goggles 3 on a Mac over USB-C. The protocol is reverse-engineered; no extra hardware or dongle is needed.
 
 **[Download the latest release](https://github.com/Kristian-Buriasco/gogglecast/releases/latest)** (DMG, Apple Silicon, not notarized).
