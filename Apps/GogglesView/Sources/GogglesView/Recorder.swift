@@ -64,17 +64,19 @@ final class Recorder: ObservableObject, SampleBufferRendering {
     private var framesSeenWhileArmed = 0
 
     // Mid-stream fallback. The goggles send one IDR when Share Liveview starts and none after, so a
-    // recording started later cannot be passthrough. The display decoder has the full picture state,
-    // so we re-encode the frames it shows instead.
-    /// Supplies the picture currently on screen (set by the host view; main thread).
-    var fallbackFrameSource: (() -> CVPixelBuffer?)?
-    private var transcoding = false
-    private var startingFallback = false
-    private var adaptor: AVAssetWriterInputPixelBufferAdaptor?
-    private var pollTimer: DispatchSourceTimer?
-    private var transcodeStartHost: CFTimeInterval = 0
-    private var lastSurface: (id: UInt32, seed: UInt32)?
-    static let transcodeBitrate = 25_000_000
+    // recording started later cannot be passthrough. Instead we subscribe to the shared keyframe
+    // encoder, which re-encodes the decoded picture with a keyframe every second, and record that.
+    /// Set by the host view (`DecodeSession.reencodeHub`).
+    var keyframeHub: ReencodeHub?
+    private var usingHub = false
+    private var hubRelay: HubRelay?
+
+    /// Forwards the hub's samples into the recorder; the raw stream is ignored while this is active.
+    private final class HubRelay: SampleBufferRendering {
+        weak var recorder: Recorder?
+        func enqueue(_ sampleBuffer: CMSampleBuffer) { recorder?.process(sampleBuffer, fromHub: true) }
+        func flush() {}
+    }
 
     /// Shifts a timestamp so the recording starts at 0.
     static func normalized(_ time: CMTime, relativeTo start: CMTime) -> CMTime {
@@ -143,7 +145,7 @@ final class Recorder: ObservableObject, SampleBufferRendering {
         baseURL = url; part = 1; limits = RecordingExtras.currentLimits()
         sessionStart = nil; segmentBytes = 0; sessionElapsed = 0; finished = []; pendingMarkers = []
         armed = true
-        startingFallback = false
+        usingHub = false
         framesSeenWhileArmed = 0
         armedAt = Date()
         Logging.recorder.info("armed, waiting for a start frame: \(url.lastPathComponent, privacy: .public)")
@@ -160,8 +162,9 @@ final class Recorder: ObservableObject, SampleBufferRendering {
         let base = baseURL, marks = pendingMarkers
         writer = nil; input = nil; url = nil; baseURL = nil; armed = false; startTime = nil; lastPTS = nil
         sessionStart = nil; pendingMarkers = []
-        pollTimer?.cancel(); pollTimer = nil; transcoding = false; adaptor = nil; lastSurface = nil
+        let relay = hubRelay; hubRelay = nil; usingHub = false
         lock.unlock()
+        if let relay { keyframeHub?.unsubscribe(relay) }
         guard wasArmed else { completion?(nil); return }
         if let base, !marks.isEmpty { Recorder.writeMarkers(marks, for: base) }
         DispatchQueue.main.async { self.isRecording = false }
@@ -177,10 +180,12 @@ final class Recorder: ObservableObject, SampleBufferRendering {
 
     // MARK: - SampleBufferRendering
 
-    func enqueue(_ sampleBuffer: CMSampleBuffer) {
+    func enqueue(_ sampleBuffer: CMSampleBuffer) { process(sampleBuffer, fromHub: false) }
+
+    private func process(_ sampleBuffer: CMSampleBuffer, fromHub: Bool) {
         lock.lock()
         defer { lock.unlock() }
-        guard armed, !transcoding else { return }
+        guard armed, fromHub == usingHub else { return }
         if writer == nil { framesSeenWhileArmed += 1; if framesSeenWhileArmed == 1 || framesSeenWhileArmed % 120 == 0 { Logging.recorder.info("frames seen while waiting: \(self.framesSeenWhileArmed), keyframe=\(Recorder.isKeyframe(sampleBuffer))") } }
 
         let samplePTS = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
@@ -196,9 +201,11 @@ final class Recorder: ObservableObject, SampleBufferRendering {
             // would wait forever: after `keyframeWait` start on the next frame regardless.
             let waited = armedAt.map { Date().timeIntervalSince($0) } ?? 0
             if !Recorder.isKeyframe(sampleBuffer) {
-                if waited >= Recorder.keyframeWait, fallbackFrameSource != nil, !startingFallback {
-                    startingFallback = true
-                    DispatchQueue.main.async { [weak self] in self?.beginTranscoding() }
+                if !fromHub, waited >= Recorder.keyframeWait, let hub = keyframeHub {
+                    usingHub = true
+                    let relay = HubRelay(); relay.recorder = self; hubRelay = relay
+                    Logging.recorder.info("no IDR from the goggles: recording the re-encoded stream instead")
+                    DispatchQueue.main.async { hub.subscribe(relay) }
                 }
                 return
             }
@@ -255,74 +262,6 @@ final class Recorder: ObservableObject, SampleBufferRendering {
     }
 
     func flush() {}
-
-    // MARK: - Re-encode fallback
-
-    /// Main queue. Opens an encoding writer and starts polling the displayed picture.
-    private func beginTranscoding() {
-        // Needs a picture to learn the size; the next frame retries if none is up yet.
-        let first = fallbackFrameSource?()
-        lock.lock(); defer { lock.unlock(); startingFallback = false }
-        guard armed, writer == nil, let url, let first else { return }
-        let w = CVPixelBufferGetWidth(first), h = CVPixelBufferGetHeight(first)
-        do {
-            let writer = try AVAssetWriter(outputURL: url, fileType: url.pathExtension == "mp4" ? .mp4 : .mov)
-            let settings: [String: Any] = [
-                AVVideoCodecKey: AVVideoCodecType.h264, AVVideoWidthKey: w, AVVideoHeightKey: h,
-                AVVideoCompressionPropertiesKey: [
-                    AVVideoAverageBitRateKey: Recorder.transcodeBitrate,
-                    AVVideoProfileLevelKey: AVVideoProfileLevelH264HighAutoLevel,
-                    AVVideoExpectedSourceFrameRateKey: 60,
-                    AVVideoMaxKeyFrameIntervalKey: 120,
-                    AVVideoAllowFrameReorderingKey: false,
-                ],
-            ]
-            let inp = AVAssetWriterInput(mediaType: .video, outputSettings: settings)
-            inp.expectsMediaDataInRealTime = true
-            let ad = AVAssetWriterInputPixelBufferAdaptor(assetWriterInput: inp, sourcePixelBufferAttributes: nil)
-            guard writer.canAdd(inp) else { return fail("cannot add video input") }
-            writer.add(inp)
-            guard writer.startWriting() else { return fail(writer.error?.localizedDescription ?? "startWriting failed") }
-            writer.startSession(atSourceTime: .zero)
-            self.writer = writer; input = inp; adaptor = ad
-            transcoding = true
-            transcodeStartHost = CACurrentMediaTime()
-            lastPTS = nil; lastSurface = nil
-            Logging.recorder.info("no IDR available: re-encoding the displayed picture (\(w)x\(h), pixel format \(CVPixelBufferGetPixelFormatType(first)), planar=\(CVPixelBufferIsPlanar(first)))")
-            let t = DispatchSource.makeTimerSource(queue: .main)
-            t.schedule(deadline: .now(), repeating: .milliseconds(8))
-            t.setEventHandler { [weak self] in self?.pollDisplayedFrame() }
-            pollTimer = t
-            t.resume()
-        } catch {
-            fail(error.localizedDescription)
-        }
-    }
-
-    /// Main queue. Appends the displayed picture whenever it changed.
-    private func pollDisplayedFrame() {
-        lock.lock(); defer { lock.unlock() }
-        guard transcoding, let writer, let input, let adaptor, writer.status == .writing else { return }
-        if writer.status == .failed { return fail(writer.error?.localizedDescription ?? "writer failed") }
-        guard input.isReadyForMoreMediaData, let buf = fallbackFrameSource?() else { return }
-        if let surface = CVPixelBufferGetIOSurface(buf)?.takeUnretainedValue() {
-            let key = (id: IOSurfaceGetID(surface), seed: IOSurfaceGetSeed(surface))
-            if let last = lastSurface, last == key { return }
-            lastSurface = key
-        }
-        var pts = CMTime(seconds: CACurrentMediaTime() - transcodeStartHost, preferredTimescale: 1_000_000)
-        // Wider than the passthrough spacing: the mp4 muxer rounds to its own timescale and duplicate DTS values warn.
-        let spacing = CMTime(value: 1, timescale: 120)
-        if let last = lastPTS, pts <= last + spacing { pts = last + spacing }
-        if adaptor.append(buf, withPresentationTime: pts) {
-            lastPTS = pts
-            let secs = CMTimeGetSeconds(pts)
-            sessionElapsed = secs
-            elapsed = secs
-        } else {
-            fail(writer.error?.localizedDescription ?? "append failed")
-        }
-    }
 
     /// Finalizes the current segment and points `url` at the next part; the same
     /// keyframe then opens the new file in `enqueue`. Caller holds `lock`.

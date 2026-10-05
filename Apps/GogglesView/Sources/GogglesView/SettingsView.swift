@@ -68,6 +68,7 @@ struct SettingsView: View {
                         card { BurnInSettingsSection() }
                         card { GallerySettingsRow() }
                     case .streaming:
+                        card { ReencodeSettingsSection() }
                         card { NetworkStreamSettingsSection() }
                         card { RTMPSettingsSection() }
                         card { WebViewerSettingsSection() }
@@ -197,7 +198,7 @@ struct SettingsView: View {
                 Toggle("Resolution", isOn: $osdResolution)
                 Toggle("Framerate", isOn: $osdFps)
                 Toggle("Bitrate", isOn: $osdBitrate)
-                Toggle("Latency (helper to screen)", isOn: $osdLatency)
+                Toggle("Latency (stream in to decoded picture)", isOn: $osdLatency)
                 Toggle("Dropped frames", isOn: $osdDrops)
                 Toggle("Goggles battery", isOn: $osdBattery)
             }

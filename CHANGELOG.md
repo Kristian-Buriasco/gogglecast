@@ -4,12 +4,17 @@ All notable changes to this project are documented here. Format based on [Keep a
 
 ## [Unreleased]
 
-### Fixed
-- Recording started mid-stream produced no file (0.3.0) or an unplayable one: the goggles send a single keyframe when Share Liveview starts and none after. A recording armed before that keyframe stays lossless passthrough; one started later now falls back to re-encoding the displayed picture (hardware H.264, 25 Mbps) after 1 s, so it plays from the first frame.
-- Recorder now logs its lifecycle and failures (subsystem `com.kburiasco.gogglesview.app`, category `Recorder`).
+### Added
+- Shared keyframe encoder: instant replay, UDP, RTMP, SRT and the web viewer now get a re-encoded stream with a keyframe every second (hardware encoder, only while one of them is active), so clips and late-joining viewers start cleanly. Settings > Streaming has an on/off switch and a bitrate stepper.
+- The overlay's latency now measures the stream arriving to the decoded picture being ready (includes hardware decode).
 
-### Known issues
-- Instant replay and the UDP/RTMP/SRT/HLS outputs still depend on keyframes. Clips saved from a long-running stream, and players that join late, may start with grey areas until the goggles send a new keyframe.
+### Changed
+- The app decodes the stream once and gives every window the decoded picture. A capture or mini window opened mid-stream, or a window reopened after closing, shows video straight away instead of waiting for a keyframe.
+- The window's "Disconnect" button is now "Close": it hides the window and keeps the stream and decoder running, so coming back is instant. Goggles > Disconnect and the menu-bar item still stop the stream.
+
+### Fixed
+- Recording started mid-stream produced no file or an unplayable one (the goggles send a single keyframe when Share Liveview starts and none after). A recording armed before that keyframe stays lossless passthrough; one started later now records the shared keyframe encoder's stream after 1 s, so it plays from the first frame.
+- Recorder now logs its lifecycle and failures (subsystem `com.kburiasco.gogglesview.app`, category `Recorder`).
 
 ## [0.3.0] - 2026-10-04
 

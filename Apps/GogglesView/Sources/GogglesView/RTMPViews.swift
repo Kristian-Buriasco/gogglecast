@@ -21,7 +21,7 @@ struct RTMPStreamControl: View {
     private func toggle() { publisher.isStreaming ? stop() : start() }
 
     private func start() {
-        session.addConsumer(publisher)
+        session.addKeyframeSafeConsumer(publisher)
         publisher.start(url: RTMPPrefs.url, streamKey: RTMPPrefs.streamKey)
     }
 

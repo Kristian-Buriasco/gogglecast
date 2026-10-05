@@ -41,7 +41,7 @@ struct ReplayControl: View {
     private func sync() {
         if enabled {
             buffer.setSeconds(clamped)
-            session.addConsumer(buffer)
+            session.addKeyframeSafeConsumer(buffer)
         } else {
             session.removeConsumer(buffer)
             buffer.clear()

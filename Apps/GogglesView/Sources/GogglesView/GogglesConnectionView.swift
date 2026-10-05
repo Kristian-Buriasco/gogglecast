@@ -155,7 +155,7 @@ struct GogglesConnectionView: View {
         let url = UniqueFileURL.reserve(Recorder.defaultURL())
         do {
             try recorder.start(to: url)
-            recorder.fallbackFrameSource = { [weak session] in session?.copyDisplayedFrame() }
+            recorder.keyframeHub = session.reencodeHub
             NotificationCenter.default.post(name: .gogglesRecordingStarted, object: session, userInfo: ["path": url.path])
         } catch { session.removeConsumer(recorder) }
     }
@@ -299,13 +299,13 @@ struct GogglesConnectionView: View {
             }
             if let onDisconnect {
                 Button(action: onDisconnect) {
-                    Label("Disconnect", systemImage: "xmark.circle")
+                    Label("Close", systemImage: "xmark.circle")
                         .font(.caption)
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
-                .help("Stop streaming these goggles and close this window")
-                .accessibilityHint("Stops streaming these goggles and closes this window")
+                .help("Hide this window. The stream keeps running, so coming back shows video straight away. To stop it, use Goggles > Disconnect or the menu bar item.")
+                .accessibilityHint("Hides this window; the stream keeps running")
                 .accessibilityIdentifier("disconnectButton")
             }
             Button {
@@ -364,7 +364,7 @@ struct GogglesConnectionView: View {
         ZStack {
             GogglesVideoView(session: session)
                 .opacity(videoOpacity)
-            OSDOverlay(stats: coordinator.stats, resolution: resolutionText, latencyMs: session.latencyMs,
+            OSDOverlay(stats: coordinator.stats, resolution: resolutionText, latencyMs: session.decodeLatencyMs ?? session.latencyMs,
                        batteryPercent: coordinator.batteryPercent)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 .opacity(videoOpacity)

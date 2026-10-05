@@ -24,7 +24,7 @@ struct SRTStreamControl: View {
     private func toggle() { out.isStreaming ? stop() : start() }
 
     private func start() {
-        session.addConsumer(out)
+        session.addKeyframeSafeConsumer(out)
         out.start(mode: SRTPrefs.mode, host: SRTPrefs.host, port: SRTPrefs.port,
                   latencyMs: SRTPrefs.latencyMs, passphrase: SRTPrefs.passphrase)
         if !out.isStreaming { session.removeConsumer(out) }
@@ -89,7 +89,7 @@ struct NDIStreamControl: View {
     private func toggle() { out.isStreaming ? stop() : start() }
 
     private func start() {
-        session.addConsumer(out)
+        session.addKeyframeSafeConsumer(out)
         out.start(sourceName: NDIPrefs.sourceName)
         if !out.isStreaming { session.removeConsumer(out) }
     }

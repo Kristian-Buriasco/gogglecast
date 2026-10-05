@@ -33,6 +33,7 @@ enum DecodeSessionError: Error, Equatable {
     case blockBufferCreationFailed(OSStatus)
     case sampleBufferCreationFailed(OSStatus)
     case attachmentsUnavailable
+    case decoderFailed(OSStatus)
 }
 
 /// Owns the parameter-set cache (Task 3.2) and the running
@@ -62,8 +63,20 @@ final class DecodeSession: ObservableObject {
     /// display layer (XPC + queueing). Excludes goggles-internal and display time.
     @Published private(set) var latencyMs: Double?
     private var latencyEMA: Double?
+    /// Smoothed delay from the helper stamping a NAL to the decoded picture being ready for display:
+    /// XPC + queueing + hardware decode. The screen adds at most one refresh on top.
+    @Published private(set) var decodeLatencyMs: Double?
+    private var decodeEMA: Double?
+    private var lastDecodePublish: UInt64 = 0
     private var lastLatencyPublish: UInt64 = 0
     private(set) var consecutiveFailures = 0
+    // Decode once, display everywhere: display layers get decoded pictures from this session's own
+    // decoder, so a window opened later needs no keyframe of its own. The decoder is created from the
+    // stream's parameter sets and only starts at an IDR.
+    private var decoder: VTDecompressionSession?
+    private var decoderReady = false
+    private let frameLock = NSLock()
+    private var latestDecoded: CVPixelBuffer?
     private(set) var teardownCount = 0
 
     /// Fired (on whatever queue `handle`/`recordExternalFailure` is called
@@ -81,6 +94,8 @@ final class DecodeSession: ObservableObject {
 
     init() {}
 
+    deinit { invalidateDecoder() }
+
     /// Attaches (or replaces) the render target. Safe to call before any
     /// NAL has been seen, and again later (e.g. `GogglesVideoView` handing
     /// over a freshly-created `AVSampleBufferDisplayLayer` once its host
@@ -91,6 +106,7 @@ final class DecodeSession: ObservableObject {
 
     /// The frame currently on screen in the primary display layer (screenshots).
     func copyDisplayedFrame() -> CVPixelBuffer? {
+        if let f = latestDecodedFrame() { return f }
         guard #available(macOS 14.4, *) else { return nil }
         return (renderer as? AVSampleBufferDisplayLayer)?.sampleBufferRenderer.displayedPixelBuffer()
     }
@@ -116,8 +132,25 @@ final class DecodeSession: ObservableObject {
 
     func removeConsumer(_ consumer: SampleBufferRendering) {
         consumerLock.lock()
-        defer { consumerLock.unlock() }
         extraConsumers.removeAll { $0.value == nil || $0.value === consumer }
+        consumerLock.unlock()
+        reencodeHub.unsubscribe(consumer)
+    }
+
+    /// Re-encodes the displayed picture with a keyframe every second (see `ReencodeHub`).
+    lazy var reencodeHub = ReencodeHub(source: { [weak self] in self?.latestDecodedFrame() })
+
+    /// For consumers that must be able to start cleanly at any time (replay, network outputs).
+    /// Gets the re-encoded stream, or the raw one when re-encoding is turned off in Settings.
+    func addKeyframeSafeConsumer(_ consumer: SampleBufferRendering) {
+        if ReencodePrefs.enabled {
+            consumerLock.lock()
+            extraConsumers.removeAll { $0.value == nil || $0.value === consumer }
+            consumerLock.unlock()
+            reencodeHub.subscribe(consumer)
+        } else {
+            addConsumer(consumer)
+        }
     }
 
     /// `true` once a parameter set has been decoded and cached -- i.e.
@@ -195,15 +228,104 @@ final class DecodeSession: ObservableObject {
             hostTime: hostTime
         )
         try DecodeSession.markDisplayImmediately(sampleBuffer)
-        renderer?.enqueue(sampleBuffer)
+        feedDecoder(sampleBuffer, avcc: avccData, format: formatDescription)
+        // Display layers are fed decoded pictures (see `decoded`); every other consumer gets the stream.
+        if let renderer, !(renderer is AVSampleBufferDisplayLayer) { renderer.enqueue(sampleBuffer) }
         recordLatency(hostTime: hostTime)
         consumerLock.lock()
         let extras = extraConsumers.compactMap { $0.value }
         consumerLock.unlock()
-        for consumer in extras { consumer.enqueue(sampleBuffer) }
+        for consumer in extras where !(consumer is AVSampleBufferDisplayLayer) { consumer.enqueue(sampleBuffer) }
+    }
+
+    // MARK: - Decoder
+
+    private func feedDecoder(_ sample: CMSampleBuffer, avcc: Data, format: CMVideoFormatDescription) {
+        if let d = decoder, !VTDecompressionSessionCanAcceptFormatDescription(d, formatDescription: format) {
+            invalidateDecoder()
+        }
+        if decoder == nil { createDecoder(format) }
+        guard let decoder else { return }
+        if !decoderReady {
+            // A decoder joining mid-stream would only produce grey; wait for a real IDR.
+            guard Recorder.containsIDR(avcc: avcc) == true else { return }
+            decoderReady = true
+        }
+        let status = VTDecompressionSessionDecodeFrame(
+            decoder, sampleBuffer: sample,
+            flags: [._EnableAsynchronousDecompression, ._1xRealTimePlayback], infoFlagsOut: nil
+        ) { [weak self] status, _, image, pts, _ in
+            self?.decoded(status: status, image: image, pts: pts)
+        }
+        if status != noErr { recordFailure(DecodeSessionError.decoderFailed(status)) }
+    }
+
+    private func createDecoder(_ format: CMVideoFormatDescription) {
+        var s: VTDecompressionSession?
+        let attrs: [CFString: Any] = [kCVPixelBufferIOSurfacePropertiesKey: [String: Any]()]
+        let st = VTDecompressionSessionCreate(
+            allocator: nil, formatDescription: format, decoderSpecification: nil,
+            imageBufferAttributes: attrs as CFDictionary, outputCallback: nil, decompressionSessionOut: &s)
+        guard st == noErr, let s else {
+            Logging.decode.error("decoder create failed (\(st, privacy: .public))")
+            return
+        }
+        VTSessionSetProperty(s, key: kVTDecompressionPropertyKey_RealTime, value: kCFBooleanTrue)
+        decoder = s
+        decoderReady = false
+    }
+
+    private func invalidateDecoder() {
+        if let d = decoder {
+            VTDecompressionSessionWaitForAsynchronousFrames(d)
+            VTDecompressionSessionInvalidate(d)
+        }
+        decoder = nil
+        decoderReady = false
+    }
+
+    /// Decoder output (VideoToolbox thread): remember the picture and hand it to every display layer.
+    private func decoded(status: OSStatus, image: CVImageBuffer?, pts: CMTime) {
+        guard status == noErr, let image else {
+            if status != noErr { recordFailure(DecodeSessionError.decoderFailed(status)) }
+            return
+        }
+        frameLock.lock(); latestDecoded = image; frameLock.unlock()
+        var fd: CMVideoFormatDescription?
+        guard CMVideoFormatDescriptionCreateForImageBuffer(allocator: nil, imageBuffer: image, formatDescriptionOut: &fd) == noErr,
+              let fd else { return }
+        var timing = CMSampleTimingInfo(duration: .invalid, presentationTimeStamp: pts, decodeTimeStamp: .invalid)
+        var sample: CMSampleBuffer?
+        guard CMSampleBufferCreateReadyWithImageBuffer(allocator: nil, imageBuffer: image, formatDescription: fd,
+                                                       sampleTiming: &timing, sampleBufferOut: &sample) == noErr,
+              let sample else { return }
+        try? DecodeSession.markDisplayImmediately(sample)
+        consecutiveFailures = 0
+        recordDecodeLatency(stampNs: pts.value)
+        if let layer = renderer as? AVSampleBufferDisplayLayer { layer.enqueue(sample) }
+        consumerLock.lock()
+        let layers = extraConsumers.compactMap { $0.value as? AVSampleBufferDisplayLayer }
+        consumerLock.unlock()
+        for layer in layers where layer !== renderer { layer.enqueue(sample) }
+    }
+
+    /// The newest decoded picture, independent of whether any window is showing.
+    func latestDecodedFrame() -> CVPixelBuffer? {
+        frameLock.lock(); defer { frameLock.unlock() }
+        return latestDecoded
     }
 
     // MARK: - Latency
+
+    private func recordDecodeLatency(stampNs: Int64) {
+        let now = DispatchTime.now().uptimeNanoseconds
+        guard stampNs > 0, now >= UInt64(stampNs) else { return }
+        let ms = DecodeSession.milliseconds(fromNanoseconds: now - UInt64(stampNs))
+        decodeEMA = decodeEMA.map { $0 * 0.9 + ms * 0.1 } ?? ms
+        guard DecodeSession.milliseconds(fromNanoseconds: now &- lastDecodePublish) >= 500, let value = decodeEMA else { return }
+        lastDecodePublish = now
+        DispatchQueue.main.async { self.decodeLatencyMs = value }
+    }
 
     static func milliseconds(fromNanoseconds ns: UInt64) -> Double {
         Double(ns) / 1_000_000
@@ -332,6 +454,7 @@ final class DecodeSession: ObservableObject {
     private func tearDown() {
         Logging.decode.fault("\(DecodeSession.maxConsecutiveFailures, privacy: .public) consecutive decode failures -- tearing down decode session, waiting for next parameter set")
         formatCache.reset()
+        invalidateDecoder()
         renderer?.flush()
         consecutiveFailures = 0
         teardownCount += 1

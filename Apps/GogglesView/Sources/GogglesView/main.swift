@@ -406,6 +406,7 @@ if args.contains("--run") || !args.dropFirst().contains(where: { $0.hasPrefix("-
     // Forward-declared so the menu targets below can call them.
     var presentPicker: () -> Void = {}
     var disconnectSession: (String) -> Void = { _ in }
+    var parkSession: (String) -> Void = { _ in }
 
     let gogglesMenuItem = NSMenuItem()
     mainMenu.addItem(gogglesMenuItem)
@@ -485,7 +486,7 @@ if args.contains("--run") || !args.dropFirst().contains(where: { $0.hasPrefix("-
                 cascadeFrom: cascadeFrom,
                 settingsWindowController: settingsWindowController,
                 onOpenAnother: { presentPicker() },
-                onDisconnect: { disconnectSession($0) }
+                onDisconnect: { parkSession($0) }
             )
         }
         guard created else { return }
@@ -546,6 +547,15 @@ if args.contains("--run") || !args.dropFirst().contains(where: { $0.hasPrefix("-
         window.makeKeyAndOrderFront(nil)
         app.activate(ignoringOtherApps: true)
         picker.resumeIfConnected()
+    }
+
+    // The window's close button: hide the window but keep the stream and decoder running, so coming
+    // back shows video at once (the goggles only send a keyframe when Share Liveview starts).
+    // The menu-bar item and Goggles > Disconnect still stop the stream for real.
+    parkSession = { deviceId in
+        guard let session = registry.session(for: deviceId) else { return }
+        session.window.orderOut(nil)
+        if !registry.all.contains(where: { $0.window.isVisible }) { presentPicker() }
     }
 
     disconnectSession = { deviceId in
