@@ -4,6 +4,13 @@ All notable changes to this project are documented here. Format based on [Keep a
 
 ## [Unreleased]
 
+### Fixed
+- Recording started mid-stream produced no file (0.3.0) or an unplayable one: the goggles send a single keyframe when Share Liveview starts and none after. A recording armed before that keyframe stays lossless passthrough; one started later now falls back to re-encoding the displayed picture (hardware H.264, 25 Mbps) after 1 s, so it plays from the first frame.
+- Recorder now logs its lifecycle and failures (subsystem `com.kburiasco.gogglesview.app`, category `Recorder`).
+
+### Known issues
+- Instant replay and the UDP/RTMP/SRT/HLS outputs still depend on keyframes. Clips saved from a long-running stream, and players that join late, may start with grey areas until the goggles send a new keyframe.
+
 ## [0.3.0] - 2026-10-04
 
 ### Added

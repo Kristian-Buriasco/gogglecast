@@ -155,6 +155,7 @@ struct GogglesConnectionView: View {
         let url = UniqueFileURL.reserve(Recorder.defaultURL())
         do {
             try recorder.start(to: url)
+            recorder.fallbackFrameSource = { [weak session] in session?.copyDisplayedFrame() }
             NotificationCenter.default.post(name: .gogglesRecordingStarted, object: session, userInfo: ["path": url.path])
         } catch { session.removeConsumer(recorder) }
     }

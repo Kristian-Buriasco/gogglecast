@@ -24,4 +24,6 @@ enum Logging {
     /// Task 3.3: `DecodeSession`'s Annex-B->AVCC conversion, `CMSampleBuffer`
     /// construction, and §7 error-policy (drop/teardown) logging.
     static let decode = Logger(subsystem: subsystem, category: "Decode")
+    /// Recorder lifecycle: armed, writer created, failures.
+    static let recorder = Logger(subsystem: subsystem, category: "Recorder")
 }

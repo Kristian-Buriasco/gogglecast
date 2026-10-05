@@ -204,7 +204,15 @@ if let idx = args.firstIndex(of: "--record-test") {
     var firstHost: UInt64?
     var firstApp: UInt64?
     var seen = 0
+    var typeCounts: [Int: Int] = [:]
+    var paramSets = 0
+    var realTypeCounts: [Int: Int] = [:]
     client.onNALUnit = { data, nalType, isParameterSet, hostTime in
+        if isParameterSet { paramSets += 1 } else { typeCounts[Int(nalType), default: 0] += 1 }
+        // Real header type: skip an Annex-B start code if present.
+        var o = 0
+        if data.count > 4, data[0] == 0, data[1] == 0, (data[2] == 1 || (data[2] == 0 && data[3] == 1)) { o = data[2] == 1 ? 3 : 4 }
+        if o < data.count { realTypeCounts[Int(data[o] & 0x1F), default: 0] += 1 }
         if !isParameterSet, seen < 80 {
             let now = mach_absolute_time()
             if firstHost == nil { firstHost = hostTime; firstApp = now }
@@ -225,7 +233,8 @@ if let idx = args.firstIndex(of: "--record-test") {
             do { try recorder.start() } catch { print("[record-test] start failed: \(error)"); exit(4) }
             DispatchQueue.main.asyncAfter(deadline: .now() + seconds) {
                 recorder.stop { url in
-                    print("[record-test] file: \(url?.path ?? "nil") lastError=\(recorder.lastError ?? "nil")")
+                    print("[record-test] nal types (excluding parameter sets): \(typeCounts.sorted { $0.key < $1.key }) parameterSets=\(paramSets) realHeaderTypes=\(realTypeCounts.sorted { $0.key < $1.key })")
+            print("[record-test] file: \(url?.path ?? "nil") lastError=\(recorder.lastError ?? "nil")")
                     client.stopStreaming(deviceId: deviceId) { exit(url == nil ? 5 : 0) }
                 }
             }
