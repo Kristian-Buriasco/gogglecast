@@ -11,6 +11,12 @@ A free, native macOS app that shows the live video feed from DJI Goggles 3 on a 
 
 **[Download the latest release](https://github.com/Kristian-Buriasco/gogglecast/releases/latest)** (DMG, Apple Silicon, not notarized).
 
+![Live view with the stats overlay](docs/images/live-view.png)
+
+<p>
+<img src="docs/images/settings.png" width="49%" alt="Settings"> <img src="docs/images/picker.png" width="49%" alt="Goggles picker">
+</p>
+
 ## Features
 
 - Live view of the goggles' video feed, H.264 passthrough decoded with VideoToolbox.
