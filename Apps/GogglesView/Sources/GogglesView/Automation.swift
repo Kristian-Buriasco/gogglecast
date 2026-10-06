@@ -41,6 +41,7 @@ enum AutomationCommand: Equatable {
     case addMarker(label: String)
     case startStream, stopStream
     case showWindow
+    case raceOn, raceOff, raceToggle
 }
 
 struct AutomationRequest: Equatable {
@@ -61,6 +62,7 @@ enum AutomationURLParser {
     static let examplePaths = [
         "record/start", "record/stop", "record/toggle", "replay/save", "screenshot", "screenshot/copy",
         "freeze/toggle", "marker", "stream/start", "stream/stop", "window/show",
+        "race/on", "race/off", "race/toggle",
     ]
 
     static func parse(_ url: URL) -> AutomationRequest? {
@@ -104,6 +106,9 @@ enum AutomationURLParser {
         case "stream/start": command = .startStream
         case "stream/stop": command = .stopStream
         case "window/show": command = .showWindow
+        case "race/on": command = .raceOn
+        case "race/off": command = .raceOff
+        case "race/toggle": command = .raceToggle
         default: return nil
         }
         return AutomationRequest(command: command, device: device)
@@ -210,6 +215,13 @@ final class AutomationController: NSObject {
 
     func perform(_ request: AutomationRequest) -> AutomationResult {
         guard AutomationPrefs.enabled() else { return .disabled }
+        // Race mode is app-wide, so it needs no target window.
+        switch request.command {
+        case .raceOn: RaceModeController.shared.set(true); return .done
+        case .raceOff: RaceModeController.shared.set(false); return .done
+        case .raceToggle: RaceModeController.shared.toggle(); return .done
+        default: break
+        }
         guard let session = target(device: request.device) else {
             if request.command == .showWindow, request.device == nil {
                 showWithoutSession()
@@ -233,6 +245,7 @@ final class AutomationController: NSObject {
         case .startStream: post(.gogglesNetworkStreamStart)
         case .stopStream: post(.gogglesNetworkStreamStop)
         case .showWindow: session.focus()
+        case .raceOn, .raceOff, .raceToggle: break
         }
         return .done
     }

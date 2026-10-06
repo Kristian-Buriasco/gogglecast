@@ -68,7 +68,7 @@ final class Stabilizer {
 
     /// Returns a stabilized copy of `input`, or `input` itself when off or when anything fails.
     func process(_ input: CVPixelBuffer) -> CVPixelBuffer {
-        guard StabilizerPrefs.enabled else {
+        guard StabilizerPrefs.enabled, !RaceModePrefs.enabled else {
             lock.lock(); if previousSmall != nil { previousSmall = nil; smoother.reset() }; lock.unlock()
             return input
         }

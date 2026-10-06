@@ -431,6 +431,15 @@ if args.contains("--run") || !args.dropFirst().contains(where: { $0.hasPrefix("-
     disconnectMenuItem.target = disconnectMenuTarget
     disconnectMenuItem.isEnabled = false
     gogglesMenu.addItem(disconnectMenuItem)
+    gogglesMenu.addItem(.separator())
+    let raceMenuTarget = MenuActionTarget { RaceModeController.shared.toggle() }
+    let raceMenuItem = NSMenuItem(title: "Race Mode", action: #selector(MenuActionTarget.invoke), keyEquivalent: "")
+    raceMenuItem.target = raceMenuTarget
+    raceMenuItem.state = RaceModePrefs.enabled ? .on : .off
+    gogglesMenu.addItem(raceMenuItem)
+    NotificationCenter.default.addObserver(forName: .gogglesRaceModeChanged, object: nil, queue: .main) { _ in
+        raceMenuItem.state = RaceModePrefs.enabled ? .on : .off
+    }
     gogglesMenuItem.submenu = gogglesMenu
 
     let windowMenuItem = NSMenuItem()
@@ -593,6 +602,7 @@ if args.contains("--run") || !args.dropFirst().contains(where: { $0.hasPrefix("-
         frontmost: { sessionForCommand() },
         showWithoutSession: { presentPicker() }
     )
+    RaceModeController.shared.install(sessions: { registry.all })
     presentPicker()
     OnboardingWindow.showIfFirstRun()  // after the picker so it opens on top
 
@@ -600,7 +610,7 @@ if args.contains("--run") || !args.dropFirst().contains(where: { $0.hasPrefix("-
     app.activate(ignoringOtherApps: true)
     // `app.run()` is called exactly once for the whole process; every window
     // after this point is created from main-queue callbacks while it spins.
-    withExtendedLifetime((appDelegate, settingsWindowController, settingsMenuTarget, reconnectMenuTarget,
+    withExtendedLifetime((appDelegate, raceMenuTarget, settingsWindowController, settingsMenuTarget, reconnectMenuTarget,
                          openAnotherMenuTarget, disconnectMenuTarget, menuBarController, registry)) {
         app.run()
     }

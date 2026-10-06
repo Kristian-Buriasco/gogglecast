@@ -125,3 +125,83 @@ not found), and the stream resolution from the SPS.
   counters are read; the capture/mini windows and outputs (recording,
   streaming) still receive the same samples and cost CPU, which does show up
   in the CPU figure.
+
+## Race mode
+
+Settings > Display > **Race mode**, Goggles menu > Race Mode, the menu-bar menu,
+`gogglesview://race/on|off|toggle` and the AppleScript property `race mode`
+(read/write) switch the lowest-latency preview. It is app-wide, applies
+instantly and survives restarts (`raceMode` in UserDefaults, default off). A red
+RACE badge shows in the video window (not in the capture window, which stays
+clean for OBS). No global hotkey: the hotkeys are per-window and a test pins
+their count, so it was not trivial.
+
+### Audit of the preview path
+
+Already minimal, unchanged:
+
+- Decoder: `kVTDecompressionPropertyKey_RealTime` is set, frames are decoded with
+  `_EnableAsynchronousDecompression` + `_1xRealTimePlayback`, and
+  `EnableTemporalProcessing` is not set, so output is in decode order with no
+  reorder queue. The decoder is a single session shared by all windows.
+- Display: pictures are enqueued with `kCMSampleAttachmentKey_DisplayImmediately`,
+  there is no timebase/presentation clock, and the layer is the view's backing
+  layer (no extra passthrough layer). Layout transforms (orientation, zoom, pan,
+  crop) are compositor-side and cost no frame delay.
+- Idle features cost nothing: the keyframe re-encode hub only runs while
+  something subscribes; the output crop/look (`OutputProcessor`) runs only in
+  that hub; the benchmark recorder exists only during a run; recording
+  passthrough taps the compressed NALs, not the preview.
+
+Avoidable, now removed by race mode (all live, no decoder re-creation):
+
+| Item | Cost | Race mode |
+|---|---|---|
+| Stabilizer | CoreImage render + Vision registration on the decode callback, a few ms per frame, inline before the frame is shown | bypassed (and its state reset) |
+| Preview LUT, brightness/contrast/saturation | `CALayer.filters` evaluated by the compositor every frame | filters removed |
+| Grid overlay | extra shape layer | emptied |
+| Stats overlay (OSD) | SwiftUI re-render on the main thread, which also feeds the decoder | hidden |
+| Mini window | a second display layer enqueued from the decode callback, plus a window to composite | hidden (preference kept, restored when race mode ends) |
+| Decoder power hints | `MaximizePowerEfficiency` may let the hardware decoder favour efficiency | set to false on the running session; original value restored when race mode ends |
+
+The decoder is also created with `EnableHardwareAcceleratedVideoDecoder` set (not
+`Require`, so software remains the fallback). On Apple Silicon hardware decode is
+the default, so this is an explicit statement rather than a change.
+
+Why no decoder re-creation: every property above applies to a live
+`VTDecompressionSession`, and the goggles send a single IDR, so re-creating the
+decoder would freeze the picture until the next IDR. If a future property ever
+needs it, it must go through the existing `decoderReady` IDR gate, never an
+unconditional invalidate.
+
+Not touched on purpose:
+
+- Capture window (OBS): an output, kept. It adds one more `enqueue` per frame;
+  close it while racing if every millisecond counts.
+- Replay buffer / keyframe hub: when replay is enabled in Settings, the hub
+  polls every 8 ms **on the main queue**, which is also where NALs are delivered
+  and decoded. That is the main remaining avoidable cost for people who leave
+  replay on. Recommendation (not done, it changes threading of the hub): run the
+  hub's timer on its own serial queue. Race mode does not disable replay or any
+  stream and never starts the hub.
+- Stabilized frames are not recorded or streamed while race mode is on, because
+  those outputs read the same decoded picture.
+
+Remaining costs outside race mode's reach:
+
+- The whole decode feed (XPC callback -> Annex B to AVCC copy -> sample buffer ->
+  `VTDecompressionSessionDecodeFrame`) runs on the main queue. Anything slow on
+  main (any SwiftUI update, another window) delays the next frame. Moving it to a
+  dedicated queue would remove that coupling but changes `DecodeSession`'s
+  threading contract; not done here.
+- `decoded()` builds a new `CMVideoFormatDescription` per frame; microseconds, cached
+  would be marginally cheaper.
+- The display's refresh (0-16.7 ms at 60 Hz) and the compositor.
+
+### Measurement
+
+Not measured. A synthetic H.264 source for `DecodeSession` needs the bundled
+parameter-set blob format and a real encoder loop, and a decode-latency number
+without the real goggles stream would not reflect the 146 ms glass-to-glass path
+(our share is a few ms). To compare, run Settings > Advanced > Run benchmark
+once with race mode off and once on, on a live stream.

@@ -69,6 +69,12 @@ extension NSApplication {
         return AutomationRecordingState.shared.isRecording(s.decodeSession)
     }
 
+    /// Race mode (lowest-latency preview). Settable, same "Allow automation" gate as the commands.
+    @objc var gvRaceMode: Bool {
+        get { RaceModePrefs.enabled }
+        set { if AutomationPrefs.enabled() { RaceModeController.shared.set(newValue) } }
+    }
+
     @objc var gvBattery: NSNumber? {
         AutomationController.shared.target(device: nil)?.coordinator.batteryPercent.map { NSNumber(value: $0) }
     }

@@ -67,6 +67,7 @@ struct SettingsView: View {
                         card { OrientationSettingsSection() }
                         card { captureWindowSection }
                         card { MiniWindowSettingsSection() }
+                        card { RaceModeSettingsSection() }
                     case .recording:
                         card { recordingSection }
                         card { RecordingExtrasSettingsSection() }

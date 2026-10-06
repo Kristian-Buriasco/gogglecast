@@ -21,6 +21,7 @@ struct OSDOverlay: View {
     var batteryPercent: Int?
 
     @AppStorage(OSDPrefs.enabledKey) private var enabled = false
+    @AppStorage(RaceModePrefs.key) private var race = false
     @AppStorage(OSDPrefs.showFpsKey) private var showFps = true
     @AppStorage(OSDPrefs.showBitrateKey) private var showBitrate = true
     @AppStorage(OSDPrefs.showResolutionKey) private var showResolution = true
@@ -44,7 +45,7 @@ struct OSDOverlay: View {
     }
 
     var body: some View {
-        if enabled, let stats {
+        if enabled, !race, let stats {
             let lines = Self.lines(stats: stats, resolution: resolution, fps: showFps, bitrate: showBitrate,
                                    showResolution: showResolution, drops: showDrops,
                                    latencyMs: latencyMs, showLatency: showLatency,
