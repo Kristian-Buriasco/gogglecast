@@ -1,18 +1,18 @@
 <!doctype html>
-<html lang="en">
+<html lang="it">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>GogglesView: DJI Goggles 3 live view for Mac</title>
-<meta name="description" content="Free, open source macOS app that shows the DJI Goggles 3 live feed over USB-C. Record it, replay it, send it to OBS.">
+<title>GogglesView: la vista live dei DJI Goggles 3 su Mac</title>
+<meta name="description" content="App macOS gratuita e open source che mostra il video live dei DJI Goggles 3 via USB-C. Registralo, rivedilo, mandalo a OBS.">
 <meta property="og:title" content="GogglesView">
-<meta property="og:description" content="DJI Goggles 3 live view on a Mac, over USB-C. Free and open source.">
+<meta property="og:description" content="La vista live dei DJI Goggles 3 su Mac, via USB-C. Gratuita e open source.">
 <meta property="og:image" content="https://kristian-buriasco.github.io/gogglecast/images/social.png">
 <meta property="og:type" content="website">
-<meta property="og:locale" content="en_US">
-<meta property="og:locale:alternate" content="it_IT">
-<meta property="og:url" content="https://kristian-buriasco.github.io/gogglecast/">
-<link rel="canonical" href="https://kristian-buriasco.github.io/gogglecast/">
+<meta property="og:locale" content="it_IT">
+<meta property="og:locale:alternate" content="en_US">
+<meta property="og:url" content="https://kristian-buriasco.github.io/gogglecast/it/">
+<link rel="canonical" href="https://kristian-buriasco.github.io/gogglecast/it/">
 <link rel="alternate" hreflang="en" href="https://kristian-buriasco.github.io/gogglecast/">
 <link rel="alternate" hreflang="it" href="https://kristian-buriasco.github.io/gogglecast/it/">
 <link rel="alternate" hreflang="x-default" href="https://kristian-buriasco.github.io/gogglecast/">
@@ -176,21 +176,21 @@
 </style>
 </head>
 <body>
-<a class="skip" href="#main">Skip to content</a>
+<a class="skip" href="#main">Vai al contenuto</a>
 
 <header class="top page">
     <a class="brand" href="#">GogglesView</a>
     <div class="tools">
-    <nav aria-label="Primary">
-      <a href="#latency">Latency</a>
-      <a href="#features">What it does</a>
-      <a href="#setup">Set up</a>
-      <a href="#limits">Limits</a>
-      <a class="keep" href="https://github.com/Kristian-Buriasco/gogglecast">Source</a>
+    <nav aria-label="Principale">
+      <a href="#latency">Latenza</a>
+      <a href="#features">Cosa fa</a>
+      <a href="#setup">Configurazione</a>
+      <a href="#limits">Limiti</a>
+      <a class="keep" href="https://github.com/Kristian-Buriasco/gogglecast">Sorgente</a>
     </nav>
-    <nav class="lang" aria-label="Language">
-      <span aria-current="true" lang="en">English</span>
-      <a class="keep" href="it/" hreflang="it" lang="it">Italiano</a>
+    <nav class="lang" aria-label="Lingua">
+      <a class="keep" href="../" hreflang="en" lang="en">English</a>
+      <span aria-current="true" lang="it">Italiano</span>
     </nav>
     </div>
 </header>
@@ -199,27 +199,27 @@
   <div class="page">
     <div class="hero">
       <div>
-        <h1>See what your goggles see</h1>
-        <p class="lede">The DJI Goggles 3 live feed on your Mac, over USB-C. Record it, replay it, send it to OBS.</p>
-        <a class="dl" id="dl" href="https://github.com/Kristian-Buriasco/gogglecast/releases/latest">Download GogglesView 0.5.0 (2.4 MB)</a>
-        <a class="alt" href="https://github.com/Kristian-Buriasco/gogglecast">Free and GPL-3.0. Apple Silicon, macOS 14 or later. Read the source.</a>
+        <h1>Guarda quello che vedono i tuoi goggles</h1>
+        <p class="lede">Il video live dei DJI Goggles 3 sul tuo Mac, via USB-C. Registralo, rivedilo, mandalo a OBS.</p>
+        <a class="dl" id="dl" href="https://github.com/Kristian-Buriasco/gogglecast/releases/latest">Scarica GogglesView 0.5.0 (2,4 MB)</a>
+        <a class="alt" href="https://github.com/Kristian-Buriasco/gogglecast">Gratuita, licenza GPL-3.0. Apple Silicon, macOS 14 o successivo. Leggi il sorgente.</a>
       </div>
-      <div class="screen"><img src="images/live-view.png" alt="GogglesView window showing a live feed with the stats overlay" width="1931" height="1091"></div>
+      <div class="screen"><img src="../images/live-view.png" alt="Finestra di GogglesView con un video live e la sovrapposizione delle statistiche" width="1931" height="1091"></div>
     </div>
 
     <section id="latency" aria-labelledby="latency-h">
       <div class="measure">
         <div>
-          <p class="eyebrow">Measured</p>
-          <h2 id="latency-h">Camera to screen in about a seventh of a second</h2>
-          <p>Point the goggles at a stopwatch running on the Mac's own screen. The picture in the app shows an older time than the stopwatch does. The gap is the whole delay: camera, air link, goggles, USB, decode, display.</p>
-          <p>Each reading is good to about one frame at 60 Hz, 17 ms. The app's own share is a few milliseconds of that.</p>
+          <p class="eyebrow">Misurata</p>
+          <h2 id="latency-h">Dalla camera allo schermo in circa un settimo di secondo</h2>
+          <p>Punta i goggles su un cronometro che gira sullo schermo del Mac. L'immagine nell'app mostra un tempo più vecchio di quello del cronometro. La differenza è il ritardo complessivo: camera, collegamento radio, goggles, USB, decodifica, schermo.</p>
+          <p>Ogni lettura è precisa a circa un fotogramma a 60 Hz, cioè 17 ms. La parte dovuta all'app è di pochi millisecondi.</p>
         </div>
         <div>
           <div class="big mono">146<small>ms</small></div>
           <table class="mono">
-            <caption>Five readings, stopwatch in centiseconds</caption>
-            <thead><tr><th scope="col">Run</th><th scope="col">Stopwatch</th><th scope="col">In the app</th><th scope="col">Delay</th></tr></thead>
+            <caption>Cinque letture, cronometro in centesimi di secondo</caption>
+            <thead><tr><th scope="col">Prova</th><th scope="col">Cronometro</th><th scope="col">Nell'app</th><th scope="col">Ritardo</th></tr></thead>
             <tbody>
               <tr><td>1</td><td>49.55</td><td>49.42</td><td>130 ms</td></tr>
               <tr><td>2</td><td>52.44</td><td>52.27</td><td>170 ms</td></tr>
@@ -227,80 +227,80 @@
               <tr><td>4</td><td>48.19</td><td>48.05</td><td>140 ms</td></tr>
               <tr><td>5</td><td>46.85</td><td>46.72</td><td>130 ms</td></tr>
             </tbody>
-            <tfoot><tr><td colspan="3">Mean</td><td>146 ms</td></tr></tfoot>
+            <tfoot><tr><td colspan="3">Media</td><td>146 ms</td></tr></tfoot>
           </table>
         </div>
       </div>
     </section>
 
     <section id="features" aria-labelledby="features-h">
-      <h2 id="features-h">What it does</h2>
+      <h2 id="features-h">Cosa fa</h2>
       <div class="bento">
         <article class="tile dark a">
-          <p class="eyebrow">Recording</p>
-          <h3>Saves the stream the goggles send, untouched</h3>
-          <p>No re-encode, so no quality loss. Files go to <code>~/Movies/GogglesView</code> as .mov or .mp4.</p>
+          <p class="eyebrow">Registrazione</p>
+          <h3>Salva lo stream che mandano i goggles, così com'è</h3>
+          <p>Nessuna ricodifica, quindi nessuna perdita di qualità. I file vanno in <code>~/Movies/GogglesView</code> come .mov o .mp4.</p>
           <ul>
-            <li>Start by hand or when the stream goes live</li>
-            <li>Split by length or size, drop markers while flying</li>
-            <li>Clip gallery with trim that doesn't re-encode</li>
-            <li>Optional logo or text burned in</li>
+            <li>Avvio a mano o quando lo stream parte</li>
+            <li>Divisione per durata o dimensione, marcatori mentre voli</li>
+            <li>Galleria di clip con taglio senza ricodifica</li>
+            <li>Logo o testo incorporato, se vuoi</li>
           </ul>
         </article>
         <article class="tile b">
-          <p class="eyebrow">Send it somewhere</p>
-          <h3>Five outputs</h3>
+          <p class="eyebrow">Mandalo altrove</p>
+          <h3>Cinque uscite</h3>
           <ul>
             <li>UDP MPEG-TS</li>
-            <li>RTMP, for Twitch or YouTube</li>
+            <li>RTMP, per Twitch o YouTube</li>
             <li>SRT</li>
-            <li>Local web viewer</li>
-            <li>NDI, experimental</li>
+            <li>Visualizzatore web locale</li>
+            <li>NDI, sperimentale</li>
           </ul>
         </article>
         <article class="tile c">
-          <p class="eyebrow soon">New in 0.5</p>
-          <h3>Stabilize, grade, crop for export</h3>
-          <p>Electronic stabilization that adds no frames of delay, .cube LUT looks, and a separate crop for what you record and stream. Covered by tests, not yet tried much on live goggles, so tell me what looks off.</p>
+          <p class="eyebrow soon">Novità della 0.5</p>
+          <h3>Stabilizza, correggi i colori, ritaglia per l'export</h3>
+          <p>Stabilizzazione elettronica che non aggiunge fotogrammi di ritardo, look LUT .cube e un ritaglio separato per ciò che registri e trasmetti. Coperta da test, ma ancora poco provata con goggles veri in diretta, quindi dimmi cosa non va.</p>
         </article>
         <article class="tile d">
-          <p class="eyebrow">Control</p>
-          <h3>Without leaving your editor</h3>
-          <p>Menu bar controls, global hotkeys, a <code>gogglesview://</code> URL scheme and AppleScript. Start a recording from a shell script with <code>open gogglesview://…</code>.</p>
+          <p class="eyebrow">Controllo</p>
+          <h3>Senza lasciare l'editor</h3>
+          <p>Comandi nella barra dei menu, scorciatoie globali, uno schema URL <code>gogglesview://</code> e AppleScript. Avvia una registrazione da uno script di shell con <code>open gogglesview://…</code>.</p>
         </article>
         <article class="tile e">
           <p class="eyebrow">Replay</p>
-          <h3>Save what just happened</h3>
-          <p>A rolling buffer you can write to disk after the moment passes.</p>
+          <h3>Salva quello che è appena successo</h3>
+          <p>Un buffer continuo che puoi scrivere su disco a momento passato.</p>
         </article>
         <article class="tile f">
-          <p class="eyebrow">For OBS and for more than one pair</p>
-          <h3>A window made to be captured</h3>
-          <p>A chrome-less capture window for Window Capture, optional keep-on-top, and a mini window. Plug in several goggles and each gets its own window and settings. The app checks GitHub for updates, verifies the checksum and signature, and installs them only when you are not recording.</p>
+          <p class="eyebrow">Per OBS e per più di un paio di goggles</p>
+          <h3>Una finestra fatta per essere catturata</h3>
+          <p>Una finestra di cattura senza cornice per Window Capture, in primo piano se vuoi, e una mini finestra. Collega più goggles e ognuno ha la sua finestra e le sue impostazioni. L'app controlla gli aggiornamenti su GitHub, verifica checksum e firma e li installa solo quando non stai registrando.</p>
         </article>
       </div>
       <div class="steps flip more">
-        <div class="bare"><img src="images/recording-tab.png" alt="The Settings window on the Recording tab, with a sidebar listing General, Display, Recording, Streaming and Advanced" width="1560" height="1335" loading="lazy"></div>
+        <div class="bare"><img src="../images/recording-tab.png" alt="La finestra Impostazioni nella scheda Registrazione, con una barra laterale che elenca Generale, Display, Registrazione, Streaming e Avanzate" width="1560" height="1335" loading="lazy"></div>
         <div>
-          <h3>Settings in five tabs</h3>
-          <p>General, Display, Recording, Streaming and Advanced. Presets switch a whole set of options at once, and each pair of goggles can keep its own saved profile that applies when it connects.</p>
-          <p>The same window runs the update check, the diagnostics report and the latency benchmark. Recording options here include splitting by length or size, a loop mode that keeps only the last few minutes, and auto-delete of old files.</p>
+          <h3>Impostazioni in cinque schede</h3>
+          <p>Generale, Display, Registrazione, Streaming e Avanzate. I preset cambiano un intero gruppo di opzioni in una volta, e ogni paio di goggles può avere il suo profilo salvato, che si applica quando si collega.</p>
+          <p>La stessa finestra gestisce il controllo aggiornamenti, il rapporto diagnostico e il benchmark della latenza. Tra le opzioni di registrazione ci sono la divisione per durata o dimensione, una modalità a ciclo che tiene solo gli ultimi minuti e l'eliminazione automatica dei file vecchi.</p>
         </div>
       </div>
       <div class="steps more">
         <div>
-          <h3>Stabilize, grade and crop in Settings</h3>
-          <p>Live stabilization has one strength slider. Color looks take any 3D .cube file, with an intensity control and separate switches for the preview and for what you record and stream.</p>
-          <p>Output framing has its own aspect, zoom and position, so the preview can stay 16:9 while the file or stream is a vertical 9:16 crop.</p>
+          <h3>Stabilizza, correggi i colori e ritaglia nelle Impostazioni</h3>
+          <p>La stabilizzazione live ha un solo cursore di intensità. I look colore accettano qualsiasi file .cube 3D, con un controllo di intensità e interruttori separati per l'anteprima e per ciò che registri e trasmetti.</p>
+          <p>L'inquadratura in uscita ha proporzioni, zoom e posizione propri, così l'anteprima resta 16:9 mentre il file o lo stream è un ritaglio verticale 9:16.</p>
         </div>
-        <div class="screen"><img src="images/display-tab.png" alt="The Display tab showing live stabilization, framing and color, and output framing" width="1080" height="1373" loading="lazy"></div>
+        <div class="screen"><img src="../images/display-tab.png" alt="La scheda Display con stabilizzazione live, inquadratura e colore, e inquadratura in uscita" width="1080" height="1373" loading="lazy"></div>
       </div>
       <div class="steps flip more">
-        <div class="screen"><img src="images/streaming-tab.png" alt="The Streaming tab with the keyframe encoder switch and the network, RTMP, web viewer and SRT cards" width="1560" height="1295" loading="lazy"></div>
+        <div class="screen"><img src="../images/streaming-tab.png" alt="La scheda Streaming con l'interruttore dell'encoder a keyframe e le schede rete, RTMP, visualizzatore web e SRT" width="1560" height="1295" loading="lazy"></div>
         <div>
-          <h3>Each output has its own card</h3>
-          <p>UDP, RTMP, the local web viewer, SRT and NDI are set up separately. The switch at the top turns the keyframe encoder on or off, and the stepper beside it sets its bitrate.</p>
-          <p>The RTMP stream key is kept in the macOS Keychain. The web viewer listens on localhost unless you allow other devices.</p>
+          <h3>Ogni uscita ha la sua scheda</h3>
+          <p>UDP, RTMP, il visualizzatore web locale, SRT e NDI si configurano separatamente. L'interruttore in alto accende o spegne l'encoder a keyframe, e il selettore accanto ne imposta il bitrate.</p>
+          <p>La chiave dello stream RTMP è conservata nel Portachiavi di macOS. Il visualizzatore web ascolta solo su localhost, a meno che tu non permetta altri dispositivi.</p>
         </div>
       </div>
     </section>
@@ -308,40 +308,40 @@
     <section id="setup" aria-labelledby="setup-h">
       <div class="steps">
         <div>
-          <h2 id="setup-h">Set up in four steps</h2>
+          <h2 id="setup-h">Configurazione in quattro passi</h2>
           <ol>
-            <li><span>On the goggles, open Settings, then About, and turn on <code>OTG Wired Connection to Computer</code>. Unplug before you toggle it, then plug back in.</span></li>
-            <li><span>Drag GogglesView to Applications. The first time, right-click it and choose Open, because releases aren't notarized.</span></li>
-            <li><span>Approve the helper in System Settings, General, Login Items &amp; Extensions. It owns the USB device.</span></li>
-            <li><span>Start Share Liveview on the goggles, pick them in the app.</span></li>
+            <li><span>Sui goggles apri Impostazioni, poi Informazioni, e attiva <code>OTG Wired Connection to Computer</code>. Scollega il cavo prima di cambiare l'opzione, poi ricollegalo.</span></li>
+            <li><span>Trascina GogglesView in Applicazioni. La prima volta fai clic destro e scegli Apri, perché le versioni non sono notarizzate.</span></li>
+            <li><span>Approva l'helper in Impostazioni di Sistema, Generali, Elementi login ed estensioni. È lui a gestire il dispositivo USB.</span></li>
+            <li><span>Avvia Share Liveview sui goggles e scegli i goggles nell'app.</span></li>
           </ol>
         </div>
-        <div class="screen"><img src="images/picker.png" alt="The goggles picker listing the connected pair" width="1451" height="1051" loading="lazy"></div>
+        <div class="screen"><img src="../images/picker.png" alt="Il selettore dei goggles con l'elenco del paio collegato" width="1451" height="1051" loading="lazy"></div>
       </div>
       <div class="steps flip more">
-        <div class="screen"><img src="images/waiting-keyframe.png" alt="The window showing a notice that it is waiting for a keyframe from the goggles" width="1931" height="1091" loading="lazy"></div>
+        <div class="screen"><img src="../images/waiting-keyframe.png" alt="La finestra con un avviso che sta aspettando un keyframe dai goggles" width="1931" height="1091" loading="lazy"></div>
         <div>
-          <h3>If it says it's waiting for a keyframe</h3>
-          <p>The goggles send one full picture when Share Liveview starts and none after. If you connect late, the app has nothing to start from and says so.</p>
-          <p>On the goggles, switch Share Liveview to Mobile Device via Wi-Fi off and on again. That's a limit of the goggles' stream, not something the app can fix.</p>
+          <h3>Se dice che aspetta un keyframe</h3>
+          <p>I goggles mandano un'immagine completa quando parte Share Liveview e poi nessun'altra. Se ti colleghi in ritardo, l'app non ha un punto da cui partire e te lo dice.</p>
+          <p>Sui goggles, porta Share Liveview su Mobile Device via Wi-Fi spegni e riaccendi. È un limite dello stream dei goggles, non qualcosa che l'app possa risolvere.</p>
         </div>
       </div>
     </section>
 
     <section id="limits" aria-labelledby="limits-h">
       <div class="limits">
-        <h2 id="limits-h">What to know before you install</h2>
+        <h2 id="limits-h">Cosa sapere prima di installare</h2>
         <dl>
-          <dt>Only Goggles 3 has been tried</dt>
-          <dd>Other DJI goggles may or may not work. Nobody has checked.</dd>
-          <dt>Apple Silicon only</dt>
-          <dd>The bundled USB library is universal, but nothing has run on an Intel Mac.</dd>
-          <dt>Not notarized</dt>
-          <dd>That needs a paid Apple developer account. macOS asks you to confirm the first launch. Updates inside the app are checked against the release checksum and code signature.</dd>
-          <dt>No calls home</dt>
-          <dd>The app contacts GitHub to look for updates, and nothing else unless you set up a stream or webhook. You can switch the update check off.</dd>
-          <dt>Something broken</dt>
-          <dd><a href="https://github.com/Kristian-Buriasco/gogglecast/issues">Open an issue</a> and attach the diagnostics report from Settings, Advanced.</dd>
+          <dt>Solo i Goggles 3 sono stati provati</dt>
+          <dd>Altri goggles DJI potrebbero funzionare o no. Nessuno ha controllato.</dd>
+          <dt>Solo Apple Silicon</dt>
+          <dd>La libreria USB inclusa è universale, ma nulla è stato eseguito su un Mac Intel.</dd>
+          <dt>Non notarizzata</dt>
+          <dd>Servirebbe un account sviluppatore Apple a pagamento. macOS ti chiede di confermare il primo avvio. Gli aggiornamenti dentro l'app sono verificati con il checksum della release e la firma del codice.</dd>
+          <dt>Nessuna chiamata a casa</dt>
+          <dd>L'app contatta GitHub per cercare aggiornamenti e nient'altro, a meno che tu non configuri uno stream o un webhook. Puoi disattivare il controllo aggiornamenti.</dd>
+          <dt>Qualcosa non va</dt>
+          <dd><a href="https://github.com/Kristian-Buriasco/gogglecast/issues">Apri una issue</a> e allega il rapporto diagnostico da Impostazioni, Avanzate.</dd>
         </dl>
       </div>
     </section>
@@ -350,17 +350,17 @@
 
 <footer class="foot">
   <div class="page">
-    <p>GogglesView is not affiliated with or endorsed by DJI. DJI and Goggles are trademarks of SZ DJI Technology Co., Ltd.</p>
-    <nav aria-label="Project">
-      <a href="https://github.com/Kristian-Buriasco/gogglecast/releases">Release downloads</a>
-      <a href="https://github.com/Kristian-Buriasco/gogglecast/blob/main/CHANGELOG.md">What changed in each version</a>
-      <a href="https://github.com/Kristian-Buriasco/gogglecast">Source on GitHub</a>
+    <p>GogglesView non è affiliato a DJI né approvato da DJI. DJI e Goggles sono marchi di SZ DJI Technology Co., Ltd.</p>
+    <nav aria-label="Progetto">
+      <a href="https://github.com/Kristian-Buriasco/gogglecast/releases">Download delle versioni</a>
+      <a href="https://github.com/Kristian-Buriasco/gogglecast/blob/main/CHANGELOG.md">Cosa cambia in ogni versione</a>
+      <a href="https://github.com/Kristian-Buriasco/gogglecast">Sorgente su GitHub</a>
     </nav>
   </div>
 </footer>
 
 <script>
-  // Point the button at the newest DMG if GitHub answers. The static link works without it.
+  // Punta il pulsante all'ultimo DMG se GitHub risponde. Il link statico funziona anche senza.
   fetch("https://api.github.com/repos/Kristian-Buriasco/gogglecast/releases/latest")
     .then(function (r) { return r.ok ? r.json() : null; })
     .then(function (rel) {
@@ -369,7 +369,7 @@
       if (!dmg) return;
       var a = document.getElementById("dl");
       a.href = dmg.browser_download_url;
-      a.textContent = "Download GogglesView " + rel.tag_name.replace(/^v/, "") + " (" + (dmg.size / 1e6).toFixed(1) + " MB)";
+      a.textContent = "Scarica GogglesView " + rel.tag_name.replace(/^v/, "") + " (" + (dmg.size / 1e6).toFixed(1).replace(".", ",") + " MB)";
     })
     .catch(function () {});
 </script>

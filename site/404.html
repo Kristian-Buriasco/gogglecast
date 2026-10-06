@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Page not found | GogglesView</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%231a1612'/%3E%3Ccircle cx='16' cy='16' r='6' fill='%23d9461f'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700&family=Geist:wght@400;500;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* Palette sampled from the goggles themselves: matte shell, black foam, and the red-orange of a recording dot.
+     One temperature (warm), one accent. */
+  :root {
+    --shell: #ebe7df;
+    --shell-deep: #ddd7cb;
+    --ink: #1a1612;
+    --ink-soft: #2b251f;
+    --grey: #5c554b;      /* 5.1:1 on the deep tile colour, 6.0:1 on the shell */
+    --on-ink: #e9e4da;
+    --on-ink-dim: #a39a8d;
+    --rec: #d9461f;
+    --rec-text: #a83414;  /* the accent as small text: 4.6:1 on the deep tile colour */
+
+    /* type scale, 1.25 */
+    --t-s: 0.875rem;
+    --t-b: 1.0625rem;
+    --t-m: 1.3125rem;
+    --t-l: 1.625rem;
+    --t-xl: 2.5rem;
+    --t-display: clamp(3.5rem, 8vw, 6.75rem);
+
+    --gap: 10px;
+    --r-panel: 18px;                    /* outer */
+    --r-inner: calc(var(--r-panel) - var(--gap));  /* concentric: outer minus gap */
+    --r-tile: 14px;
+
+    --grain-light: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.1 0 0 0 0 0.08 0 0 0 0 0.06 0 0 0 1 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.06'/%3E%3C/svg%3E");
+    --grain-dark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.16'/%3E%3C/svg%3E");
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; overflow-x: clip; background: var(--shell) var(--grain-light); color: var(--ink);
+    font: 400 var(--t-b)/1.55 "Geist", ui-sans-serif, sans-serif;
+  }
+  h1, h2, h3 { text-wrap: balance; margin: 0; font-family: "Big Shoulders Display", "Geist", sans-serif; font-weight: 700; letter-spacing: 0; line-height: .95; }
+  p { text-wrap: pretty; margin: 0; }
+  a { color: inherit; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+  a:hover { color: var(--rec-text); }
+  a:focus-visible, button:focus-visible { outline: 3px solid var(--rec); outline-offset: 3px; border-radius: 4px; }
+  em, i { font-style: normal; }
+  strong { font-weight: 500; }
+  .eyebrow { font-variant-caps: all-small-caps; letter-spacing: .08em; font-weight: 500; font-size: var(--t-b); color: var(--grey); }
+  .mono { font-family: "Geist Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+  .skip { position: absolute; left: -999px; top: 8px; background: var(--ink); color: var(--on-ink); padding: 8px 12px; z-index: 10; }
+  .skip:focus { left: 8px; }
+
+  .page { max-width: 1240px; margin: 0 auto; padding: 0 20px; }
+
+  /* header and footer are siblings of main */
+  .top { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px 22px; padding-top: 20px; padding-bottom: 0; }
+  .top .tools { display: flex; gap: 22px; align-items: baseline; }
+  .brand { font-family: "Big Shoulders Display", sans-serif; font-weight: 700; font-size: var(--t-l); text-decoration: none; display: inline-flex; align-items: center; gap: 10px; }
+  .brand::before { content: ""; width: 12px; height: 12px; border-radius: 50%; background: var(--rec); }
+  .top nav { display: flex; gap: 22px; font-size: var(--t-s); }
+  .top nav a { color: var(--grey); text-decoration: none; }
+  .top nav a:hover { color: var(--ink); text-decoration: underline; }
+  .top [aria-current] { color: var(--ink); font-weight: 500; font-size: var(--t-s); }
+  .top .lang { display: flex; gap: 14px; }
+
+  /* hero: copy offset to the left and anchored low, the picture bleeding off the right edge */
+  .hero { min-height: min(calc(100dvh - 60px), 560px); padding-top: 40px; display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 48px; align-items: end; padding-bottom: 40px; }
+  .hero h1 { font-size: var(--t-display); margin-bottom: 24px; }
+  .hero .lede { font-size: var(--t-m); line-height: 1.4; max-width: 30ch; margin-bottom: 28px; }
+  .dl { display: inline-flex; align-items: center; gap: 12px; background: var(--ink); color: var(--on-ink); font-weight: 500; text-decoration: none; padding: 14px 20px; border-radius: 10px; transition: background-color .15s; }
+  .dl::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--rec); }
+  .dl:hover { background: var(--ink-soft); color: var(--on-ink); }
+  .dl:active { transform: translateY(1px); }
+  .hero .alt { display: block; margin-top: 16px; font-size: var(--t-s); color: var(--grey); }
+  .screen { position: relative; background: var(--ink); padding: var(--gap); border-radius: var(--r-panel); 
+            box-shadow: 10px 18px 36px -14px rgba(26,22,18,.45); overflow: hidden; }
+  .screen::after { content: ""; position: absolute; inset: 0; background: var(--grain-dark); mix-blend-mode: overlay; pointer-events: none; }
+  .screen img { display: block; width: 100%; height: auto; border-radius: var(--r-inner); }
+
+  section { padding: 72px 0 0; }
+  h2 { font-size: var(--t-xl); margin-bottom: 20px; }
+  @media (min-width: 900px) { h2 { font-size: 3.75rem; } }
+
+  /* measured latency */
+  .measure { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 56px; margin-left: 8%; }
+  .measure p + p { margin-top: 14px; }
+  .big { font-family: "Big Shoulders Display", sans-serif; font-weight: 700; font-size: clamp(5rem, 14vw, 10rem); line-height: .85; color: var(--ink); }
+  .big small { font-size: var(--t-l); margin-left: 8px; color: var(--grey); }
+  table { border-collapse: collapse; width: 100%; font-size: var(--t-b); }
+  caption { text-align: left; color: var(--grey); font-size: var(--t-s); padding-bottom: 10px; }
+  th, td { text-align: right; padding: 10px 0; border-bottom: 1px solid var(--shell-deep); }
+  th:first-child, td:first-child { text-align: left; }
+  th { font-weight: 500; font-size: var(--t-s); color: var(--grey); }
+  tfoot td { border-bottom: 0; font-weight: 500; padding-top: 14px; }
+
+  /* what it does: bento, uneven on purpose, colour only */
+  .bento { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: var(--gap); }
+  .tile { background: var(--shell-deep); border-radius: var(--r-tile); padding: 24px; }
+  .tile h3 { font-size: var(--t-l); margin-bottom: 12px; }
+  .tile p { color: var(--ink-soft); }
+  .tile ul { margin: 12px 0 0; padding: 0; list-style: none; }
+  .tile li { padding: 6px 0; }
+  .tile li + li { border-top: 1px solid rgba(26,22,18,.12); }
+  .tile.dark { background: var(--ink); color: var(--on-ink); position: relative; overflow: hidden; }
+  .tile.dark::after { content: ""; position: absolute; inset: 0; background: var(--grain-dark); mix-blend-mode: overlay; pointer-events: none; }
+  .tile.dark p { color: var(--on-ink-dim); }
+  .tile.dark li + li { border-color: rgba(233,228,218,.14); }
+  .tile.dark code { background: rgba(233,228,218,.14); color: var(--on-ink); }
+  .tile.dark h3 { font-size: 2.75rem; }
+  .a { grid-column: span 4; grid-row: span 2; }
+  .b { grid-column: span 2; grid-row: span 2; }
+  .c { grid-column: span 3; }
+  .d { grid-column: span 3; }
+  .e { grid-column: span 2; }
+  .f { grid-column: span 4; }
+  .tile .soon { color: var(--rec-text); }
+
+  /* set up: zig-zag */
+  .steps { display: grid; grid-template-columns: minmax(0, 6fr) minmax(0, 5fr); gap: 56px; align-items: end; }
+  ol { margin: 0; padding: 0; list-style: none; counter-reset: s; }
+  ol li { counter-increment: s; display: grid; grid-template-columns: 2.4rem 1fr; padding: 14px 0; border-bottom: 1px solid var(--shell-deep); }
+  ol li::before { content: counter(s); font-family: "Big Shoulders Display", sans-serif; font-weight: 700; font-size: var(--t-l); line-height: 1.1; color: var(--rec); }
+  code { font-family: "Geist Mono", ui-monospace, monospace; font-size: .9em; background: var(--shell-deep); padding: 1px 6px; border-radius: 4px; }
+  .steps .screen { margin-right: 0; }
+  .steps.flip { grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); }
+  .steps.flip .screen, .steps.flip .bare { order: -1; }
+  .bare img { display: block; width: 100%; height: auto; }
+  .more { padding-top: 56px; }
+  .more h3 { font-size: var(--t-xl); margin-bottom: 14px; }
+  .more p + p { margin-top: 12px; }
+
+  /* limits */
+  .limits { display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 7fr); gap: 56px; }
+  .limits dl { margin: 0; }
+  .limits dt { font-weight: 500; margin-top: 18px; }
+  .limits dt:first-child { margin-top: 0; }
+  .limits dd { margin: 2px 0 0; color: var(--ink-soft); }
+
+  .foot { margin-top: 88px; background: var(--ink); color: var(--on-ink-dim); position: relative; }
+  .foot .page { padding-top: 40px; padding-bottom: 48px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 24px; font-size: var(--t-s); }
+  .foot a { color: var(--on-ink); }
+  .foot a:hover { color: #ff8a65; }
+  .foot nav { display: flex; gap: 22px; flex-wrap: wrap; }
+
+  @media (max-width: 820px) {
+    .hero { grid-template-columns: 1fr; min-height: 0; padding-top: 32px; }
+    .screen { margin-right: 0; }
+    .measure, .steps, .steps.flip, .limits { grid-template-columns: 1fr; gap: 28px; margin-left: 0; }
+    .steps.flip .screen, .steps.flip .bare { order: 0; }
+    .a, .b, .c, .d, .e, .f { grid-column: span 6; grid-row: auto; }
+    .top nav a:not(.keep) { display: none; }
+    .top .tools { gap: 16px; }
+    section { padding-top: 64px; }
+    .foot .page { grid-template-columns: 1fr; }
+  }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; } .dl:active { transform: none; } }
+  .nf { min-height: 70vh; display: grid; align-content: center; padding: 72px 0; max-width: 40rem; margin-left: 8%; }
+  .nf h1 { font-size: var(--t-display); margin-bottom: 20px; }
+  .nf p { font-size: var(--t-m); line-height: 1.4; margin-bottom: 28px; }
+  @media (max-width: 820px) { .nf { margin-left: 0; } }
+</style>
+</head>
+<body>
+<header class="top page">
+  <a class="brand" href="/gogglecast/">GogglesView</a>
+</header>
+<main id="main">
+  <div class="page">
+    <div class="nf">
+      <h1>Nothing here</h1>
+      <p>That page does not exist, or it moved. The home page has the download and everything else.</p>
+      <div><a class="dl" href="/gogglecast/">Back to the home page</a></div>
+    </div>
+  </div>
+</main>
+</body>
+</html>
