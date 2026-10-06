@@ -7,7 +7,7 @@ import PackageDescription
 // `Device`/`Stream` skeleton needed to be installable at all, plus one
 // `NSXPCConnection` attempt to the helper's Mach service and one logged
 // `stats` callback. See `Sources/GogglesCameraExtension/main.swift`'s doc
-// comment and `.superpowers/sdd/plan/task-4.1-brief.md` for the exact
+// comment and the original task notes (not kept in the repo) for the exact
 // scope. Mirrors `Helper/GogglesHelper/Package.swift`'s path-dependency
 // pattern for `GogglesXPC` -- same protocol/value types, no duplication.
 // ─────────────────────────────────────────────────────────────────────────

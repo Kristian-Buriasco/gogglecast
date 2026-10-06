@@ -33,7 +33,7 @@
 #
 # Task 4.1 also adds the third bundle component
 # (`Contents/Library/SystemExtensions/`, the throwaway CMIOExtension
-# mach-lookup spike -- see `.superpowers/sdd/plan/task-4.1-report.md`) and
+# mach-lookup spike -- see the original task notes (not kept in the repo)) and
 # entitlements-based signing for both the app and the extension (needed for
 # `com.apple.developer.system-extension.install` / app-sandbox /
 # application-groups) -- previously nothing in this script passed

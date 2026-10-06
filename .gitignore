@@ -20,7 +20,7 @@ xcuserdata/
 # Apps/GogglesView/build-stub-bundle.sh; not a source artifact)
 Apps/GogglesView/build/
 
-# This project's SDD scratch directory (not part of the deliverable)
+# Local scratch notes (not part of the deliverable)
 .superpowers/
 
 # Hardware capture corpus (Fixtures/README.md): kept local-only, too large

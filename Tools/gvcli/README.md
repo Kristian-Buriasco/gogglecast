@@ -17,7 +17,7 @@ gvcli replay <capture-file> [--out <path>] [--stats]
 ```
 
 See `docs/design.md` §9.2 for the parity-gate acceptance criteria this
-tool exists to measure, and `.superpowers/sdd/plan/task-1.7-report.md`
+tool exists to measure, and the original task notes (not kept in the repo)
 for what has and hasn't been run/recorded so far.
 
 Build/run:

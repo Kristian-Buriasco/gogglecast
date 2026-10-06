@@ -178,7 +178,7 @@ struct GogglesConnectionView: View {
     }
 
     // ── GUI restyle task: CosmoViewer-Direct-inspired chrome ──
-    // (.superpowers/sdd/plan/task-gui-restyle-brief.md, later revised by
+    // (the original task notes (not kept in the repo), later revised by
     // task-gui-v2-brief.md). The dark background + `statusRow` + `footerBar`
     // are new; `mainContent` below is exactly Task 3.4/3.5's original
     // device-card + state-content body, unchanged, just relocated into the

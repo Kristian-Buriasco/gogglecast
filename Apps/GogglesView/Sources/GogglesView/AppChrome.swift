@@ -9,7 +9,7 @@ import SwiftUI
 
 // ─────────────────────────────────────────────────────────────────────────
 // GUI restyle task (post-Phase-3 v1 skin pass, bounded/approved in chat --
-// see .superpowers/sdd/plan/task-gui-restyle-brief.md): shared presentational
+// see the original task notes (not kept in the repo)): shared presentational
 // pieces for the CosmoViewer-Direct-inspired chrome -- the in-window status
 // pill (reusing Task 3.6's `GogglesStatusGlyphCategory`) and the
 // version-footer text. Deliberately small and dumb: no state, no XPC,

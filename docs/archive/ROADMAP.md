@@ -49,7 +49,7 @@ and what unblocks the most value; the phases are not time estimates.
   independently sized and positioned. Builds on the existing multi-device
   helper protocol; needs a per-window session/coordinator instead of the
   single `launchMainWindow` flow (see
-  `docs/archive/superpowers/specs/2026-08-29-multi-device-picker-design.md`).
+  `docs/archive/specs/specs/2026-08-29-multi-device-picker-design.md`).
 
 ## Phase 3 — Telemetry and flight data (largely blocked)
 
