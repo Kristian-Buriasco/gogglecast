@@ -4,6 +4,20 @@ All notable changes to this project are documented here. Format based on [Keep a
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-10-06
+
+### Fixed
+- Live stabilization shifted colours slightly (a flat 200/100/50 came out as 203/108/61) because the output was always rendered in Rec.709. It now keeps the input's colour space.
+- Live stabilization silently stopped after about 7 frames whenever something held on to its output pictures, passing the unstabilized picture through. The buffer pool no longer has that cap.
+- Live stabilization measured motion too coarsely at 1080p (shake reduction was about 50%). The analysis resolution is higher now: about 57% at 1080p and 63% at 720p on synthetic shaky footage, at roughly 6 ms per frame.
+
+### Added
+- VoiceOver support across the app: labels for icon-only buttons, values with units on sliders, spoken status for colour-only indicators, clip gallery actions (open, reveal, share, trim, move to Trash), trim start and end sliders, and marker ticks.
+- Stabilizer tests on synthetic shaky footage for BGRA, 420v and 10-bit input, including a colour check.
+
+### Developer
+- `GogglesView --doc-shot <clip-gallery|mini-window|menu-bar|live-synthetic> <out.png>` renders documentation pictures with generated data and no helper.
+
 ## [0.5.0] - 2026-10-06
 
 ### Added
