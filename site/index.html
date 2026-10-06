@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GogglesView - DJI Goggles 3 live view for Mac</title>
+<meta name="description" content="A free, native macOS app that shows the live video from DJI Goggles 3 over USB-C. Recording, replay, streaming, stabilization. No extra hardware.">
+<meta property="og:title" content="GogglesView">
+<meta property="og:description" content="Free, native macOS live view for DJI Goggles 3 over USB-C.">
+<meta property="og:image" content="https://kristian-buriasco.github.io/gogglecast/images/social.png">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230b0d12'/%3E%3Crect x='5' y='11' width='9' height='10' rx='4' fill='%234da3ff'/%3E%3Crect x='18' y='11' width='9' height='10' rx='4' fill='%234da3ff'/%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg: #0b0d12; --panel: #141821; --line: #232938; --text: #e8ebf2; --muted: #98a1b3;
+    --accent: #4da3ff; --accent-ink: #04111f;
+  }
+  @media (prefers-color-scheme: light) {
+    :root { --bg: #f6f7fa; --panel: #ffffff; --line: #dde1ea; --text: #151822; --muted: #586074; --accent: #1668d8; --accent-ink: #ffffff; }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif; }
+  a { color: var(--accent); }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 0 16px; }
+  nav { display: flex; align-items: center; justify-content: space-between; padding: 18px 0; }
+  nav .brand { font-weight: 700; letter-spacing: -0.01em; color: var(--text); text-decoration: none; }
+  nav .links { display: flex; gap: 20px; font-size: 14px; }
+  nav .links a { color: var(--muted); text-decoration: none; }
+  nav .links a:hover { color: var(--text); }
+  .hero { text-align: center; padding: 48px 0 32px; }
+  h1 { font-size: clamp(34px, 6vw, 58px); line-height: 1.08; margin: 0 0 16px; letter-spacing: -0.03em; }
+  .lead { color: var(--muted); font-size: clamp(17px, 2.2vw, 20px); max-width: 640px; margin: 0 auto 28px; }
+  .cta { display: inline-flex; flex-wrap: wrap; gap: 12px; justify-content: center; }
+  .btn { display: inline-block; padding: 12px 22px; border-radius: 10px; font-weight: 600; text-decoration: none; border: 1px solid var(--line); color: var(--text); background: var(--panel); }
+  .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+  .fine { color: var(--muted); font-size: 13px; margin-top: 14px; }
+  .shot { margin: 36px auto 0; border-radius: 14px; border: 1px solid var(--line); overflow: hidden; box-shadow: 0 24px 70px rgba(0,0,0,.35); }
+  .shot img { display: block; width: 100%; height: auto; }
+  section { padding: 56px 0 8px; }
+  h2 { font-size: clamp(24px, 3.4vw, 32px); letter-spacing: -0.02em; margin: 0 0 8px; }
+  .sub { color: var(--muted); margin: 0 0 28px; max-width: 640px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px; }
+  .card h3 { margin: 0 0 6px; font-size: 16px; }
+  .card p { margin: 0; color: var(--muted); font-size: 14.5px; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 24px; }
+  .two { align-items: start; }
+  .two .shot { margin: 0; box-shadow: none; }
+  ol.steps { padding-left: 20px; margin: 0; }
+  ol.steps li { margin: 8px 0; }
+  code { background: var(--panel); border: 1px solid var(--line); padding: 1px 6px; border-radius: 6px; font-size: .92em; }
+  details { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 18px; margin: 10px 0; }
+  summary { cursor: pointer; font-weight: 600; }
+  details p { color: var(--muted); margin: 10px 0 0; }
+  footer { border-top: 1px solid var(--line); margin-top: 64px; padding: 28px 0 40px; color: var(--muted); font-size: 14px; }
+  footer .row { display: flex; flex-wrap: wrap; gap: 8px 22px; justify-content: space-between; }
+  @media (max-width: 640px) { .two { grid-template-columns: 1fr; } nav .links a:not(.keep) { display: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav>
+    <a class="brand" href="#">GogglesView</a>
+    <div class="links">
+      <a href="#features">Features</a>
+      <a href="#start">Get started</a>
+      <a href="#faq">FAQ</a>
+      <a class="keep" href="https://github.com/Kristian-Buriasco/gogglecast">GitHub</a>
+    </div>
+  </nav>
+
+  <header class="hero">
+    <h1>DJI Goggles 3 live view,<br>native on your Mac.</h1>
+    <p class="lead">Plug in over USB-C and see what the goggles see. Record it, replay it, stream it. Free and open source, no extra hardware.</p>
+    <div class="cta">
+      <a class="btn primary" id="dl" href="https://github.com/Kristian-Buriasco/gogglecast/releases/latest">Download for Mac</a>
+      <a class="btn" href="https://github.com/Kristian-Buriasco/gogglecast">View source</a>
+    </div>
+    <p class="fine" id="dlinfo">Apple Silicon, macOS 14 or later. Not notarized: right-click &gt; Open the first time.</p>
+    <div class="shot"><img src="images/live-view.png" alt="GogglesView showing a live feed with the stats overlay" width="2144" height="1304"></div>
+  </header>
+
+  <section id="features">
+    <h2>What it does</h2>
+    <p class="sub">Everything runs locally. The goggles' H.264 stream is decoded once with VideoToolbox and shared by every window and output.</p>
+    <div class="grid">
+      <div class="card"><h3>Full-rate live view</h3><p>59/60 fps when the goggles send it, with an optional overlay for resolution, frame rate, bitrate, drops and latency.</p></div>
+      <div class="card"><h3>Record anything</h3><p>Lossless passthrough to .mov or .mp4, auto-start, auto-split, markers, a clip gallery with trim and share.</p></div>
+      <div class="card"><h3>Instant replay</h3><p>A rolling buffer you can save after the moment happens. Clips start cleanly thanks to a shared keyframe encoder.</p></div>
+      <div class="card"><h3>Stream out</h3><p>UDP MPEG-TS, RTMP for Twitch and YouTube, SRT, a local web viewer and NDI (experimental).</p></div>
+      <div class="card"><h3>Live stabilization</h3><p>Electronic shake removal that adds processing time but no frames of delay. Adjustable strength.</p></div>
+      <div class="card"><h3>Color looks</h3><p>Import .cube LUTs and apply them to the preview or to what you record and stream. Separate crop for output.</p></div>
+      <div class="card"><h3>Made for OBS</h3><p>A chrome-less capture window for Window Capture, keep-on-top, mini window, rotate and flip.</p></div>
+      <div class="card"><h3>Automation</h3><p>Menu-bar controls, global hotkeys, a <code>gogglesview://</code> URL scheme and AppleScript.</p></div>
+      <div class="card"><h3>Several goggles</h3><p>Each pair gets its own window, profile and settings. Updates itself, with checksum and signature checks.</p></div>
+    </div>
+    <div class="two">
+      <div class="shot"><img src="images/settings.png" alt="Settings window" width="1784" height="1384" loading="lazy"></div>
+      <div class="shot"><img src="images/picker.png" alt="Goggles picker" width="1664" height="1264" loading="lazy"></div>
+    </div>
+  </section>
+
+  <section id="start">
+    <h2>Get started</h2>
+    <p class="sub">You need an Apple Silicon Mac, a DJI Goggles 3 and a USB-C cable that carries data.</p>
+    <ol class="steps">
+      <li>On the goggles open Settings &gt; About and enable <code>OTG Wired Connection to Computer</code>. Unplug before toggling, then reconnect.</li>
+      <li>Download the DMG, drag GogglesView to Applications and right-click &gt; Open the first time.</li>
+      <li>Approve the helper once in System Settings &gt; General &gt; Login Items &amp; Extensions. It's what talks to the USB device.</li>
+      <li>On the goggles start Share Liveview, pick your goggles in the app and you're live.</li>
+    </ol>
+  </section>
+
+  <section id="faq">
+    <h2>Questions</h2>
+    <details><summary>Is it really free?</summary><p>Yes. It's GPL-3.0 and the source is on GitHub. There are no accounts, no ads and no analytics. The only thing it contacts on its own is GitHub, to check for updates (you can turn that off in Settings).</p></details>
+    <details><summary>Why does macOS warn me when I open it?</summary><p>Releases aren't notarized because that needs a paid Apple developer account. Right-click the app and choose Open once. The in-app updater verifies each update's checksum and code signature.</p></details>
+    <details><summary>How much latency is there?</summary><p>Measured with an on-screen stopwatch, about 130 to 170 ms glass to glass over USB. The app's own share is a few milliseconds. See the latency notes in the repository for the method.</p></details>
+    <details><summary>Does it work with other DJI goggles?</summary><p>It's built and tested on Goggles 3. Other models haven't been tried.</p></details>
+    <details><summary>Intel Macs?</summary><p>Only Apple Silicon has been tested.</p></details>
+    <details><summary>Something doesn't work.</summary><p>Open an issue on GitHub. Settings &gt; Advanced has a diagnostics report you can attach.</p></details>
+  </section>
+
+  <footer>
+    <div class="row">
+      <span>GogglesView is not affiliated with or endorsed by DJI. DJI and Goggles are trademarks of SZ DJI Technology Co., Ltd.</span>
+      <span><a href="https://github.com/Kristian-Buriasco/gogglecast/releases">Releases</a> · <a href="https://github.com/Kristian-Buriasco/gogglecast/blob/main/CHANGELOG.md">Changelog</a> · <a href="https://github.com/Kristian-Buriasco/gogglecast/issues">Issues</a></span>
+    </div>
+  </footer>
+</div>
+<script>
+  // Point the button at the newest DMG when GitHub answers; the static link works without it.
+  fetch("https://api.github.com/repos/Kristian-Buriasco/gogglecast/releases/latest")
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (rel) {
+      if (!rel) return;
+      var dmg = (rel.assets || []).filter(function (a) { return /\.dmg$/.test(a.name); })[0];
+      if (dmg) document.getElementById("dl").href = dmg.browser_download_url;
+      document.getElementById("dl").textContent = "Download " + rel.tag_name + " for Mac";
+    })
+    .catch(function () {});
+</script>
+</body>
+</html>
