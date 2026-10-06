@@ -250,6 +250,9 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         }
         menu.addItem(.separator())
         menu.addItem(item("Open Another Goggles…") { [weak self] in self?.onOpenAnother() })
+        let raceItem = item("Race Mode") { RaceModeController.shared.toggle() }
+        raceItem.state = RaceModePrefs.enabled ? .on : .off
+        menu.addItem(raceItem)
         if let onOpenSettings {
             menu.addItem(item("Settings…") {
                 NSApp.activate(ignoringOtherApps: true)

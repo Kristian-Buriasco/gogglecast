@@ -128,6 +128,7 @@ enum FramingPrefs {
 
     /// nil when all adjustments are neutral (no filter cost).
     static func colorFilters() -> [CIFilter]? {
+        if RaceModePrefs.enabled { return nil }
         var filters: [CIFilter] = []
         if brightness != 0 || contrast != 1 || saturation != 1, let f = CIFilter(name: "CIColorControls") {
             f.setValue(brightness, forKey: kCIInputBrightnessKey)

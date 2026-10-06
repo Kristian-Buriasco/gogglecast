@@ -104,7 +104,7 @@ final class SampleBufferHostView: NSView {
         displayLayer.filters = FramingPrefs.colorFilters()
 
         let path = CGMutablePath()
-        for (a, b) in FramingGeometry.gridLines(in: crop, mode: FramingPrefs.grid) {
+        for (a, b) in FramingGeometry.gridLines(in: crop, mode: RaceModePrefs.enabled ? .off : FramingPrefs.grid) {
             path.move(to: a); path.addLine(to: b)
         }
         gridLayer.frame = bounds

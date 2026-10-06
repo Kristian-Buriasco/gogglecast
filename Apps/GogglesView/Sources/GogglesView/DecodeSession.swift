@@ -273,16 +273,37 @@ final class DecodeSession: ObservableObject {
     private func createDecoder(_ format: CMVideoFormatDescription) {
         var s: VTDecompressionSession?
         let attrs: [CFString: Any] = [kCVPixelBufferIOSurfacePropertiesKey: [String: Any]()]
+        // Ask for the hardware decoder explicitly (not "require": software stays the fallback).
+        let spec: [CFString: Any] = [kVTVideoDecoderSpecification_EnableHardwareAcceleratedVideoDecoder: true]
         let st = VTDecompressionSessionCreate(
-            allocator: nil, formatDescription: format, decoderSpecification: nil,
+            allocator: nil, formatDescription: format, decoderSpecification: spec as CFDictionary,
             imageBufferAttributes: attrs as CFDictionary, outputCallback: nil, decompressionSessionOut: &s)
         guard st == noErr, let s else {
             Logging.decode.error("decoder create failed (\(st, privacy: .public))")
             return
         }
         VTSessionSetProperty(s, key: kVTDecompressionPropertyKey_RealTime, value: kCFBooleanTrue)
+        var original: CFTypeRef?
+        if VTSessionCopyProperty(s, key: kVTDecompressionPropertyKey_MaximizePowerEfficiency, allocator: nil, valueOut: &original) == noErr {
+            originalPowerEfficiency = original as? Bool
+        }
         decoder = s
         decoderReady = false
+        if RaceModePrefs.enabled { applyRaceMode(true) }
+    }
+
+    private var originalPowerEfficiency: Bool?
+
+    /// Race mode decoder tuning. Only properties that apply to a running session are used, so the
+    /// decoder is never re-created (the goggles send one IDR only). Call on the queue that calls `handle`.
+    func applyRaceMode(_ on: Bool) {
+        guard let d = decoder else { return }
+        VTSessionSetProperty(d, key: kVTDecompressionPropertyKey_RealTime, value: kCFBooleanTrue)
+        if on {
+            VTSessionSetProperty(d, key: kVTDecompressionPropertyKey_MaximizePowerEfficiency, value: kCFBooleanFalse)
+        } else if let original = originalPowerEfficiency {
+            VTSessionSetProperty(d, key: kVTDecompressionPropertyKey_MaximizePowerEfficiency, value: original as CFBoolean)
+        }
     }
 
     private func invalidateDecoder() {

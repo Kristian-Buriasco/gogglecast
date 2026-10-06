@@ -23,8 +23,11 @@ final class MiniWindowController: NSObject, NSWindowDelegate {
     /// Apply the saved preference for `session` (rebuilds if the session changed, e.g. after re-picking goggles).
     func sync(session: DecodeSession) {
         if self.session !== session { hide(); self.session = session }
-        if UserDefaults.standard.bool(forKey: MiniWindowPrefs.enabledKey) { show() } else { hide() }
+        if UserDefaults.standard.bool(forKey: MiniWindowPrefs.enabledKey), !RaceModePrefs.enabled { show() } else { hide() }
     }
+
+    /// Re-applies the saved preference to the current session (race mode hides the mini window).
+    func refresh() { if let session { sync(session: session) } }
 
     /// Called when a goggles window is torn down: hides the mini window if it
     /// was showing that window's video.

@@ -368,6 +368,9 @@ struct GogglesConnectionView: View {
                        batteryPercent: coordinator.batteryPercent)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 .opacity(videoOpacity)
+            RaceBadge()
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                .opacity(videoOpacity)
             overlay
         }
     }
