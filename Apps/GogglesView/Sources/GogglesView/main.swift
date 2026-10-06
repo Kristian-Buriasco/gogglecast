@@ -621,6 +621,11 @@ func launchMainWindow(
     session.start()
     return session
 }
+if let idx = args.firstIndex(of: "--doc-shot"), idx + 2 < args.count {
+    // Dev aid for documentation screenshots with fake data (see DocShots.swift):
+    // `GogglesView --doc-shot <clip-gallery|mini-window|menu-bar|live-synthetic> <out.png>`
+    DocShots.run(name: args[idx + 1], out: URL(fileURLWithPath: args[idx + 2]))
+}
 if let idx = args.firstIndex(of: "--settings-shot"), idx + 2 < args.count {
     // Dev aid for documentation screenshots: `GogglesView --settings-shot <Tab> <out.png> [height]`
     // opens only the Settings window on that tab, writes it to a PNG and exits. No helper, no XPC.

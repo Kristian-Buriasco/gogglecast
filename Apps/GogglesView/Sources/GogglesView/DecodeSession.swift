@@ -320,6 +320,11 @@ final class DecodeSession: ObservableObject {
         for layer in layers where layer !== renderer { layer.enqueue(sample) }
     }
 
+    /// Dev aid for documentation screenshots (`--doc-shot`): shows `image` as if the decoder had produced it.
+    func injectDecodedFrame(_ image: CVPixelBuffer) {
+        decoded(status: noErr, image: image, pts: CMClockGetTime(CMClockGetHostTimeClock()))
+    }
+
     /// The newest decoded picture, independent of whether any window is showing.
     func latestDecodedFrame() -> CVPixelBuffer? {
         frameLock.lock(); defer { frameLock.unlock() }
