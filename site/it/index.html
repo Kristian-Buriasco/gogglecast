@@ -145,6 +145,7 @@
   .steps.flip .screen, .steps.flip .bare { order: -1; }
   .bare img { display: block; width: 100%; height: auto; }
   .more { padding-top: 56px; }
+  .note { font-size: var(--t-s); color: var(--grey); margin-top: 12px; }
   .more h3 { font-size: var(--t-xl); margin-bottom: 14px; }
   .more p + p { margin-top: 12px; }
 
@@ -301,6 +302,23 @@
           <h3>Ogni uscita ha la sua scheda</h3>
           <p>UDP, RTMP, il visualizzatore web locale, SRT e NDI si configurano separatamente. L'interruttore in alto accende o spegne l'encoder a keyframe, e il selettore accanto ne imposta il bitrate.</p>
           <p>La chiave dello stream RTMP è conservata nel Portachiavi di macOS. Il visualizzatore web ascolta solo su localhost, a meno che tu non permetta altri dispositivi.</p>
+        </div>
+      </div>
+      <div class="steps more">
+        <div>
+          <h3>Clip, tagliate senza ricodifica</h3>
+          <p>La galleria elenca tutto ciò che c'è nella cartella delle registrazioni, con anteprima, durata e dimensione. Puoi aprire una clip, mostrarla nel Finder, condividerla, tagliarla o spostarla nel Cestino.</p>
+          <p>Il taglio copia il flusso tra due punti invece di codificarlo di nuovo, quindi la qualità resta quella registrata.</p>
+          <p class="note">Le clip e le anteprime in questa immagine sono campioni generati.</p>
+        </div>
+        <div class="screen"><img src="../images/clip-gallery.png" alt="La galleria clip con sei clip di esempio, con anteprime, nomi, date, durate e dimensioni" width="1040" height="1344" loading="lazy"></div>
+      </div>
+      <div class="steps flip more">
+        <div class="screen"><img src="../images/menu-bar.png" alt="Il menu nella barra dei menu con Stop Recording, Save Replay, Screenshot, Freeze Video, Add Marker, Hide Window, Start Network Stream, Reconnect e Disconnect" width="662" height="638" loading="lazy"></div>
+        <div>
+          <h3>Comandi dalla barra dei menu</h3>
+          <p>Avvia o ferma una registrazione, salva il replay, fai uno screenshot, blocca l'immagine, aggiungi un marcatore o avvia lo streaming di rete senza portare in primo piano la finestra.</p>
+          <p class="note">Questa immagine è ridisegnata a partire dalle voci del menu, non è una cattura dello schermo.</p>
         </div>
       </div>
     </section>

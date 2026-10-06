@@ -145,6 +145,7 @@
   .steps.flip .screen, .steps.flip .bare { order: -1; }
   .bare img { display: block; width: 100%; height: auto; }
   .more { padding-top: 56px; }
+  .note { font-size: var(--t-s); color: var(--grey); margin-top: 12px; }
   .more h3 { font-size: var(--t-xl); margin-bottom: 14px; }
   .more p + p { margin-top: 12px; }
 
@@ -301,6 +302,23 @@
           <h3>Each output has its own card</h3>
           <p>UDP, RTMP, the local web viewer, SRT and NDI are set up separately. The switch at the top turns the keyframe encoder on or off, and the stepper beside it sets its bitrate.</p>
           <p>The RTMP stream key is kept in the macOS Keychain. The web viewer listens on localhost unless you allow other devices.</p>
+        </div>
+      </div>
+      <div class="steps more">
+        <div>
+          <h3>Clips, trimmed without re-encoding</h3>
+          <p>The gallery lists everything in your recordings folder with a thumbnail, length and size. Open a clip, reveal it in Finder, share it, trim it or move it to the Trash.</p>
+          <p>Trimming copies the stream between two points instead of encoding it again, so quality stays as recorded.</p>
+          <p class="note">The clips and thumbnails in this picture are generated samples.</p>
+        </div>
+        <div class="screen"><img src="images/clip-gallery.png" alt="The clip gallery showing six sample clips with thumbnails, names, dates, lengths and sizes" width="1040" height="1344" loading="lazy"></div>
+      </div>
+      <div class="steps flip more">
+        <div class="screen"><img src="images/menu-bar.png" alt="The menu bar menu with Stop Recording, Save Replay, Screenshot, Freeze Video, Add Marker, Hide Window, Start Network Stream, Reconnect and Disconnect" width="662" height="638" loading="lazy"></div>
+        <div>
+          <h3>Run it from the menu bar</h3>
+          <p>Start or stop a recording, save the replay, take a screenshot, freeze the picture, add a marker or start the network stream without bringing the window forward.</p>
+          <p class="note">This image is redrawn from the menu's own items, not a screen capture.</p>
         </div>
       </div>
     </section>

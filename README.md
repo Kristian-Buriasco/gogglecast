@@ -25,6 +25,12 @@ A free, native macOS app that shows the live video feed from DJI Goggles 3 on a 
 <img src="docs/images/display.png" width="49%" alt="Settings, stabilization, framing and output framing"> <img src="docs/images/general.png" width="49%" alt="Settings, presets and updates">
 </p>
 
+<p>
+<img src="docs/images/clip-gallery.png" width="49%" alt="Clip gallery with sample clips"> <img src="docs/images/menu-bar.png" width="49%" alt="Menu bar menu (redrawn from the menu's items)">
+</p>
+
+The clip gallery picture uses generated sample clips, and the menu picture is redrawn from the menu's own items.
+
 ## Features
 
 - Live view of the goggles' video feed, H.264 passthrough decoded with VideoToolbox.
