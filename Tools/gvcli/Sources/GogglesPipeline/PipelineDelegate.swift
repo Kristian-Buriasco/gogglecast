@@ -38,6 +38,12 @@ public protocol PipelineDelegate: AnyObject {
     /// on `GogglesXPC`; `GogglesHelper` converts one of these at the XPC
     /// boundary.
     func pipelineDidUpdateStats(_ stats: PipelineStats)
+    /// The started-gate was re-armed while video is flowing (a burst of
+    /// dropped frames corrupted the reference chain): output is paused until
+    /// the next SPS+IDR -- design §6's `.waitingForKeyframe`. (After a
+    /// silence re-arm this is signalled by `pipelineDidBeginReceivingVideo`
+    /// firing again once video resumes.)
+    func pipelineDidRequireKeyframe()
 }
 
 public extension PipelineDelegate {
@@ -46,6 +52,7 @@ public extension PipelineDelegate {
     func pipelineDidStart() {}
     func pipelineWentSilent() {}
     func pipelineDidUpdateStats(_ stats: PipelineStats) {}
+    func pipelineDidRequireKeyframe() {}
 }
 
 /// See `PipelineDelegate.pipelineDidUpdateStats`. Field set mirrors

@@ -154,16 +154,6 @@ public func installSigintHandler() {
     sigintSource = source
 }
 
-/// Per-frame started-gate state, matching `stream.py`'s `state["sps"]` /
-/// `state["started"]`: output doesn't begin until a parameter-set NAL
-/// (type 7 SPS or 8 PPS) has been seen, followed by an IDR (type 5) --
-/// every NAL before that point is silently dropped, same as Python's
-/// `flush_frame`.
-private struct FrameGateState {
-    var sps: Data?
-    var started = false
-}
-
 /// Runs the full receive/decode/emit pipeline against `transport` --
 /// handshake, I-frame request + 1.5s retry until started, 2s data-silence
 /// handshake resend, per-frame-boundary ack (complete or not), `FrameReassembler`-driven
@@ -256,8 +246,9 @@ public func runPipeline(
     await state.markIframeRequested()
     FileHandle.standardError.write(Data("[gvcli] Requested fresh I-frame (DUML 02:B3).\n".utf8))
 
-    var gate = FrameGateState()
-    var sawFirstVideoPacket = false
+    let gate = SharedKeyframeGate()
+    var dropDetector = DropBurstDetector()
+    let sawFirstVideoPacket = LockedFlag()
 
     // Reproduces stream.py's ack-on-every-frame-boundary behavior
     // (`FrameBoundaryAckTracker.swift`), independent of whatever
@@ -292,8 +283,9 @@ public func runPipeline(
                 }
                 guard outer.body.count >= 12 else { continue }
 
-                if !sawFirstVideoPacket {
-                    sawFirstVideoPacket = true
+                // Fires once at first video, and again after a silence
+                // re-arm (so the helper re-enters `.waitingForKeyframe`).
+                if sawFirstVideoPacket.setIfUnset() {
                     delegate?.pipelineDidBeginReceivingVideo()
                 }
 
@@ -319,11 +311,18 @@ public func runPipeline(
                     await state.recordWindowAck(range.first)
                 }
 
-                guard let nal = reassembler.process(videoPayload: outer.body, receivedAt: Date()) else {
-                    await state.updateDroppedTotal(reassembler.droppedFrameCount)
-                    continue
-                }
+                let reassembled = reassembler.process(videoPayload: outer.body, receivedAt: Date())
                 await state.updateDroppedTotal(reassembler.droppedFrameCount)
+                // A burst of dropped slices corrupts the P-frame chain the
+                // decoder is following: stop forwarding until the next
+                // SPS+IDR and ask for one.
+                if dropDetector.record(droppedTotal: reassembler.droppedFrameCount, now: Date()),
+                   gate.rearm() {
+                    await state.markStopped()
+                    FileHandle.standardError.write(Data("[gvcli] Burst of dropped frames, waiting for next SPS+IDR.\n".utf8))
+                    delegate?.pipelineDidRequireKeyframe()
+                }
+                guard let nal = reassembled else { continue }
 
                 // Completion ack: fires immediately when a frame
                 // completes, in addition to (never instead of) the
@@ -339,36 +338,32 @@ public func runPipeline(
                     await sendWindowAck(ackSeq)
                 }
 
-                // Started-gate: matches stream.py's flush_frame. NAL type
-                // is the low 5 bits of the first byte after the 4-byte
-                // 00 00 00 01 start code FrameReassembler always prepends.
-                let headerOffset = 4
-                let nalType: UInt8 = nal.count > headerOffset ? (nal[nal.startIndex + headerOffset] & 0x1F) : 0xFF
-
-                if !gate.started {
-                    if nalType == 7 || nalType == 8 {
-                        gate.sps = nal
-                    } else if nalType == 5, let sps = gate.sps {
-                        gate.started = true
-                        await state.markStarted()
-                        FileHandle.standardError.write(Data("[gvcli] Got param-set + IDR, starting output.\n".utf8))
-                        sink?.write(sps)
-                        sink?.write(nal)
-                        await state.recordEmittedFrame(bytes: sps.count + nal.count)
-                        let spsType: UInt8 = sps.count > headerOffset ? (sps[sps.startIndex + headerOffset] & 0x1F) : 0xFF
-                        let hostTime = DispatchTime.now().uptimeNanoseconds
-                        delegate?.pipeline(didEmitNAL: sps, nalType: spsType, isParameterSet: true, hostTime: hostTime)
-                        delegate?.pipeline(didEmitNAL: nal, nalType: nalType, isParameterSet: false, hostTime: hostTime)
-                        delegate?.pipelineDidStart()
+                // Started-gate: matches stream.py's flush_frame (see
+                // KeyframeGate.swift). NAL type is the low 5 bits of the
+                // first byte after the 4-byte start code FrameReassembler
+                // always prepends.
+                let nalType = KeyframeGate.nalType(of: nal)
+                let wasStarted = gate.started
+                let out = gate.process(nal)
+                if out.didStart {
+                    await state.markStarted()
+                    FileHandle.standardError.write(Data("[gvcli] Got param-set + IDR, starting output.\n".utf8))
+                    let hostTime = DispatchTime.now().uptimeNanoseconds
+                    for emitted in out.nals {
+                        sink?.write(emitted)
+                        await state.recordEmittedFrame(bytes: emitted.count)
+                        let t = KeyframeGate.nalType(of: emitted)
+                        delegate?.pipeline(didEmitNAL: emitted, nalType: t, isParameterSet: t == 7 || t == 8, hostTime: hostTime)
                     }
-                    // else: still waiting for a parameter set or an IDR;
-                    // this NAL is dropped, matching Python's flush_frame.
-                } else {
-                    sink?.write(nal)
-                    await state.recordEmittedFrame(bytes: nal.count)
+                    delegate?.pipelineDidStart()
+                } else if wasStarted, let emitted = out.nals.first {
+                    sink?.write(emitted)
+                    await state.recordEmittedFrame(bytes: emitted.count)
                     let isParamSet = (nalType == 7 || nalType == 8)
-                    delegate?.pipeline(didEmitNAL: nal, nalType: nalType, isParameterSet: isParamSet, hostTime: DispatchTime.now().uptimeNanoseconds)
+                    delegate?.pipeline(didEmitNAL: emitted, nalType: nalType, isParameterSet: isParamSet, hostTime: DispatchTime.now().uptimeNanoseconds)
                 }
+                // else: still waiting for a parameter set or an IDR; this
+                // NAL is dropped, matching Python's flush_frame.
             }
         }
 
@@ -397,8 +392,20 @@ public func runPipeline(
                     FileHandle.standardError.write(Data("[gvcli] No data for 2s, resending handshake.\n".utf8))
                     await state.markRx()
                     delegate?.pipelineWentSilent()
+                    // The decoder's reference chain can't be trusted after
+                    // a gap: re-arm so only the next SPS+IDR resumes output,
+                    // and let the `!started` branch below request one every
+                    // 1.5s (the request often goes unanswered on Goggles 3;
+                    // the helper's `.waitingForKeyframe` state is what shows
+                    // the user the manual instruction).
+                    if gate.rearm() {
+                        await state.markStopped()
+                        sawFirstVideoPacket.reset()
+                        FileHandle.standardError.write(Data("[gvcli] Re-armed started-gate, waiting for next SPS+IDR.\n".utf8))
+                    }
                 }
-                if !timers.started, now.timeIntervalSince(timers.lastIframe) > 1.5 {
+                let startedNow = await state.snapshotTimers().started
+                if !startedNow, now.timeIntervalSince(timers.lastIframe) > 1.5 {
                     let seq = await state.nextSeq()
                     send(WireProtocol.requestIFrameTelemetry(seq: seq, sessionId: sessionId))
                     await state.markIframeRequested()
@@ -461,4 +468,18 @@ public func runPipeline(
     FileHandle.standardError.write(Data(
         "[gvcli] Done. Emitted \(final.frames) NALs, \(final.bytes) bytes, \(final.drops) dropped frame(s).\n".utf8
     ))
+}
+
+/// Tiny lock-protected boolean for state shared between the pipeline's tasks.
+private final class LockedFlag: @unchecked Sendable {
+    private let lock = NSLock()
+    private var isSet = false
+    /// Returns true if the flag was unset (and sets it).
+    func setIfUnset() -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        if isSet { return false }
+        isSet = true
+        return true
+    }
+    func reset() { lock.lock(); isSet = false; lock.unlock() }
 }

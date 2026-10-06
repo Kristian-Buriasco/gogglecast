@@ -113,6 +113,14 @@ final class HelperService: NSObject, GogglesHelperProtocol {
         var currentStateValue: GogglesState = .noDevice
         var everReachedLive = false
 
+        /// Latest SPS/PPS/IDR, replayed to late subscribers. Invalidated on
+        /// reconnect, gate re-arm (silence / dropped-frame burst) and
+        /// pipeline end.
+        var headCache = StreamHeadCache()
+
+        /// Backoff for retrying a failed (non-deviceNotFound) bring-up.
+        var claimRetryBackoff = RetryBackoff()
+
         var batteryPoller: BatteryPoller?
         /// Last polled goggles battery %, -1 = unknown.
         var batteryPercent = -1
@@ -256,9 +264,19 @@ final class HelperService: NSObject, GogglesHelperProtocol {
                 proxy.deviceChanged(deviceId, device.currentDeviceInfoValue)
                 proxy.stateChanged(deviceId, device.currentStateValue.rawValue, detail: nil)
                 proxy.batteryChanged(deviceId, percent: device.batteryPercent)
+                // Late joiner on an already-live pipeline: replay the cached
+                // SPS, PPS, IDR (same callback and order as live delivery)
+                // so the decoder can start without waiting for a new IDR.
+                // Runs on stateQueue, so it cannot interleave with a live
+                // NAL fan-out.
+                let hostTime = DispatchTime.now().uptimeNanoseconds
+                for entry in device.headCache.replay() {
+                    proxy.nalUnit(deviceId, entry.data, nalType: entry.nalType, isParameterSet: entry.isParameterSet, hostTime: hostTime)
+                }
             }
             if wasEmpty, device.pipelineTask == nil {
                 self.cancelDeviceRetry(device)
+                device.claimRetryBackoff.reset()
                 self.beginStreaming(device, reply: reply)
             } else {
                 // Hardware already up (or in the middle of coming up) for
@@ -324,6 +342,7 @@ final class HelperService: NSObject, GogglesHelperProtocol {
             device.lingerTimer?.cancel()
             device.lingerTimer = nil
             self.cancelDeviceRetry(device)
+            device.claimRetryBackoff.reset()
             self.teardownHardware(device)
             if device.streamingSubscriberIDs.isEmpty {
                 self.setState(device, .noDevice)
@@ -348,6 +367,7 @@ final class HelperService: NSObject, GogglesHelperProtocol {
             setState(device, .claiming)
         }
         device.pipelineGeneration += 1
+        device.headCache.invalidate()
         let myGeneration = device.pipelineGeneration
         let priorClose = device.pendingClose
         device.pendingClose = nil
@@ -375,6 +395,7 @@ final class HelperService: NSObject, GogglesHelperProtocol {
                 self.stateQueue.async {
                     guard device.pipelineGeneration == myGeneration else { return }
                     device.activeTransport = transport
+                    device.claimRetryBackoff.reset()
                     device.currentDeviceInfoValue = info
                     self.fanOut(deviceId: deviceId) { $0.deviceChanged(deviceId, info) }
                     self.setState(device, .handshaking)
@@ -407,6 +428,7 @@ final class HelperService: NSObject, GogglesHelperProtocol {
                         // generation guard is the real, meaningful gate.
                         device.activeTransport = nil
                         device.currentDeviceInfoValue = nil
+                        device.headCache.invalidate()
                         self.stopBatteryPolling(device)
                         self.setState(device, .noDevice)
                         // Task 3.7, design §9.3 scenario 1/2: the
@@ -473,8 +495,22 @@ final class HelperService: NSObject, GogglesHelperProtocol {
                         reply(true, nil)
                         self.scheduleDeviceRetry(device)
                     } else {
-                        self.setState(device, .claimFailed, detail: nsError.localizedDescription)
+                        // Still report the failure, but don't give up: a
+                        // transient claim failure (macOS still holding the
+                        // interface after replug/wake) or an ARP timeout
+                        // (goggles still booting) usually clears by itself.
+                        // Retry with bounded exponential backoff for as long
+                        // as a subscriber wants this device; the timer is
+                        // cancelled when the last one leaves, and
+                        // `beginStreaming`'s generation guard (above) drops
+                        // results of superseded attempts. Background retries
+                        // (`announceClaiming == false`) don't re-announce an
+                        // unchanged failure.
+                        if device.currentStateValue != .claimFailed || announceClaiming {
+                            self.setState(device, .claimFailed, detail: nsError.localizedDescription)
+                        }
                         reply(false, nsError)
+                        self.scheduleDeviceRetry(device, delay: device.claimRetryBackoff.nextDelay())
                     }
                 }
             }
@@ -503,10 +539,10 @@ final class HelperService: NSObject, GogglesHelperProtocol {
     /// Schedules a `beginStreaming()` retry for one device after
     /// `deviceRetryInterval`. A no-op if one's already pending for this
     /// device, or if nothing is actually streaming it.
-    private func scheduleDeviceRetry(_ device: DeviceState) {
+    private func scheduleDeviceRetry(_ device: DeviceState, delay: TimeInterval = HelperService.deviceRetryInterval) {
         guard device.deviceRetryTimer == nil, !device.streamingSubscriberIDs.isEmpty else { return }
         let timer = DispatchSource.makeTimerSource(queue: stateQueue)
-        timer.schedule(deadline: .now() + Self.deviceRetryInterval)
+        timer.schedule(deadline: .now() + delay)
         timer.setEventHandler { [weak self, weak device] in
             guard let self, let device else { return }
             device.deviceRetryTimer = nil
@@ -570,6 +606,7 @@ final class HelperService: NSObject, GogglesHelperProtocol {
     /// references) is what actually stops the running pipeline `Task`.
     private func teardownHardware(_ device: DeviceState) {
         stopBatteryPolling(device)
+        device.headCache.invalidate()
         device.handle.releaseSynchronously()
         device.pipelineTask?.cancel()
         device.pipelineTask = nil
@@ -620,9 +657,15 @@ final class HelperService: NSObject, GogglesHelperProtocol {
             // multi-device) doc comment on this recovery check -- unchanged
             // logic, now against this device's own state instead of the
             // helper's singular state.
+            // Only real video NALs reach this callback: the pipeline's
+            // SPS+IDR gate forwards nothing until a keyframe has been seen
+            // (and nothing between a re-arm and the next one), and stats /
+            // telemetry never come through here, so this is the one place
+            // where recovery to `.live` from a stall is legitimate.
             if device.everReachedLive, device.currentStateValue == .stalled || device.currentStateValue == .handshaking {
                 self.setState(device, .live)
             }
+            device.headCache.record(nal: data, nalType: nalType)
             self.fanOut(deviceId: deviceId) { $0.nalUnit(deviceId, data, nalType: nalType, isParameterSet: isParameterSet, hostTime: hostTime) }
         }
     }
@@ -630,8 +673,25 @@ final class HelperService: NSObject, GogglesHelperProtocol {
     fileprivate func pipelineDidBeginReceivingVideo(deviceId: String) {
         stateQueue.async {
             let device = self.deviceState(deviceId)
-            if device.currentStateValue.rawValue < GogglesState.waitingForKeyframe.rawValue {
+            // `.stalled` here means video resumed after a silence re-arm:
+            // the decoder needs a fresh keyframe before it can show anything.
+            if device.currentStateValue.rawValue < GogglesState.waitingForKeyframe.rawValue
+                || device.currentStateValue == .stalled {
                 self.setState(device, .waitingForKeyframe)
+            }
+        }
+    }
+
+    /// The pipeline re-armed its keyframe gate while video was flowing (burst
+    /// of dropped frames). Surface `.waitingForKeyframe` so the app can show
+    /// its manual-instruction card (the DUML I-frame request often goes
+    /// unanswered on Goggles 3).
+    fileprivate func pipelineDidRequireKeyframe(deviceId: String) {
+        stateQueue.async {
+            let device = self.deviceState(deviceId)
+            device.headCache.invalidate()
+            if device.currentStateValue != .waitingForKeyframe {
+                self.setState(device, .waitingForKeyframe, detail: "dropped frames, waiting for keyframe")
             }
         }
     }
@@ -643,6 +703,9 @@ final class HelperService: NSObject, GogglesHelperProtocol {
     fileprivate func pipelineWentSilent(deviceId: String) {
         stateQueue.async {
             let device = self.deviceState(deviceId)
+            // The pipeline re-arms its keyframe gate on silence, so the
+            // cached IDR no longer starts a valid chain.
+            device.headCache.invalidate()
             if device.everReachedLive, device.currentStateValue == .live {
                 self.setState(device, .stalled, detail: "no data for 2s")
             } else {
@@ -651,6 +714,9 @@ final class HelperService: NSObject, GogglesHelperProtocol {
         }
     }
 
+    /// NOTE: stats fire every second unconditionally, even when no video is
+    /// flowing. They are NOT an activity signal; clients must not use their
+    /// arrival to decide that the stream is alive.
     fileprivate func pipelineDidUpdateStats(deviceId: String, _ stats: PipelineStats) {
         let wire = StreamStats(
             fps: stats.fps,
@@ -700,6 +766,10 @@ private final class DevicePipelineDelegateAdapter: PipelineDelegate {
 
     func pipelineDidUpdateStats(_ stats: PipelineStats) {
         service?.pipelineDidUpdateStats(deviceId: deviceId, stats)
+    }
+
+    func pipelineDidRequireKeyframe() {
+        service?.pipelineDidRequireKeyframe(deviceId: deviceId)
     }
 }
 
