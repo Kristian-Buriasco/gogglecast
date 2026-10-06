@@ -68,12 +68,56 @@ if [[ ! -x "$HELPER_BIN" ]]; then
     exit 1
 fi
 
+# App Intents (ShortcutsIntents.swift): SwiftPM does not run the App Intents
+# metadata extraction Xcode does, so we ask the compiler for const-value
+# output of the intent protocols and run appintentsmetadataprocessor below.
+# Without the resulting Contents/Resources/Metadata.appintents the actions do
+# not show up in Shortcuts.
+INTENTS_PROTOCOLS="$SCRIPT_DIR/.build/appintents-protocols.json"
+mkdir -p "$SCRIPT_DIR/.build"
+cat > "$INTENTS_PROTOCOLS" <<'JSON'
+["AppIntent","EntityQuery","AppEntity","TransientAppEntity","AppEnum","AppShortcutProviding","AppShortcutsProvider","AnyResolverProviding","AppIntentsPackage","DynamicOptionsProvider","_IntentValueRepresentable","IntentValueQuery"]
+JSON
+
 echo "==> Building GogglesView app binary (swift build)"
-( cd "$SCRIPT_DIR" && swift build -c release )
+( cd "$SCRIPT_DIR" && swift build -c release \
+    -Xswiftc -emit-const-values \
+    -Xswiftc -Xfrontend -Xswiftc -const-gather-protocols-file \
+    -Xswiftc -Xfrontend -Xswiftc "$INTENTS_PROTOCOLS" )
 APP_BIN="$SCRIPT_DIR/.build/release/GogglesView"
 if [[ ! -x "$APP_BIN" ]]; then
     echo "error: expected app binary not found at $APP_BIN" >&2
     exit 1
+fi
+
+# Generate Metadata.appintents (best effort: on failure the app still works,
+# the Shortcuts actions are just not listed; URL scheme/AppleScript are
+# unaffected). Output: $INTENTS_META/Metadata.appintents.
+INTENTS_META=""
+echo "==> Generating App Intents metadata"
+INTENTS_TMP="$(mktemp -d)"
+TOOLCHAIN_DIR="$(dirname "$(dirname "$(dirname "$(xcrun --find swiftc)")")")"
+PROCESSOR="$(xcrun --find appintentsmetadataprocessor 2>/dev/null || true)"
+CONST_LIST="$INTENTS_TMP/const.txt"
+find "$SCRIPT_DIR/.build/out/Intermediates.noindex/GogglesView.build/Release" -name '*.swiftconstvalues' > "$CONST_LIST" 2>/dev/null || true
+find "$SCRIPT_DIR/Sources/GogglesView" -name '*.swift' > "$INTENTS_TMP/src.txt"
+if [[ -n "$PROCESSOR" && -s "$CONST_LIST" ]] && "$PROCESSOR" \
+    --output "$INTENTS_TMP/out" \
+    --toolchain-dir "$TOOLCHAIN_DIR" \
+    --module-name GogglesView \
+    --sdk-root "$(xcrun --sdk macosx --show-sdk-path)" \
+    --xcode-version "$(xcodebuild -version | awk '/Build version/ {print $3}')" \
+    --platform-family macOS \
+    --deployment-target 14.0 \
+    --target-triple "$(uname -m)-apple-macos14.0" \
+    --source-file-list "$INTENTS_TMP/src.txt" \
+    --swift-const-vals-list "$CONST_LIST" \
+    --force > "$INTENTS_TMP/log.txt" 2>&1 \
+    && [[ -f "$INTENTS_TMP/out/Metadata.appintents/extract.actionsdata" ]]; then
+    INTENTS_META="$INTENTS_TMP/out/Metadata.appintents"
+else
+    echo "warning: App Intents metadata not generated; Shortcuts actions will not be listed" >&2
+    cat "$INTENTS_TMP/log.txt" >&2 2>/dev/null || true
 fi
 
 # Task 4.1: third bundle component, the throwaway CMIOExtension spike
@@ -112,6 +156,10 @@ cp "$SCRIPT_DIR/BundleResources/com.kburiasco.gogglesview.autoopen.plist" \
 # AppleScript dictionary (Info.plist OSAScriptingDefinition -> Resources/).
 mkdir -p "$APP_BUNDLE/Contents/Resources"
 cp "$SCRIPT_DIR/BundleResources/GogglesView.sdef" "$APP_BUNDLE/Contents/Resources/GogglesView.sdef"
+
+if [[ -n "$INTENTS_META" ]]; then
+    cp -R "$INTENTS_META" "$APP_BUNDLE/Contents/Resources/Metadata.appintents"
+fi
 
 cp "$APP_BIN" "$APP_BUNDLE/Contents/MacOS/GogglesView"
 cp "$HELPER_BIN" "$APP_BUNDLE/Contents/MacOS/GogglesHelper"
