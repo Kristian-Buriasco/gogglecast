@@ -64,19 +64,28 @@ The dictionary is `Apps/GogglesView/BundleResources/GogglesView.sdef` (open it i
 
 ## Shortcuts
 
-Use the URL scheme:
+GogglesView ships native Shortcuts actions (App Intents, macOS 14+). In Shortcuts.app open the sidebar, choose **Apps > GogglesView** (or search the action list for "GogglesView"). They also work from Siri and Spotlight, e.g. "Start recording in GogglesView".
 
-1. New shortcut > add the **Open URLs** action.
-2. Set the URL to e.g. `gogglesview://record/toggle`.
-3. Optionally give it a keyboard shortcut (shortcut details > Add Keyboard Shortcut) or add it to the menu bar.
+| Action | Result |
+|--------|--------|
+| Start Recording / Stop Recording / Toggle Recording | "Recording started" etc. |
+| Save Instant Replay | Saves the replay buffer |
+| Take Screenshot | Saves a screenshot |
+| Add Marker | Optional **Label** (default "Marker") |
+| Start Network Stream / Stop Network Stream | UDP stream using the host/port from Settings |
+| Toggle Freeze | Freezes/unfreezes the live view |
+| Show Goggles Window | Brings the window (or device picker) to the front |
+| Get Goggles Status | Returns goggles count, recording, fps, battery (%) and a one-line summary; fps/battery are -1 when unknown |
 
-Alternatively use the **Run AppleScript** action with any of the scripts above (this one can also read `recording`, `battery`, ...).
+Every action has an optional **Device** parameter (serial or device id, same as `?device=`). Actions run inside the app without opening a window, go through the same dispatcher and "Allow automation" switch as the URL scheme, and fail with a readable message when no goggles are live ("No goggles are live. Connect the goggles and open a GogglesView window first.") or automation is off. There is no copy-frame action here.
 
-GogglesView has no native App Intents actions: the app is built with SwiftPM, which compiles but does not package App Intents metadata, so Shortcuts would not list them.
+Feasibility notes: Shortcuts only lists actions from apps whose bundle contains `Contents/Resources/Metadata.appintents`. Xcode generates that at build time; plain SwiftPM does not. `Apps/GogglesView/build-stub-bundle.sh` therefore builds with `-emit-const-values` for the intent protocols and runs `appintentsmetadataprocessor` afterwards, copying the result into the bundle before signing (so `scripts/make-dmg.sh` bundles get it too). If the processor is missing the script prints a warning and the app still works, just without the Shortcuts actions. A plain `swift build` / `swift run` binary has no metadata, so no actions there. After installing a new build, Shortcuts may need a few seconds (or a relaunch of Shortcuts.app) to pick the app up.
+
+Alternatives that always work, even without metadata: the **Open URLs** action with e.g. `gogglesview://record/toggle`, or **Run AppleScript** with any of the scripts above.
 
 ## Stream Deck / Raycast
 
-- **Stream Deck**: use the built-in **System > Website** action with a `gogglesview://...` URL (untick "GET request in background"), or the **Open** action with a small shell script that runs `open "gogglesview://record/toggle"`.
+- **Stream Deck**: use the Shortcuts support (the "Run Shortcut"/Shortcuts action in the Stream Deck app) to run a shortcut containing a GogglesView action, or use the built-in **System > Website** action with a `gogglesview://...` URL (untick "GET request in background"), or the **Open** action with a small shell script that runs `open "gogglesview://record/toggle"`.
 - **Raycast**: create a Quicklink with the link `gogglesview://record/toggle` and open it with GogglesView, or a Script Command that runs `open "gogglesview://screenshot"` / `osascript -e '...'`.
 - Anything that can open a URL or run a shell command works the same way (Alfred, BetterTouchTool, Keyboard Maestro, `cron`, hooks).
 
