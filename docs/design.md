@@ -1,20 +1,17 @@
-# GogglesView — Design Spec
+# GogglesView: design
 
 Native macOS live-video receiver for DJI Goggles 3 (Goggles N3) over USB-C, plus a
 virtual camera output for OBS / Zoom / FaceTime.
 
-- **Status:** design, pre-implementation.
-- **Basis:** the working Python prototype at `~/PycharmProjects/dji-goggles3-videoout/`
-  (`stream.py`, `rndis.py`, `rawnet.py`, `duml.py`). That prototype is the normative
-  reference for every protocol detail below; this document restates it exactly, and
-  every deviation from it is called out explicitly.
-- **Project root:** `~/XcodeProjects/GogglesView/`.
+- **Basis:** a Python prototype (`stream.py`, `rndis.py`, `rawnet.py`, `duml.py`) that
+  was the reference for every protocol detail below. Where the Swift implementation
+  deliberately differs from it, the text says so.
 
 ---
 
 ## 1. Goal and scope
 
-### In scope (v1)
+### In scope
 
 1. A native macOS app that displays the goggles' live 1080p H.264 FPV feed with the
    goggles connected by USB-C only. No Cynthion, no Raspberry Pi bridge, no phone,
@@ -23,7 +20,7 @@ virtual camera output for OBS / Zoom / FaceTime.
 3. A device-info panel (product string, serial, USB VID:PID, bus/address) and a
    clear connection state machine.
 
-### In scope (v2)
+### Planned, not shipped
 
 4. A `CMIOExtension` virtual camera publishing the same feed as a system camera
    device named "DJI Goggles 3".
@@ -31,17 +28,16 @@ virtual camera output for OBS / Zoom / FaceTime.
 ### Explicitly out of scope
 
 - Audio. The prototype never touched an audio path and none has been located.
-- Recording to disk (trivial to add later; not a v1 requirement).
 - Any control of the goggles beyond what is needed to start/keep the video flowing.
 - Windows/Linux.
-- Solving the IDR-trigger problem (see §8.1). v1 designs *around* it.
+- Solving the IDR-trigger problem (see §8.1). The design works around it.
 
 ---
 
 ## 2. What is actually proven, and what is not
 
-This section exists so no later phase silently assumes something the prototype did
-not demonstrate.
+This section records what the prototype demonstrated, so nothing downstream silently
+assumes more.
 
 ### Proven on real hardware
 
@@ -49,13 +45,13 @@ not demonstrate.
 |---|---|
 | USB device is VID:PID `2CA3:0020`, 8 interfaces | `N3-usb-descriptor.txt` |
 | IF0 (class `0xE0`/`0x01`/`0x03`, Wireless-Controller = RNDIS control, EP `0x82` INT IN) + IF1 (class `0x0A` CDC-Data, EP `0x81` bulk IN / `0x01` bulk OUT) form the RNDIS pair | `N3-usb-descriptor.txt`, `rndis.py` |
-| macOS binds IF0/IF1 as `en3`/`en4` but reports `media inactive` and never completes DHCP — the OS RNDIS stack is unusable | `FINDINGS.md` P0 |
+| macOS binds IF0/IF1 as `en3`/`en4` but reports `media inactive` and never completes DHCP — the OS RNDIS stack is unusable | prototype notes (P0) |
 | A userspace RNDIS driver over libusb brings the link up | `rndis.py` |
 | Goggles answer at `192.168.60.2`; host presents as `192.168.60.1` | `stream.py` |
 | A 48-byte UDP packet to port 9003 starts the video stream | `stream.py` |
-| Video is H.264 Annex-B, 1920x1080, High Profile Level 5.2, ~56 fps measured (Phase 1 on-hardware parity run superseded an earlier ~33 fps figure — see `docs/parity-results.md`) | `get_resolution.py` + a clean per-second counter in `stream.py` |
-| Claiming IF0/IF1 requires root on this Mac, and often a `detach_kernel_driver()` first | Empirical, this session |
-| The goggles' RNDIS MAC rotates on every goggles reboot | Empirical, this session |
+| Video is H.264 Annex-B, 1920x1080, High Profile Level 5.2, ~56 fps measured (an on-hardware parity run superseded an earlier ~33 fps figure, see `docs/parity-results.md`) | `get_resolution.py` + a clean per-second counter in `stream.py` |
+| Claiming IF0/IF1 requires root on this Mac, and often a `detach_kernel_driver()` first | Empirical |
+| The goggles' RNDIS MAC rotates on every goggles reboot | Empirical |
 | SPS and PPS arrive bundled in one small (~40 byte) NAL blob, not as two NALs | Empirical; broke an early gating attempt |
 | A random per-connection session id is required; a fixed one breaks IDR delivery on reconnect | Empirical; was a real bug |
 | The only reliable way to get a fresh IDR is the user toggling "Share Liveview to Mobile Device via Wi-Fi" off then on in the goggles' menu | Empirical |
@@ -66,17 +62,10 @@ not demonstrate.
 - **DUML `02:B3` (`camera_get_app_request_i_frame`) as an I-frame trigger.** `stream.py`
   retries it every 1.5 s inside a type-`0x01` telemetry packet while waiting for a
   keyframe. It does not reliably produce an IDR. Treat as non-functional.
-- **The vendor-interface DUML control path (IF3–IF7).** `FINDINGS.md` P1–P4 documents a
+- **The vendor-interface DUML control path (IF3 to IF7).** The prototype notes (P1 to P4) document a
   full dead end: functional commands to `0xBC` are rejected with status `0xE0`, the same
   commands to the air unit `0x09` get no reply, and IF3/5/6/7 never wake. This path is
   *not* part of the video pipeline. Only the credential queries on IF4 work.
-
-### Documentation hazard
-
-`FINDINGS.md` in the Python project is **stale**. It concludes "the network path is a
-dead end" and "the N3 is driven over DUML on IF4" — both of which the later RNDIS work
-disproved. Anyone reading that file for context must read `stream.py` first. This spec
-supersedes it.
 
 ---
 
@@ -127,7 +116,7 @@ Data path on IF1:
 - Source port `54321`, destination port `9003`. Inbound video is filtered on
   *source* port == 9003.
 
-**Deviation from the prototype, required for v1:** `stream.py` has the goggles MAC
+**Deviation from the prototype:** `stream.py` has the goggles MAC
 **hardcoded** (`ca:3c:b4:8d:51:c3`) and `rndis_arp_sweep.py` is a *separate manual tool*
 that blasts ARP across eight candidate /24s. Because the MAC rotates on goggles reboot,
 the shipping implementation must resolve it at connect time. Since the subnet is now
@@ -207,24 +196,23 @@ Frame: `0x55` magic, u16 LE `(version << 10) | length`, CRC-8 of bytes 0..2 (see
 of everything but the last two bytes (seed `0x3692`). Header is 11 bytes, minimum frame
 13 bytes. `duml.py` builds version 1 frames.
 
-Used in v1 for exactly two things:
+Used for exactly two things:
 
 1. The best-effort I-frame request: sender `0x2A`, receiver `0xBC`, seq `0x9000`,
    cmd_type `0x40`, cmd_set `0x02`, cmd_id `0xB3`, empty payload, wrapped in a type-`0x01`
-   telemetry packet. Retained because it is harmless; **the UI must not depend on it**.
-2. (Optional, Wi-Fi transport only, see §5.3) SSID/passphrase queries on IF4.
+   telemetry packet. Retained because it is harmless; the UI must not depend on it.
+2. (Optional, Wi-Fi transport only, see §4.1) SSID/passphrase queries on IF4.
 
 ---
 
 ## 4. Architecture
 
-### 4.1 Review of the proposed three-component design
+### 4.1 Component split and decisions
 
-The proposed split was: privileged USB helper -> main app, plus a CMIOExtension consuming
-the same stream. That is the right *shape*. Four changes:
+The split is: privileged USB helper -> main app, plus a CMIOExtension consuming the
+same stream. Four decisions shape it.
 
-**Change 1 — the CMIOExtension cannot own the USB connection. Confirmed keep-the-helper.**
-This was raised as an open question. It is not viable:
+**Change 1: the CMIOExtension cannot own the USB connection, so the helper stays.**
 - Claiming IF0/IF1 needs root and needs `detach_kernel_driver()`. A CMIO system extension
   runs sandboxed and unprivileged; it has no route to either.
 - Even setting privilege aside, a camera extension is lifecycle-managed by the CMIO DAL
@@ -235,8 +223,8 @@ This was raised as an open question. It is not viable:
 - The exclusive-ownership argument runs the other way too: exactly one process may claim
   IF0/IF1, so the helper must be that process and must fan out to N consumers.
 
-**Change 2 — Mach-service XPC, not a Unix domain socket.** Also raised as an open
-question; XPC wins, and the reason is the extension, not the app:
+**Change 2: Mach-service XPC, not a Unix domain socket.** The reason is the extension,
+not the app:
 - A root LaunchDaemon vends a Mach service by declaring `MachServices` in its launchd
   plist; the app connects with `NSXPCConnection(machServiceName:options:.privileged)`.
   Either transport would work for the app alone.
@@ -248,14 +236,14 @@ question; XPC wins, and the reason is the extension, not the app:
 - **Decision:** one Mach service, name `<TeamID>.com.kburiasco.gogglesview.helper`,
   declared in the daemon plist and listed in the app group shared by app, helper and
   extension.
-- **Caveat to verify in Phase 4, not to assume:** system-extension sandbox rules around
-  Mach lookup have historically been finicky. Phase 4 begins with a throwaway spike that
-  proves the extension can reach the helper's Mach service *before* any video code is
-  written into it. If it cannot, the fallback is for the app (not the extension) to be
+- **Caveat to verify, not to assume:** system-extension sandbox rules around Mach lookup
+  have historically been finicky. A throwaway spike should prove the extension can reach
+  the helper's Mach service before any video code is written into it (see §10 question 1).
+  If it cannot, the fallback is for the app (not the extension) to be
   the extension's frame source over the CMIO sink-stream / `CMIOExtensionStreamSource`
   push path.
 
-**Change 3 — abstract the transport. This is the significant addition.**
+**Change 3: abstract the transport.**
 The UDP-9003 protocol in §3.3 is *the goggles' Wi-Fi liveview protocol*; the RNDIS link
 is only a carrier for it. `get_wifi_creds.py` already extracts the share SSID and
 passphrase over IF4, and IF4 needs **no root** (no kernel driver binds the vendor
@@ -268,18 +256,17 @@ interfaces). That means there is a fully unprivileged second transport:
 Everything above the transport — session ids, handshake, fragment reassembly, ack,
 parameter-set gating, decode, display, virtual camera — is bit-for-bit identical.
 
-This is not proposed as v1's primary path (it monopolises the Mac's Wi-Fi radio and costs
-internet access, which is exactly why USB is the product). It is proposed as:
+This is not the primary path (it monopolises the Mac's Wi-Fi radio and costs
+internet access, which is exactly why USB is the product). It is kept as:
 - a **design constraint**: define `protocol GogglesTransport { func send(_: Data); var
   frames: AsyncStream<Data> }` with `RNDISTransport` and `WiFiUDPTransport` conformances,
   so the protocol core is testable without root and without hardware;
 - a **de-risking escape hatch**: if the SMAppService/privileged-helper plumbing
   (§8.4) proves intractable, a Wi-Fi-only build still ships a working product;
-- a **v1.1 feature** that costs perhaps a day once the abstraction exists.
+- a possible later feature once the abstraction exists.
 
-**Change 4 — three processes, but staged.** The full three-process topology is correct as
-an end state; building it all at once is not. v1 ships app + helper (two processes) and
-adds the extension in v2. See the phase plan.
+**Change 4: three processes, but staged.** The full three-process topology is the end
+state. The app ships with app + helper (two processes); the extension is added later.
 
 ### 4.2 Components
 
@@ -302,7 +289,7 @@ adds the extension in v2. See the phase plan.
 └───────────────────────────────────────────────▲───────────────┘
                                                 │ XPC (same Mach service)
 ┌───────────────────────────────────────────────┴───────────────┐
-│ GogglesCamera.systemextension  (CMIOExtension, v2)            │
+│ GogglesCamera.systemextension  (CMIOExtension, planned)       │
 │   • decodes Annex-B → CVPixelBuffer, publishes as a camera    │
 └───────────────────────────────────────────────────────────────┘
 ```
@@ -366,12 +353,12 @@ Timers, all driven from the same loop:
 | I-frame request | 1.5 s, only while not yet started | send DUML `02:B3` telemetry (best-effort, see §8.1) |
 | Stats | 1 s | publish measured fps / bitrate / drop counters |
 
-**Implementation change from the prototype (required, not optional):** `stream.py`'s
+**Implementation change from the prototype:** `stream.py`'s
 `frames` dictionary only ever evicts the current frame number. Because frame numbers wrap
 at 256, a fragment lost mid-frame leaves a partial entry that is never freed and that a
 later frame with the same number will merge into, producing a corrupt NAL. The Swift
-implementation must (a) drop any frame entry older than ~5 frame numbers (modulo-256
-distance) or ~250 ms, and (b) discard, not merge, a frame whose fragments are incomplete
+implementation (a) drops any frame entry older than ~5 frame numbers (modulo-256
+distance) or ~250 ms, and (b) discards, not merges, a frame whose fragments are incomplete
 when it is evicted, incrementing a drop counter.
 
 **Second implementation change:** `stream.py` uses synchronous 16 KB bulk reads with a
@@ -417,7 +404,7 @@ at 256. Therefore:
   add latency and jitter for no benefit.
 - The extension synthesises a CMIO timestamp from the helper's host time so that
   consumers see a monotonic, real-rate clock. Nominal rate is advertised as 30 fps with
-  the measured ~56 fps tolerated (Phase 1 on-hardware parity run; see
+  the measured ~56 fps tolerated (see
   `docs/parity-results.md`, which supersedes an earlier ~33 fps figure traced to
   `stream.py`'s own synchronous read-loop bottleneck, not the goggles' actual encoder
   rate); consumers such as OBS resample.
@@ -449,7 +436,7 @@ Frames are delivered by the helper calling `nalUnit` on each subscriber's export
 object. A 1080p H.264 P-frame at ~56 fps (see `docs/parity-results.md`) averages roughly
 20–60 KB; XPC handles this
 volume without special treatment, and `Data` above ~16 KB is transferred out-of-line by
-`NSXPCConnection` automatically. If Phase 2 profiling shows XPC overhead is material,
+`NSXPCConnection` automatically. If profiling shows XPC overhead is material,
 the fallback is a shared-memory ring buffer whose `IOSurface`/`mach_port` handle is passed
 once over XPC — deliberately deferred, not designed in speculatively.
 
@@ -479,8 +466,8 @@ Transitions out of `live` on a 5 s silence go to `handshaking`, not straight to
 
 The device-info card (product string, serial, `2CA3:0020`, bus/address) is shown in
 every state from `claiming` onward, mirroring CosmoViewer Direct's device picker layout.
-CosmoViewer Direct is a **UX reference only**; nothing about its internals is known and
-nothing in this design is derived from it.
+CosmoViewer Direct is a UX reference only; nothing in this design is derived from its
+internals.
 
 ---
 
@@ -509,7 +496,7 @@ nothing in this design is derived from it.
 The encoder does **not** emit periodic IDRs. A genuine SPS+IDR pair is produced only when
 the user toggles "Share Liveview to Mobile Device via Wi-Fi" off and on in the goggles'
 own menu. DUML `02:B3` was implemented and retried on a 1.5 s cadence and does not
-reliably work. Nothing found in this session solves it.
+reliably work. No solution has been found.
 
 **The design must not assume this becomes automatic.** Concretely:
 
@@ -533,10 +520,9 @@ reliably work. Nothing found in this session solves it.
 - Once `live`, the app never leaves it for a missing keyframe alone — a decoder that has a
   format description keeps decoding P-frames indefinitely.
 
-**Future work, explicitly not v1:** recovering the real start sequence from
-`libdjisdk_jni.so` via Ghidra (`PigeonLiveViewLogic::Start`,
-`ModuleMediator::StartLiveStreaming`, `SpecialCommandManager::RequestIFrameForLiveView`),
-per `FINDINGS.md` P3. If that lands, it slots in behind `requestIFrame()` with no
+**Possible future work:** recovering the real start sequence from `libdjisdk_jni.so`
+via Ghidra (`PigeonLiveViewLogic::Start`, `ModuleMediator::StartLiveStreaming`,
+`SpecialCommandManager::RequestIFrameForLiveView`). If that lands, it slots in behind `requestIFrame()` with no
 architectural change.
 
 ### 8.2 MAC rotation
@@ -547,7 +533,7 @@ of thing that gets added later and breaks after a goggles reboot. **Do not add i
 
 ### 8.3 Root privilege for IF0/IF1
 
-Claiming these interfaces required root in this session, from a plain Terminal process,
+Claiming these interfaces required root, from a plain Terminal process,
 and often required `detach_kernel_driver()` first because macOS inconsistently binds a
 driver to them. Two consequences:
 
@@ -562,7 +548,7 @@ driver to them. Two consequences:
 
 ### 8.4 SMAppService daemon installation
 
-Real footguns, and one correction to the original proposal:
+Real footguns:
 
 - **`SMPrivilegedExecutables` is not used by `SMAppService`.** That key belongs to the
   legacy `SMJobBless` flow. Mixing the two is a known way to waste a day. The
@@ -582,66 +568,40 @@ Real footguns, and one correction to the original proposal:
     is the single most common "it silently doesn't work" case.
 - Development iteration is painful: an unapproved or stale registration must be cleared
   with `sudo sfltool resetbtm` (which resets *all* login items on the machine) or by
-  unregistering before every rebuild. Phase 2 budgets for this explicitly.
-- **Phase 2 mitigation:** the helper binary is written and debugged first as a plain
-  root-run CLI (`sudo ./GogglesHelper --stdout`) with a `--xpc` mode added second. That
-  way protocol bugs and packaging bugs are never being debugged simultaneously.
+  unregistering before every rebuild.
+- **Mitigation:** debug the helper as a plain root-run CLI (`sudo ./GogglesHelper
+  --stdout`) before the `--xpc` mode, so protocol bugs and packaging bugs are not
+  debugged simultaneously.
 
 ### 8.5 CMIOExtension entitlements and distribution
-
-Stated plainly, since the brief asked for a straight answer on what is achievable:
 
 - A camera extension needs: the host app entitled with
   `com.apple.developer.system-extension.install`, the extension bundled at
   `Contents/Library/SystemExtensions/`, an app group shared by app / helper / extension,
   hardened runtime everywhere, and installation via `OSSystemExtensionRequest`.
-- **Correction found during Task 4.1 — this section's original claim was wrong on one
-  specific point.** It said `com.apple.developer.system-extension.install` is "available
-  to any Apple Developer Program member" and implied a free/personal team could at least
-  provision it, with only notarization/distribution gated on paid membership. **That is
-  not true.** Apple's own current capability-support matrix
-  (`https://developer.apple.com/help/account/reference/supported-capabilities-macos/`,
-  fetched and verified against the raw HTML table during Task 4.1, not just a summary
-  of it) lists three membership columns — **ADP** (paid Apple Developer Program), **Developer
-  ID** (a cert that itself requires paid ADP), and **Apple Developer** (a free account that
-  "can't distribute apps") — and the **System Extension** row has ADP and Developer ID
-  checked, **Apple Developer unchecked**. Compare **App groups** and **App Sandbox**, both
-  checked in all three columns on the same table — so this isn't a blanket "free tier can't
-  provision anything advanced" situation, it's specific to System Extension (and to
-  several other rows on that table, e.g. Push notifications, Network extensions). What
-  *is* still true from the original claim: unlike DriverKit, there's no case-by-case Apple
-  review of the capability itself — the gate is purely "does your membership tier appear
-  in that table's checked columns for this row," which for a free/personal team it does
-  not. Confirmed empirically the same day: attempting to launch the signed app (valid
-  `Apple Development` cert, `com.apple.developer.system-extension.install` entitlement
-  manually applied via `codesign --entitlements`, no provisioning profile) failed at
+- `com.apple.developer.system-extension.install` is **not** available to free/personal
+  Apple Developer teams. Apple's capability-support matrix
+  (`https://developer.apple.com/help/account/reference/supported-capabilities-macos/`)
+  lists the System Extension row as available to the paid Apple Developer Program and
+  Developer ID, and not to the free Apple Developer tier. App groups and App Sandbox, by
+  contrast, are available on all three.
+- Confirmed empirically: launching the app signed with a valid `Apple Development`
+  certificate and this entitlement applied manually (no provisioning profile) fails at
   launch with `amfid: ... AppleMobileFileIntegrityError Code=-413 "No matching profile
-  found"` — AMFI rejects the binary before `OSSystemExtensionRequest` is ever reached,
-  because no provisioning profile covering this entitlement can exist for a free/personal
-  team, `systemextensionsctl developer on` notwithstanding. See
-  the Phase 4.1 task notes (not kept in the repo) for the full trace.
-- **The real gate is provisioning first, signing/notarization second.** Even before the
-  Developer-ID-cert-and-notarization gate described below, the app binary can't even pass
-  AMFI validation and launch with this entitlement attached unless a real provisioning
-  profile for it exists — and no such profile can be generated for a free/personal team at
-  all, for any purpose, dev-mode or not. A system extension additionally installs on a
-  normal (non-dev-mode) Mac only if the app is signed with a **Developer ID** certificate
-  and notarized. Developer ID requires a paid Apple Developer Program membership ($99/yr);
-  a free personal team cannot issue one and cannot notarize.
-- **Therefore, for a personal/local-only build with no paid membership: this is a hard
-  blocker, not a degraded-but-working path.** The original text here claimed the app,
-  helper and virtual camera would "all still work" via `systemextensionsctl developer on`
-  plus one reboot. That is false as stated — developer mode relaxes the *notarization*
-  requirement, not the *provisioning-profile* requirement, and the app can't even launch
-  with this entitlement attached until a paid membership exists. See
-  `docs/dev-setup.md`'s Phase 4 prerequisite note for the current, corrected status.
-- **Distribution to anyone else is blocked on the paid membership plus notarization.**
-  This is a hard dependency, not something that can be engineered around. It is the
-  reason the virtual camera is v2: v1 must be useful without it.
-- Note also that virtual cameras are invisible to apps with the hardened runtime and
-  library-validation enabled unless those apps opt in — historically an issue for
-  FaceTime and some Safari paths. OBS, Zoom and Chrome are fine. Set expectations in the
-  UI: list OBS/Zoom/Discord/Chrome as verified targets rather than promising "any app".
+  found"`. AMFI rejects the binary before `OSSystemExtensionRequest` is reached, because
+  no provisioning profile covering this entitlement can exist for a free team.
+  `systemextensionsctl developer on` does not change this: developer mode relaxes the
+  notarization requirement, not the provisioning-profile requirement.
+- On a normal (non-developer-mode) Mac, a system extension installs only if the app is
+  signed with a **Developer ID** certificate and notarized, which requires a paid Apple
+  Developer Program membership.
+- So without a paid membership the virtual camera cannot be built or run, and
+  distribution to anyone else additionally needs notarization. This is why the virtual
+  camera is optional: the app must be useful without it. See `docs/dev-setup.md`.
+- Virtual cameras are invisible to apps with the hardened runtime and library validation
+  enabled unless those apps opt in, historically an issue for FaceTime and some Safari
+  paths. OBS, Zoom and Chrome are fine. Set expectations in the UI: list
+  OBS/Zoom/Discord/Chrome as verified targets rather than promising "any app".
 
 ### 8.6 Protocol fragility
 
@@ -686,7 +646,7 @@ testable without goggles and without root.
 
 ### 9.2 On-hardware, parity with the prototype
 
-The Phase 1 exit criterion. Run the Python prototype and the Swift CLI back to back on
+The acceptance gate for the Swift pipeline. Run the Python prototype and the Swift CLI back to back on
 the same goggles session and compare:
 
 | Metric | Requirement |
@@ -718,7 +678,7 @@ Each must leave the app in a correct state with no crash and no leaked USB claim
    reassembly leak directly).
 9. Sleep and wake the Mac while connected.
 
-### 9.4 Virtual camera verification (v2)
+### 9.4 Virtual camera verification (planned)
 
 - The device appears in OBS, Zoom, Discord and Chrome (`getUserMedia`) as
   "DJI Goggles 3", at 1920x1080.
@@ -735,42 +695,25 @@ Each must leave the app in a correct state with no crash and no leaked USB claim
 ## 10. Open questions
 
 1. Does a CMIO system extension's sandbox permit Mach lookup of the helper's
-   app-group-prefixed service? **BLOCKED — not answerable on this machine until a paid
-   Apple Developer Program membership exists. This is a hard blocker discovered by Task
-   4.1, not the original question's answer.** The spike itself (`Extension/GogglesCamera`)
-   is fully built and staged: a minimal `CMIOExtensionProvider`/`Device`/`Stream` skeleton,
-   one `NSXPCConnection` attempt to the helper's Team-ID-prefixed Mach service
-   (`U8LK2QA3FL.com.kburiasco.gogglesview.helper`, renamed across all three call sites),
-   and one logged `stats` callback (`HelperSpikeConnector.swift`) — see
-   the Phase 4.1 task notes (not kept in the repo) for the full build/sign trace. But the app
-   can't even reach the point of attempting the Mach lookup: with
-   `systemextensionsctl developer on` confirmed live (`systemextensionsctl developer` →
-   "Developer mode is on"), launching the app still fails at the OS level —
-   `amfid: ... AppleMobileFileIntegrityError Code=-413 "No matching profile found"` — because
-   `com.apple.developer.system-extension.install` requires a real provisioning profile,
-   and Apple's current capability matrix
-   (`developer.apple.com/help/account/reference/supported-capabilities-macos/`) confirms
-   the System Extension capability is **not available to free/personal-team accounts at
-   all** (only ADP-paid or Developer-ID-cert tiers), unlike App groups/App Sandbox which
-   *are* available free. See §8.5's corrected text above for the full citation. Developer
-   mode relaxes the *notarization* requirement for an already-provisioned extension; it
-   does not create a provisioning profile that doesn't exist. **Until the paid membership
-   from docs/dev-setup.md's Phase 4 prerequisite note arrives, this question cannot be
-   tested, and Task 4.2 cannot start.** One correction to the original premise, worth
-   keeping regardless of the eventual pass/fail result once testing is possible: the
-   mechanism the Mach-lookup decision itself rests on is the sandbox's Team-ID-prefix
-   mach-lookup exception (a sandboxed process may look up any global Mach service name
-   prefixed with its own code-signing Team ID), not the app-group entitlement — the app
-   group is still declared (for possible future shared-container use) but is not what is
-   expected to gate the lookup. Fallback (app pushes frames to the extension instead of
-   the extension pulling from the helper) remains documented in §4.1 and is adopted
-   automatically once real evidence exists that the lookup fails — that evidence just
-   can't be produced yet.
+   app-group-prefixed service? **Blocked: cannot be tested without a paid Apple Developer
+   Program membership** (see §8.5). The spike (`Extension/GogglesCamera`) is built and
+   staged: a minimal `CMIOExtensionProvider`/`Device`/`Stream` skeleton, one
+   `NSXPCConnection` attempt to the helper's Team-ID-prefixed Mach service
+   (`U8LK2QA3FL.com.kburiasco.gogglesview.helper`) and one logged `stats` callback
+   (`HelperSpikeConnector.swift`). The app cannot launch with the system-extension
+   entitlement on a free team, so the lookup is never attempted. One correction to the
+   original premise, worth keeping regardless of the eventual result: the mechanism the
+   decision rests on is the sandbox's Team-ID-prefix mach-lookup exception (a sandboxed
+   process may look up any global Mach service name prefixed with its own code-signing
+   Team ID), not the app-group entitlement. The app group is still declared, for possible
+   future shared-container use, but is not what is expected to gate the lookup. The
+   fallback (app pushes frames to the extension instead of the extension pulling from the
+   helper) is documented in §4.1 and applies if testing later shows the lookup fails.
 2. Are bytes 8..15 and 19 of the video sub-header meaningful (timestamp? stream id?)? Not
-   needed for v1; worth a look at the capture corpus, since a real PTS would improve the
+   needed so far; worth a look at the capture corpus, since a real PTS would improve the
    CMIO clock.
 3. What are packet types `0x06` and `0x01` inbound? The prototype ignores both. Logging
    them at debug level (§8.6) will answer this over time.
 4. Does the goggles' Wi-Fi transport (§4.1, change 3) reach `192.168.60.2:9003` or a
    different address on the AP subnet? Trivial to determine once the SSID is joined;
-   blocks nothing in v1.
+   blocks nothing today.

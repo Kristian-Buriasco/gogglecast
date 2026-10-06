@@ -1,0 +1,13 @@
+cff-version: 1.2.0
+message: "If you use GogglesView in your work, please cite it as below."
+title: GogglesView
+type: software
+authors:
+  - family-names: Buriasco
+    given-names: Kristian
+repository-code: "https://github.com/Kristian-Buriasco/gogglecast"
+url: "https://github.com/Kristian-Buriasco/gogglecast"
+license: GPL-3.0-or-later
+version: 0.5.0
+date-released: "2026-10-06"
+abstract: "Free macOS live view for the DJI Goggles 3 over USB-C."

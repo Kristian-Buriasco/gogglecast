@@ -92,7 +92,7 @@ Shortcuts, Stream Deck, Raycast, `open "gogglesview://record/toggle"` and AppleS
 
 GPL-3.0-or-later. See `LICENSE` and `THIRD_PARTY_NOTICES.md`.
 
-GogglesView is an independent project, not affiliated with or endorsed by DJI. "DJI" and "Goggles 3" are trademarks of their owners; the protocol was reverse-engineered for interoperability. Use at your own risk. Contributions: `CONTRIBUTING.md`. Security: `SECURITY.md`.
+GogglesView is an independent project, not affiliated with or endorsed by DJI. "DJI" and "Goggles 3" are trademarks of their owners; the protocol was reverse-engineered for interoperability. Use at your own risk. Contributions: `CONTRIBUTING.md`. Help: `SUPPORT.md`. Security: `SECURITY.md`. Conduct: `CODE_OF_CONDUCT.md`.
 
 ## Troubleshooting
 
