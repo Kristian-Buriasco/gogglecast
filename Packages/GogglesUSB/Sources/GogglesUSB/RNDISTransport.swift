@@ -286,6 +286,8 @@ public final class RNDISTransport: GogglesTransport {
     private let poolLock = NSLock()
     private var isRunning = true
     private var outstandingTransfers = 0
+    /// Consecutive non-completed bulk-IN transfer statuses (guarded by `poolLock`).
+    private var errorTracker = TransferErrorTracker()
     private let allTransfersDone = DispatchSemaphore(value: 0)
 
     private var pooledTransfers: [UnsafeMutablePointer<libusb_transfer>] = []
@@ -630,6 +632,23 @@ public final class RNDISTransport: GogglesTransport {
     ///     log, unlike unrecognized higher-level packet types, which
     ///     `WireProtocol` already logs).
     fileprivate func handleBulkInCompletion(_ transfer: UnsafeMutablePointer<libusb_transfer>) {
+        // Statuses other than COMPLETED / NO_DEVICE (ERROR, STALL, OVERFLOW,
+        // TIMED_OUT) used to fall through to an unconditional resubmit, which
+        // is a hot loop on a persistent error. Count them; past the
+        // threshold treat the link as dead exactly like NO_DEVICE so the
+        // helper's retry logic takes over. A completed transfer resets it.
+        let status = transfer.pointee.status
+        if status != LIBUSB_TRANSFER_NO_DEVICE {
+            poolLock.lock()
+            let giveUp = errorTracker.record(completed: status == LIBUSB_TRANSFER_COMPLETED)
+            let stopNow = giveUp && isRunning
+            if stopNow { isRunning = false }
+            poolLock.unlock()
+            if stopNow {
+                FileHandle.standardError.write(Data("[RNDISTransport] bulk-IN failing persistently (last status \(status.rawValue)); stopping stream\n".utf8))
+                continuation.finish()
+            }
+        }
         if transfer.pointee.status == LIBUSB_TRANSFER_COMPLETED {
             let length = Int(transfer.pointee.actual_length)
             if length > 0, let buffer = transfer.pointee.buffer {

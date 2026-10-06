@@ -26,6 +26,8 @@ actor PipelineState {
 
     func markRx() { lastRxTime = Date() }
     func markStarted() { started = true }
+    /// Gate re-armed (silence / dropped-frame burst): I-frame requests resume.
+    func markStopped() { started = false; lastIframeRequestTime = Date.distantPast }
     func markIframeRequested() { lastIframeRequestTime = Date() }
 
     func snapshotTimers() -> (lastRx: Date, started: Bool, lastIframe: Date) {
