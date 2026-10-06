@@ -35,8 +35,8 @@
     --t-xl: 2.5rem;
     --t-display: clamp(3.5rem, 8vw, 6.75rem);
 
-    --gap: 12px;
-    --r-panel: 20px;                    /* outer */
+    --gap: 10px;
+    --r-panel: 18px;                    /* outer */
     --r-inner: calc(var(--r-panel) - var(--gap));  /* concentric: outer minus gap */
     --r-tile: 14px;
 
@@ -72,7 +72,7 @@
   .top nav a:hover { color: var(--ink); text-decoration: underline; }
 
   /* hero: copy offset to the left and anchored low, the picture bleeding off the right edge */
-  .hero { min-height: min(calc(100dvh - 60px), 620px); padding-top: 56px; display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 48px; align-items: end; padding-bottom: 40px; }
+  .hero { min-height: min(calc(100dvh - 60px), 560px); padding-top: 40px; display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 48px; align-items: end; padding-bottom: 40px; }
   .hero h1 { font-size: var(--t-display); margin-bottom: 24px; }
   .hero .lede { font-size: var(--t-m); line-height: 1.4; max-width: 30ch; margin-bottom: 28px; }
   .dl { display: inline-flex; align-items: center; gap: 12px; background: var(--ink); color: var(--on-ink); font-weight: 500; text-decoration: none; padding: 14px 20px; border-radius: 10px; transition: background-color .15s; }
@@ -85,7 +85,7 @@
   .screen::after { content: ""; position: absolute; inset: 0; background: var(--grain-dark); mix-blend-mode: overlay; pointer-events: none; }
   .screen img { display: block; width: 100%; height: auto; border-radius: var(--r-inner); }
 
-  section { padding: 96px 0 0; }
+  section { padding: 72px 0 0; }
   h2 { font-size: var(--t-xl); margin-bottom: 20px; }
   @media (min-width: 900px) { h2 { font-size: 3.75rem; } }
 
@@ -130,6 +130,12 @@
   ol li::before { content: counter(s); font-family: "Big Shoulders Display", sans-serif; font-weight: 700; font-size: var(--t-l); line-height: 1.1; color: var(--rec); }
   code { font-family: "Geist Mono", ui-monospace, monospace; font-size: .9em; background: var(--shell-deep); padding: 1px 6px; border-radius: 4px; }
   .steps .screen { margin-right: 0; }
+  .steps.flip { grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); }
+  .steps.flip .screen, .steps.flip .bare { order: -1; }
+  .bare img { display: block; width: 100%; height: auto; }
+  .more { padding-top: 56px; }
+  .more h3 { font-size: var(--t-xl); margin-bottom: 14px; }
+  .more p + p { margin-top: 12px; }
 
   /* limits */
   .limits { display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 7fr); gap: 56px; }
@@ -138,7 +144,7 @@
   .limits dt:first-child { margin-top: 0; }
   .limits dd { margin: 2px 0 0; color: var(--ink-soft); }
 
-  .foot { margin-top: 120px; background: var(--ink); color: var(--on-ink-dim); position: relative; }
+  .foot { margin-top: 88px; background: var(--ink); color: var(--on-ink-dim); position: relative; }
   .foot .page { padding-top: 40px; padding-bottom: 48px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 24px; font-size: var(--t-s); }
   .foot a { color: var(--on-ink); }
   .foot a:hover { color: #ff8a65; }
@@ -147,7 +153,8 @@
   @media (max-width: 820px) {
     .hero { grid-template-columns: 1fr; min-height: 0; padding-top: 32px; }
     .screen { margin-right: 0; }
-    .measure, .steps, .limits { grid-template-columns: 1fr; gap: 28px; margin-left: 0; }
+    .measure, .steps, .steps.flip, .limits { grid-template-columns: 1fr; gap: 28px; margin-left: 0; }
+    .steps.flip .screen, .steps.flip .bare { order: 0; }
     .a, .b, .c, .d, .e, .f { grid-column: span 6; grid-row: auto; }
     .top nav a:not(.keep) { display: none; }
     section { padding-top: 64px; }
@@ -181,7 +188,7 @@
         <a class="dl" id="dl" href="https://github.com/Kristian-Buriasco/gogglecast/releases/latest">Download GogglesView 0.4.0 (2.3 MB)</a>
         <a class="alt" href="https://github.com/Kristian-Buriasco/gogglecast">Free and GPL-3.0. Apple Silicon, macOS 14 or later. Read the source.</a>
       </div>
-      <div class="screen"><img src="images/live-view.png" alt="GogglesView window showing a live feed with the stats overlay" width="2144" height="1304"></div>
+      <div class="screen"><img src="images/live-view.png" alt="GogglesView window showing a live feed with the stats overlay" width="1931" height="1091"></div>
     </div>
 
     <section id="latency" aria-labelledby="latency-h">
@@ -256,6 +263,14 @@
           <p>A chrome-less capture window for Window Capture, optional keep-on-top, and a mini window. Plug in several goggles and each gets its own window and settings. The app checks GitHub for updates, verifies the checksum and signature, and installs them only when you are not recording.</p>
         </article>
       </div>
+      <div class="steps flip more">
+        <div class="bare"><img src="images/settings.png" alt="The Settings window, General tab, with a sidebar listing General, Display, Recording, Streaming and Advanced" width="1784" height="1384" loading="lazy"></div>
+        <div>
+          <h3>Settings in five tabs</h3>
+          <p>General, Display, Recording, Streaming and Advanced. Presets switch a whole set of options at once, and each pair of goggles can keep its own saved profile that applies when it connects.</p>
+          <p>The same window runs the update check, the diagnostics report and the latency benchmark.</p>
+        </div>
+      </div>
     </section>
 
     <section id="setup" aria-labelledby="setup-h">
@@ -269,7 +284,15 @@
             <li><span>Start Share Liveview on the goggles, pick them in the app.</span></li>
           </ol>
         </div>
-        <div class="screen"><img src="images/picker.png" alt="The goggles picker listing the connected pair" width="1664" height="1264" loading="lazy"></div>
+        <div class="screen"><img src="images/picker.png" alt="The goggles picker listing the connected pair" width="1451" height="1051" loading="lazy"></div>
+      </div>
+      <div class="steps flip more">
+        <div class="screen"><img src="images/waiting-keyframe.png" alt="The window showing a notice that it is waiting for a keyframe from the goggles" width="1931" height="1091" loading="lazy"></div>
+        <div>
+          <h3>If it says it's waiting for a keyframe</h3>
+          <p>The goggles send one full picture when Share Liveview starts and none after. If you connect late, the app has nothing to start from and says so.</p>
+          <p>On the goggles, switch Share Liveview to Mobile Device via Wi-Fi off and on again. That's a limit of the goggles' stream, not something the app can fix.</p>
+        </div>
       </div>
     </section>
 
