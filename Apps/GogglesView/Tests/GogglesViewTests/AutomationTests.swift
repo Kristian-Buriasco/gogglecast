@@ -88,5 +88,58 @@ final class AutomationTests: XCTestCase {
 
     func testDiagnosticsIncludesAutomationKey() {
         XCTAssertTrue(DiagnosticsReport.settingsKeys.contains(AutomationPrefs.enabledKey))
+        XCTAssertTrue(DiagnosticsReport.settingsKeys.contains(AutomationPrefs.urlEnabledKey))
+    }
+
+    func testURLCommandsDefaultOff() {
+        let d = UserDefaults(suiteName: "AutomationTests.url")!
+        d.removePersistentDomain(forName: "AutomationTests.url")
+        defer { d.removePersistentDomain(forName: "AutomationTests.url") }
+        XCTAssertFalse(AutomationPrefs.urlEnabled(d))
+        d.set(true, forKey: AutomationPrefs.urlEnabledKey)
+        XCTAssertTrue(AutomationPrefs.urlEnabled(d))
+    }
+
+    func testGateNotifiesOnceWhileOffThenIgnores() {
+        var g = AutomationURLGate()
+        XCTAssertEqual(g.decide(urlEnabled: false), .ignoredNotify)
+        XCTAssertEqual(g.decide(urlEnabled: false), .ignored)
+        XCTAssertEqual(g.decide(urlEnabled: false), .ignored)
+    }
+
+    func testGateRateLimitsToAFewPerSecond() {
+        var g = AutomationURLGate()
+        let t = Date(timeIntervalSince1970: 5000)
+        for i in 0..<AutomationURLGate.maxPerWindow {
+            XCTAssertEqual(g.decide(urlEnabled: true, now: t.addingTimeInterval(Double(i) * 0.1)), .allowed)
+        }
+        XCTAssertEqual(g.decide(urlEnabled: true, now: t.addingTimeInterval(0.5)), .rateLimited)
+        XCTAssertEqual(g.decide(urlEnabled: true, now: t.addingTimeInterval(1.05)), .allowed) // oldest aged out
+    }
+
+    func testHandleURLHonoursSwitchAndAnnounces() {
+        let d = UserDefaults(suiteName: "AutomationTests.handle")!
+        d.removePersistentDomain(forName: "AutomationTests.handle")
+        defer { d.removePersistentDomain(forName: "AutomationTests.handle") }
+        let c = AutomationController()
+        var notices: [String] = []
+        let url = URL(string: "gogglesview://record/toggle")!
+        // Off: ignored, one notice for the first command only.
+        XCTAssertEqual(c.handle(url: url, defaults: d, notify: { notices.append($0) }), .disabled)
+        XCTAssertEqual(c.handle(url: url, defaults: d, notify: { notices.append($0) }), .disabled)
+        XCTAssertEqual(notices.count, 1)
+        XCTAssertTrue(notices[0].contains("Allow gogglesview:// URL commands"))
+        // On: each command is announced, and the 4th within a second is dropped.
+        d.set(true, forKey: AutomationPrefs.urlEnabledKey)
+        notices = []
+        for _ in 0..<AutomationURLGate.maxPerWindow {
+            XCTAssertEqual(c.handle(url: url, defaults: d, notify: { notices.append($0) }), .noTarget) // no window open in tests
+        }
+        XCTAssertEqual(notices.count, AutomationURLGate.maxPerWindow)
+        XCTAssertNil(c.handle(url: url, defaults: d, notify: { notices.append($0) }))
+        XCTAssertEqual(notices.count, AutomationURLGate.maxPerWindow)
+        // AppleScript path (`perform`) is not gated by the URL switch.
+        d.set(false, forKey: AutomationPrefs.urlEnabledKey)
+        XCTAssertNotEqual(c.perform(AutomationRequest(command: .toggleRecording, device: nil)), .disabled)
     }
 }

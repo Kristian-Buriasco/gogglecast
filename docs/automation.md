@@ -2,7 +2,9 @@
 
 GogglesView can be driven from outside the app through a `gogglesview://` URL scheme and an AppleScript dictionary. Both go through the same code path as the window buttons and global hotkeys (`Apps/GogglesView/Sources/GogglesView/Automation.swift`).
 
-Both are controlled by **Settings > Advanced > Automation > Allow automation** (on by default). When it is off, URLs are ignored and AppleScript commands fail with "Automation is turned off".
+**Settings > Advanced > Automation > Allow automation** (on by default) is the master switch: when it is off, URLs are ignored and AppleScript commands fail with "Automation is turned off".
+
+URL commands have a second switch, **Allow gogglesview:// URL commands**, which is **off by default**: any web page or app can open a `gogglesview://` link, so URL commands only run once you turn this on. While it is off, URLs are ignored; the first ignored command in each launch shows a short on-screen notice that says where to turn it on. While it is on, every URL command shows a brief on-screen notice, and at most 3 run per second (extras are dropped). AppleScript is not affected by this switch.
 
 Commands act on the frontmost goggles window (the key window, else the most recently focused one). Add `?device=<serial>` (URL) or `device "<serial>"` (AppleScript) to target specific goggles; the goggles' device id also works. If no open window matches, nothing happens -- a command never falls back to a different device.
 

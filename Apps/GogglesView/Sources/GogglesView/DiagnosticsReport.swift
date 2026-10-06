@@ -57,7 +57,7 @@ enum DiagnosticsReport {
         NetStreamPrefs.hostKey, NetStreamPrefs.portKey, NetStreamPrefs.autoStartKey,
         CaptureWindowPrefs.enabledKey, CaptureWindowPrefs.onTopKey,
         SessionLogPrefs.enabledKey, SessionLogPrefs.retentionDaysKey,
-        AutomationPrefs.enabledKey,
+        AutomationPrefs.enabledKey, AutomationPrefs.urlEnabledKey,
     ] + RecordingExtras.allKeys
 
     static func sysctlString(_ name: String) -> String {
