@@ -12,7 +12,7 @@ struct EventHooksSettingsSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Event hooks").font(.headline)
-            Text("Run a program and/or POST a webhook when something happens. The program gets the event name as its only argument, the JSON on stdin, and GOGGLES_EVENT / GOGGLES_PAYLOAD in its environment. 10 s limit. Nothing runs unless set here.")
+            Text("Run a program and/or POST a webhook when something happens. The program gets the event name as its only argument, the JSON on stdin, and GOGGLES_EVENT / GOGGLES_PAYLOAD in its environment. 10 s limit. Nothing runs unless set here. Program paths are kept in the Keychain, so other apps can't change them.")
                 .font(.caption).foregroundStyle(.secondary)
             ForEach(AppEvent.allCases) { event in
                 VStack(alignment: .leading, spacing: 3) {
@@ -61,7 +61,7 @@ struct EventHooksSettingsSection: View {
 
     private func set(script: String, for event: AppEvent) {
         scripts[event] = script
-        UserDefaults.standard.set(script, forKey: EventHookConfig.scriptKey(event))
+        EventHookConfig.setScript(script, for: event)
     }
 
     private func choose(_ event: AppEvent) {
