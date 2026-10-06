@@ -417,6 +417,13 @@ if args.contains("--run") || !args.dropFirst().contains(where: { $0.hasPrefix("-
     let openAnotherMenuItem = NSMenuItem(title: "Open Another Goggles…", action: #selector(MenuActionTarget.invoke), keyEquivalent: "n")
     openAnotherMenuItem.target = openAnotherMenuTarget
     gogglesMenu.addItem(openAnotherMenuItem)
+    let copyFrameMenuTarget = MenuActionTarget {
+        NotificationCenter.default.post(name: .gogglesCopyFrame, object: sessionForCommand()?.decodeSession)
+    }
+    let copyFrameMenuItem = NSMenuItem(title: "Copy Frame", action: #selector(MenuActionTarget.invoke), keyEquivalent: "c")
+    copyFrameMenuItem.keyEquivalentModifierMask = [.command, .shift]
+    copyFrameMenuItem.target = copyFrameMenuTarget
+    gogglesMenu.addItem(copyFrameMenuItem)
     let disconnectMenuTarget = MenuActionTarget {
         if let session = sessionForCommand() { disconnectSession(session.deviceId) }
     }

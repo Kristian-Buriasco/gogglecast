@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import AppKit
 import CoreMedia
 import GogglesXPC
 @testable import GogglesView
@@ -41,6 +42,37 @@ struct RecorderTests {
     @Test func fileNameFormat() {
         let d = Date(timeIntervalSince1970: 0)
         #expect(Screenshot.fileName(for: d, timeZone: TimeZone(identifier: "UTC")!) == "GogglesView-1970-01-01-00-00-00.png")
+    }
+
+    @Test func copyFramePutsPNGAndTIFFOnPasteboard() throws {
+        var pb: CVPixelBuffer?
+        CVPixelBufferCreate(nil, 8, 4, kCVPixelFormatType_32BGRA, nil, &pb)
+        let buffer = try #require(pb)
+        CVPixelBufferLockBaseAddress(buffer, [])
+        let base = CVPixelBufferGetBaseAddress(buffer)!.assumingMemoryBound(to: UInt8.self)
+        let stride = CVPixelBufferGetBytesPerRow(buffer)
+        for y in 0..<4 { for x in 0..<8 {
+            let o = y * stride + x * 4
+            base[o] = 0; base[o + 1] = 0; base[o + 2] = 255; base[o + 3] = 255 // BGRA: pure red
+        } }
+        CVPixelBufferUnlockBaseAddress(buffer, [])
+
+        let pasteboard = NSPasteboard(name: NSPasteboard.Name("GogglesViewTests.copyFrame.\(UUID().uuidString)"))
+        defer { pasteboard.releaseGlobally() }
+        try Screenshot.copyFrameToPasteboard(buffer, pasteboard: pasteboard)
+        for type in [NSPasteboard.PasteboardType.png, .tiff] {
+            let data = try #require(pasteboard.data(forType: type))
+            let rep = try #require(NSBitmapImageRep(data: data))
+            #expect(rep.pixelsWide == 8 && rep.pixelsHigh == 4)
+            let c = try #require(rep.colorAt(x: 3, y: 2)?.usingColorSpace(.sRGB))
+            #expect(c.redComponent > 0.95 && c.greenComponent < 0.25 && c.blueComponent < 0.1)
+        }
+    }
+
+    @Test func copyFrameAutomationMapping() {
+        #expect(GVCopyFrameCommand().command == .copyFrame)
+        #expect(GVTakeScreenshotCommand().command == .screenshot)
+        #expect(MiniControlAction.copyFrame.hotkeyAction == nil)
     }
 }
 

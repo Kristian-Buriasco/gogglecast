@@ -37,6 +37,13 @@
             </parameter>
         </command>
 
+        <command name="copy frame" code="GgVwCopy" description="Copy the current frame to the clipboard.">
+            <cocoa class="GVCopyFrameCommand"/>
+            <parameter name="device" code="gDev" type="text" optional="yes" description="Serial of the goggles to target.">
+                <cocoa key="device"/>
+            </parameter>
+        </command>
+
         <command name="toggle freeze" code="GgVwFrz " description="Freeze or unfreeze the live view.">
             <cocoa class="GVToggleFreezeCommand"/>
             <parameter name="device" code="gDev" type="text" optional="yes" description="Serial of the goggles to target.">

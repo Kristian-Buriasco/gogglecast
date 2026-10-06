@@ -36,6 +36,7 @@ enum AutomationCommand: Equatable {
     case startRecording, stopRecording, toggleRecording
     case saveReplay
     case screenshot
+    case copyFrame
     case toggleFreeze
     case addMarker(label: String)
     case startStream, stopStream
@@ -58,7 +59,7 @@ enum AutomationURLParser {
 
     /// Every accepted path, for docs and the Settings helper.
     static let examplePaths = [
-        "record/start", "record/stop", "record/toggle", "replay/save", "screenshot",
+        "record/start", "record/stop", "record/toggle", "replay/save", "screenshot", "screenshot/copy",
         "freeze/toggle", "marker", "stream/start", "stream/stop", "window/show",
     ]
 
@@ -97,6 +98,7 @@ enum AutomationURLParser {
         case "record/toggle": command = .toggleRecording
         case "replay/save": command = .saveReplay
         case "screenshot": command = .screenshot
+        case "screenshot/copy": command = .copyFrame
         case "freeze/toggle": command = .toggleFreeze
         case "marker": command = .addMarker(label: label ?? defaultMarkerLabel)
         case "stream/start": command = .startStream
@@ -225,6 +227,7 @@ final class AutomationController: NSObject {
         case .toggleRecording: post(.gogglesToggleRecording)
         case .saveReplay: post(.gogglesSaveReplay)
         case .screenshot: post(.gogglesScreenshot)
+        case .copyFrame: post(.gogglesCopyFrame)
         case .toggleFreeze: target.freezeState.toggle()
         case .addMarker(let label): post(.gogglesAddMarker, ["label": label])
         case .startStream: post(.gogglesNetworkStreamStart)

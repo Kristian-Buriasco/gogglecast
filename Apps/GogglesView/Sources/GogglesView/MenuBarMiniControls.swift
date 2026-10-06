@@ -37,7 +37,7 @@ struct MiniControlsSnapshot: Equatable {
 }
 
 enum MiniControlAction: CaseIterable, Equatable {
-    case toggleRecording, saveReplay, screenshot, toggleFreeze, addMarker, showWindow, toggleNetworkStream
+    case toggleRecording, saveReplay, screenshot, toggleFreeze, addMarker, showWindow, toggleNetworkStream, copyFrame
 
     /// Actions that already have a global-hotkey notification are dispatched
     /// through it (same handlers, same per-window routing).
@@ -99,6 +99,7 @@ enum MenuBarMiniControls {
             MiniControlItem(action: .toggleNetworkStream,
                             title: s.isNetworkStreaming ? "Stop Network Stream" : "Start Network Stream",
                             isEnabled: s.networkStreamAvailable, isOn: s.isNetworkStreaming),
+            MiniControlItem(action: .copyFrame, title: "Copy Frame", isEnabled: s.isLive, isOn: false),
         ]
     }
 

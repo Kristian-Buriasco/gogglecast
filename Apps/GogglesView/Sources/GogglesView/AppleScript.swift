@@ -45,6 +45,9 @@ class GVScriptCommand: NSScriptCommand {
 @objc(GVTakeScreenshotCommand) final class GVTakeScreenshotCommand: GVScriptCommand {
     override var command: AutomationCommand { .screenshot }
 }
+@objc(GVCopyFrameCommand) final class GVCopyFrameCommand: GVScriptCommand {
+    override var command: AutomationCommand { .copyFrame }
+}
 @objc(GVToggleFreezeCommand) final class GVToggleFreezeCommand: GVScriptCommand {
     override var command: AutomationCommand { .toggleFreeze }
 }

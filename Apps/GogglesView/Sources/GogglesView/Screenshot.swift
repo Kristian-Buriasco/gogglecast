@@ -16,6 +16,20 @@ enum Screenshot {
         return "GogglesView-\(f.string(from: date)).png"
     }
 
+    /// Puts the frame on the pasteboard as PNG and TIFF (same untransformed
+    /// frame `save` writes), so any app can paste it. Replaces the contents.
+    static func copyFrameToPasteboard(_ pixelBuffer: CVPixelBuffer, pasteboard: NSPasteboard = .general) throws {
+        let rep = NSBitmapImageRep(ciImage: CIImage(cvPixelBuffer: pixelBuffer))
+        guard let png = rep.representation(using: .png, properties: [:]),
+              let tiff = rep.tiffRepresentation else {
+            throw CocoaError(.fileWriteUnknown)
+        }
+        pasteboard.clearContents()
+        guard pasteboard.setData(png, forType: .png), pasteboard.setData(tiff, forType: .tiff) else {
+            throw CocoaError(.fileWriteUnknown)
+        }
+    }
+
     @discardableResult
     static func save(_ pixelBuffer: CVPixelBuffer, date: Date = Date()) throws -> URL {
         let image = CIImage(cvPixelBuffer: pixelBuffer)

@@ -46,17 +46,47 @@ struct GogglesConnectionView: View {
     }
 
     @State private var screenshotNote: String?
+    /// Set while the note refers to a saved file: shows a "Show in Finder" action.
+    @State private var screenshotNoteURL: URL?
+    @State private var noteHovered = false
+    @State private var noteGeneration = 0
+
+    /// Shows the note for 3 s (longer while the pointer is over it).
+    private func showNote(_ text: String, revealing url: URL? = nil) {
+        screenshotNote = text
+        screenshotNoteURL = url
+        noteGeneration += 1
+        scheduleNoteDismissal(generation: noteGeneration, after: 3)
+    }
+
+    private func scheduleNoteDismissal(generation: Int, after delay: TimeInterval) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+            guard generation == noteGeneration else { return }
+            if noteHovered { scheduleNoteDismissal(generation: generation, after: 1.5); return }
+            screenshotNote = nil
+            screenshotNoteURL = nil
+        }
+    }
 
     private func takeScreenshot() {
-        guard let frame = session.copyDisplayedFrame() else { screenshotNote = "No frame yet"; return }
+        guard let frame = session.copyDisplayedFrame() else { showNote("No frame yet"); return }
         do {
             let url = try Screenshot.save(frame)
-            screenshotNote = "Saved \(url.lastPathComponent)"
+            showNote("Saved \(url.lastPathComponent)", revealing: url)
             NotificationCenter.default.post(name: .gogglesScreenshotSaved, object: nil, userInfo: ["path": url.path])
         } catch {
-            screenshotNote = "Screenshot failed"
+            showNote("Screenshot failed")
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { screenshotNote = nil }
+    }
+
+    private func copyFrame() {
+        guard let frame = session.copyDisplayedFrame() else { showNote("No frame yet"); return }
+        do {
+            try Screenshot.copyFrameToPasteboard(frame)
+            showNote("Copied frame")
+        } catch {
+            showNote("Copy failed")
+        }
     }
 
     private var recordControl: some View {
@@ -87,7 +117,14 @@ struct GogglesConnectionView: View {
             SRTStreamControl(session: session)
             NDIStreamControl(session: session)
             if let note = screenshotNote {
-                Text(note).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                HStack(spacing: 6) {
+                    Text(note).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                    if let url = screenshotNoteURL {
+                        Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([url]) }
+                            .buttonStyle(.link).font(.caption2)
+                    }
+                }
+                .onHover { noteHovered = $0 }
             }
             Button { takeScreenshot() } label: {
                 Image(systemName: "camera").foregroundStyle(Color.secondary)
@@ -98,6 +135,9 @@ struct GogglesConnectionView: View {
             .help("Save a screenshot to ~/Pictures/GogglesView (⇧⌘S)")
             .accessibilityLabel("Take screenshot")
             .accessibilityIdentifier("screenshotButton")
+            .contextMenu {
+                Button("Copy Frame") { copyFrame() }.disabled(!isLive)
+            }
             BurnInRecordControl(session: session, isLive: isLive, info: { BurnInInfo(fps: coordinator.stats?.fps, bitrateKbps: coordinator.stats?.bitrateKbps, resolution: resolutionText) })
             MarkerControl(recorder: recorder)
             Button {
@@ -131,6 +171,10 @@ struct GogglesConnectionView: View {
         .onReceive(NotificationCenter.default.publisher(for: .gogglesScreenshot)) { n in
             guard GlobalHotkeyRouting.shouldHandle(n, session: session) else { return }
             if isLive { takeScreenshot() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .gogglesCopyFrame)) { n in
+            guard GlobalHotkeyRouting.shouldHandle(n, session: session) else { return }
+            if isLive { copyFrame() }
         }
         // Automation (URL scheme / AppleScript): same paths as the buttons.
         .onReceive(NotificationCenter.default.publisher(for: .gogglesStartRecording)) { n in

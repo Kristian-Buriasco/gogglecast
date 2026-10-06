@@ -11,7 +11,7 @@ final class AutomationTests: XCTestCase {
         let expected: [(String, AutomationCommand)] = [
             ("record/start", .startRecording), ("record/stop", .stopRecording),
             ("record/toggle", .toggleRecording), ("replay/save", .saveReplay),
-            ("screenshot", .screenshot), ("freeze/toggle", .toggleFreeze),
+            ("screenshot", .screenshot), ("screenshot/copy", .copyFrame), ("freeze/toggle", .toggleFreeze),
             ("marker", .addMarker(label: "Marker")), ("stream/start", .startStream),
             ("stream/stop", .stopStream), ("window/show", .showWindow),
         ]

@@ -6,6 +6,7 @@ extension Notification.Name {
     static let gogglesToggleRecording = Notification.Name("GogglesToggleRecording")
     static let gogglesScreenshot = Notification.Name("GogglesScreenshot")
     static let gogglesSaveReplay = Notification.Name("GogglesSaveReplay")
+    static let gogglesCopyFrame = Notification.Name("GogglesCopyFrame")
 }
 
 /// Multi-window targeting: a global hotkey acts on ONE goggles window (the

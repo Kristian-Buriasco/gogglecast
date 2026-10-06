@@ -148,6 +148,8 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             NotificationCenter.default.post(name: .gogglesToggleNetworkStream, object: session.decodeSession)
         case .addMarker:
             SessionControlBoard.shared.recorder(for: session.decodeSession)?.addMarker(label: "Marker")
+        case .copyFrame:
+            NotificationCenter.default.post(name: .gogglesCopyFrame, object: session.decodeSession)
         case .toggleRecording, .saveReplay, .screenshot:
             break
         }
