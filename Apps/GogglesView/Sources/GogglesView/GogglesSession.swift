@@ -55,6 +55,7 @@ final class GogglesSession: NSObject, RegistrableSession, NSWindowDelegate {
     private var cancellables = Set<AnyCancellable>()
     private var initialInfo: DevicePickerCandidate?
     private(set) var isTornDown = false
+    private var signalAlert: SignalAlertController?
 
     /// Fired when this session's window becomes key (registry -> active session).
     var onBecameKey: ((GogglesSession) -> Void)?
@@ -137,6 +138,7 @@ final class GogglesSession: NSObject, RegistrableSession, NSWindowDelegate {
         cursorAutoHider = CursorAutoHider(window: window)
 
         EventHookInstaller.install(coordinator: coordinator)
+        signalAlert = SignalAlertController(coordinator: coordinator, deviceLabel: { [weak self] in self?.window.title ?? "Goggles" })
         SessionLogger.attach(coordinator: coordinator, decodeSession: decodeSession).store(in: &cancellables)
 
         coordinator.$deviceInfo
@@ -189,6 +191,8 @@ final class GogglesSession: NSObject, RegistrableSession, NSWindowDelegate {
     func teardown() {
         guard !isTornDown else { return }
         isTornDown = true
+        signalAlert?.userDisconnected()
+        signalAlert = nil
         NotificationCenter.default.post(name: .gogglesSessionWillClose, object: decodeSession)
         client.stopStreaming(deviceId: deviceId)
         coordinator.detach()
