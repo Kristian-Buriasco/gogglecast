@@ -47,6 +47,11 @@ final class SRTOutput: ObservableObject, SampleBufferRendering {
     @Published private(set) var bytesSent: UInt64 = 0
     @Published private(set) var lastError: String?
 
+    init() {
+        OutputActivityBoard.shared.register(self) { [weak self] in self?.isStreaming == true }
+    }
+    deinit { OutputActivityBoard.shared.unregister(self) }
+
     private typealias Fn0 = @convention(c) () -> Int32
     private typealias FnSetFlag = @convention(c) (Int32, Int32, UnsafeRawPointer?, Int32) -> Int32
     private typealias FnAddr = @convention(c) (Int32, UnsafePointer<sockaddr>?, Int32) -> Int32

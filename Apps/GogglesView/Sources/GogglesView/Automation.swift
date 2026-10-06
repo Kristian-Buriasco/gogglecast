@@ -26,9 +26,60 @@ extension Notification.Name {
 
 enum AutomationPrefs {
     static let enabledKey = "automationEnabled"
-    /// Default ON (an unset key counts as enabled).
+    /// Default ON (an unset key counts as enabled). Governs AppleScript and URL commands alike.
     static func enabled(_ d: UserDefaults = .standard) -> Bool {
         d.object(forKey: enabledKey) == nil ? true : d.bool(forKey: enabledKey)
+    }
+
+    static let urlEnabledKey = "automationURLEnabled"
+    /// `gogglesview://` URL commands are OFF unless the user turns them on: any web page can open a URL.
+    static func urlEnabled(_ d: UserDefaults = .standard) -> Bool { d.bool(forKey: urlEnabledKey) }
+}
+
+/// Decides what happens to a parsed `gogglesview://` request (pure, unit-tested).
+struct AutomationURLGate {
+    enum Decision: Equatable {
+        /// Switch is off; this is the first ignored command this launch, so tell the user once.
+        case ignoredNotify
+        case ignored
+        case rateLimited
+        case allowed
+    }
+
+    static let maxPerWindow = 3
+    static let window: TimeInterval = 1
+
+    private var notified = false
+    private var recent: [Date] = []
+
+    mutating func decide(urlEnabled: Bool, now: Date = Date()) -> Decision {
+        guard urlEnabled else {
+            if notified { return .ignored }
+            notified = true
+            return .ignoredNotify
+        }
+        recent.removeAll { now.timeIntervalSince($0) >= Self.window }
+        guard recent.count < Self.maxPerWindow else { return .rateLimited }
+        recent.append(now)
+        return .allowed
+    }
+}
+
+extension AutomationCommand {
+    /// Short human description for the on-screen notice.
+    var noticeText: String {
+        switch self {
+        case .startRecording: return "Start recording"
+        case .stopRecording: return "Stop recording"
+        case .toggleRecording: return "Toggle recording"
+        case .saveReplay: return "Save replay"
+        case .screenshot: return "Screenshot"
+        case .toggleFreeze: return "Freeze / resume video"
+        case .addMarker: return "Add marker"
+        case .startStream: return "Start network stream"
+        case .stopStream: return "Stop network stream"
+        case .showWindow: return "Show window"
+        }
     }
 }
 
@@ -193,11 +244,30 @@ final class AutomationController: NSObject {
         handle(url: url)
     }
 
+    private var urlGate = AutomationURLGate()
+
+    /// URL entry point. Web pages can open `gogglesview://` links, so URL commands need their own
+    /// opt-in switch (default off), are rate limited, and are announced on screen. AppleScript calls
+    /// `perform` directly and is unaffected.
     @discardableResult
-    func handle(url: URL) -> AutomationResult? {
+    func handle(url: URL, defaults: UserDefaults = .standard, notify: (String) -> Void = { ToastHUD.shared.show($0) }) -> AutomationResult? {
         guard let request = AutomationURLParser.parse(url) else {
             Self.log.info("ignored unrecognized URL")
             return nil
+        }
+        switch urlGate.decide(urlEnabled: AutomationPrefs.urlEnabled(defaults)) {
+        case .ignoredNotify:
+            Self.log.info("URL command ignored (URL commands are off)")
+            notify("A gogglesview:// command was ignored. To allow URL commands, turn on Settings > Advanced > Automation > Allow gogglesview:// URL commands.")
+            return .disabled
+        case .ignored:
+            Self.log.info("URL command ignored (URL commands are off)")
+            return .disabled
+        case .rateLimited:
+            Self.log.info("URL command dropped (rate limit)")
+            return nil
+        case .allowed:
+            notify("URL command: \(request.command.noticeText)")
         }
         let result = perform(request)
         Self.log.info("\(String(describing: request.command), privacy: .public) -> \(String(describing: result), privacy: .public)")

@@ -55,10 +55,16 @@ final class UpdateChecker: ObservableObject {
               let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let tag = obj["tag_name"] as? String else { return .failed }
         if VersionComparator.isNewer(remote: tag, than: current) {
-            let url = (obj["html_url"] as? String).flatMap(URL.init(string:)) ?? UpdatePrefs.releasesPage
+            let url = (obj["html_url"] as? String).flatMap(safeReleaseURL) ?? UpdatePrefs.releasesPage
             return .available(tag: tag, url: url)
         }
         return .upToDate(tag)
+    }
+
+    /// Only https://github.com/ links are ever opened from API data.
+    static func safeReleaseURL(_ s: String) -> URL? {
+        guard s.hasPrefix("https://github.com/"), let u = URL(string: s), u.scheme == "https", u.host == "github.com" else { return nil }
+        return u
     }
 
     func check() {
@@ -103,6 +109,8 @@ struct UpdateSettingsSection: View {
 
     private var status: String {
         if case .failed(let m) = installer.state { return m }
+        if case .manual(let m) = installer.state { return m }
+        if let b = installer.blockedReason, case .staged = installer.state { return b }
         if case .downloading = installer.state { return "Downloading and verifying the update…" }
         switch checker.result {
         case nil: return "Version \(UpdateChecker.currentVersion)"
@@ -124,7 +132,7 @@ struct UpdateSettingsSection: View {
             }
             Toggle("Check for updates daily", isOn: $enabled)
             Toggle("Install updates automatically", isOn: $autoInstall)
-            Text("Updates are downloaded from this project's GitHub releases, checked against their SHA-256 and code signature, and applied when you quit (or when you choose Install & Restart). Never while recording or streaming.")
+            Text("Updates are downloaded from this project's GitHub releases, checked against their SHA-256 and against the signing identity of this app (builds without a developer identity open the releases page instead), and applied when you quit (or when you choose Install & Restart). Never while recording or streaming.")
                 .font(.caption).foregroundStyle(.secondary)
         }
     }
@@ -132,12 +140,8 @@ struct UpdateSettingsSection: View {
     @ViewBuilder private var primaryButton: some View {
         switch installer.state {
         case .staged(let v):
-            Button("Install \(v) & Restart") {
-                if installer.isRecordingNow() { return }
-                installer.installAndRestart()
-            }
-            .buttonStyle(.borderedProminent)
-            .disabled(installer.isRecordingNow())
+            Button("Install \(v) & Restart") { installer.installAndRestart() }
+                .buttonStyle(.borderedProminent)
         case .downloading:
             ProgressView().controlSize(.small)
         default:

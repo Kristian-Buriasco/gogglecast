@@ -59,6 +59,11 @@ final class NDIOutput: ObservableObject, SampleBufferRendering {
     @Published private(set) var framesSent: UInt64 = 0
     @Published private(set) var lastError: String?
 
+    init() {
+        OutputActivityBoard.shared.register(self) { [weak self] in self?.isStreaming == true }
+    }
+    deinit { OutputActivityBoard.shared.unregister(self) }
+
     private typealias FnInit = @convention(c) () -> Bool
     private typealias FnVoid = @convention(c) () -> Void
     private typealias FnCreate = @convention(c) (UnsafeRawPointer?) -> UnsafeMutableRawPointer?
