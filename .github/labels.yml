@@ -1,0 +1,29 @@
+# Documentation of the intended label set. Not applied automatically;
+# create them with `gh label create <name> --color <hex> --description <text>`.
+- name: bug
+  color: d73a4a
+  description: Something isn't working
+- name: enhancement
+  color: a2eeef
+  description: New feature or request
+- name: question
+  color: d876e3
+  description: Usage question or clarification
+- name: docs
+  color: 0075ca
+  description: Documentation changes
+- name: good first issue
+  color: 7057ff
+  description: Good for newcomers
+- name: goggles-3
+  color: fbca04
+  description: Specific to DJI Goggles 3
+- name: hardware
+  color: 5319e7
+  description: Needs testing on real goggles or USB hardware
+- name: latency
+  color: e99695
+  description: Video latency, frame pacing or decode delay
+- name: macos
+  color: 1d76db
+  description: macOS version or system behavior

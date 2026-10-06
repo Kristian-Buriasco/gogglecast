@@ -3,7 +3,7 @@
 Companion to [`design.md`](design.md). Read that first; this document does not restate
 protocol details, it references them by section.
 
-Every task below is written to be executed one at a time by a developer or an AI agent,
+Every task below is written to be executed one at a time by a developer,
 with a stated exit criterion. **Do not start a phase until the previous phase's exit
 criterion is demonstrably met** — the parity gate at the end of Phase 1 in particular is
 what prevents protocol bugs and packaging bugs from being debugged simultaneously later.

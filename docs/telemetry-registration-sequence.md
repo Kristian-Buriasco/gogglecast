@@ -6,7 +6,7 @@ byte-for-byte against a real capture (the N3 `00:88` frame in
 inferred and has **not** been tested on hardware yet. The test is
 `Tools/telemetry-probe/telem_register.py`.
 
-Companion table: `docs/dji-fly-1.21-duml-commands.md` (448 commands).
+Companion table: `docs/archive/dji-fly-1.21-duml-commands.md` (448 commands).
 
 ## TL;DR
 

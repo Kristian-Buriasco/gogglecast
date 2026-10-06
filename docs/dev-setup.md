@@ -3,7 +3,7 @@
 ## Phase 4 prerequisite: Apple Developer Program membership
 
 As of 2026-08-29: **no paid Apple Developer Program membership** on this account yet
-(expected to be obtained in the future). Per docs/plan.md's Phase 4 gate and design.md
+(expected to be obtained in the future). Per docs/archive/plan.md's Phase 4 gate and design.md
 §8.5, this means Phase 4 (CMIOExtension virtual camera) targets
 `systemextensionsctl developer on` (personal-use-only, unsigned/dev-mode system
 extension install) rather than a properly notarized, App-Store/notarization-eligible
@@ -40,7 +40,7 @@ real failed launch and by Apple's own documentation:
   of Task 4.1's spike) is blocked until the paid Apple Developer Program membership
   ($99/yr) referenced at the top of this section is actually active.** This is a genuine,
   correct, evidence-based stopping point for this phase of the project, not a workaround
-  to hunt for — see `.superpowers/sdd/plan/task-4.1-report.md` for the full trace and
+  to hunt for — see the Phase 4.1 task notes (not kept in the repo) for the full trace and
   `docs/design.md` §8.5/§10 question 1 for the corrected design-doc text (the original
   §8.5 wording, "available to any Apple Developer Program member," was wrong on this
   point).

@@ -601,7 +601,7 @@ Stated plainly, since the brief asked for a straight answer on what is achievabl
   provision it, with only notarization/distribution gated on paid membership. **That is
   not true.** Apple's own current capability-support matrix
   (`https://developer.apple.com/help/account/reference/supported-capabilities-macos/`,
-  fetched and verified against the raw HTML table during Task 4.1, not just an AI summary
+  fetched and verified against the raw HTML table during Task 4.1, not just a summary
   of it) lists three membership columns — **ADP** (paid Apple Developer Program), **Developer
   ID** (a cert that itself requires paid ADP), and **Apple Developer** (a free account that
   "can't distribute apps") — and the **System Extension** row has ADP and Developer ID
@@ -619,7 +619,7 @@ Stated plainly, since the brief asked for a straight answer on what is achievabl
   found"` — AMFI rejects the binary before `OSSystemExtensionRequest` is ever reached,
   because no provisioning profile covering this entitlement can exist for a free/personal
   team, `systemextensionsctl developer on` notwithstanding. See
-  `.superpowers/sdd/plan/task-4.1-report.md` for the full trace.
+  the Phase 4.1 task notes (not kept in the repo) for the full trace.
 - **The real gate is provisioning first, signing/notarization second.** Even before the
   Developer-ID-cert-and-notarization gate described below, the app binary can't even pass
   AMFI validation and launch with this entitlement attached unless a real provisioning
@@ -742,7 +742,7 @@ Each must leave the app in a correct state with no crash and no leaked USB claim
    one `NSXPCConnection` attempt to the helper's Team-ID-prefixed Mach service
    (`U8LK2QA3FL.com.kburiasco.gogglesview.helper`, renamed across all three call sites),
    and one logged `stats` callback (`HelperSpikeConnector.swift`) — see
-   `.superpowers/sdd/plan/task-4.1-report.md` for the full build/sign trace. But the app
+   the Phase 4.1 task notes (not kept in the repo) for the full build/sign trace. But the app
    can't even reach the point of attempting the Mach lookup: with
    `systemextensionsctl developer on` confirmed live (`systemextensionsctl developer` →
    "Developer mode is on"), launching the app still fails at the OS level —
