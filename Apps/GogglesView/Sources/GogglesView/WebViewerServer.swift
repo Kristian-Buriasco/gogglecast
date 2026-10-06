@@ -1,6 +1,7 @@
 import Foundation
 import CoreMedia
 import Network
+import Security
 
 enum WebViewerPrefs {
     static let enabledKey = "webViewerEnabled"
@@ -24,6 +25,25 @@ enum WebViewerPrefs {
     static func viewerURL(host: String, port: Int, token: String) -> String {
         "http://\(host):\(port)/" + tokenSuffix(token, joiner: "?")
     }
+
+    /// 128-bit random hex token.
+    static func generateToken() -> String {
+        var bytes = [UInt8](repeating: 0, count: 16)
+        if SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes) != errSecSuccess {
+            for i in bytes.indices { bytes[i] = UInt8.random(in: 0...255) }
+        }
+        return bytes.map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// The stored token, or a fresh one when none is stored (several views may race to create it).
+    static func existingOrNewToken() -> String {
+        let t = token
+        return t.isEmpty ? generateToken() : t
+    }
+
+    /// The viewer needs a token whenever it is enabled and reachable from other devices; an empty token
+    /// is only acceptable in localhost-only mode (where the Host check still applies).
+    static func tokenRequired(allowLAN: Bool) -> Bool { allowLAN }
 
     static func tokenSuffix(_ token: String, joiner: String) -> String {
         token.isEmpty ? "" : joiner + "t=" + (token.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? "")
@@ -72,13 +92,24 @@ struct HLSWindow {
 /// Each segment starts with PAT/PMT (the muxer emits them on every keyframe) and the
 /// parameter sets, so it is independently decodable.
 struct HLSSegmenter {
+    /// If keyframes stop arriving the open segment would grow forever; past this size it is dropped
+    /// and the segmenter waits for the next keyframe.
+    static let defaultMaxSegmentBytes = 8_000_000
+
     var targetDuration = 2.0
+    var maxSegmentBytes = HLSSegmenter.defaultMaxSegmentBytes
     private(set) var window = HLSWindow()
     private var muxer = MPEGTSMuxer()
     private var current = Data()
     private var start: Double?
 
-    init(targetDuration: Double = 2.0) { self.targetDuration = targetDuration }
+    /// Bytes buffered in the open (unpublished) segment.
+    var pendingBytes: Int { current.count }
+
+    init(targetDuration: Double = 2.0, maxSegmentBytes: Int = HLSSegmenter.defaultMaxSegmentBytes) {
+        self.targetDuration = targetDuration
+        self.maxSegmentBytes = maxSegmentBytes
+    }
 
     mutating func push(avcc: Data, isKeyframe: Bool, parameterSets: [Data], pts: Double) {
         if let s = start {
@@ -92,6 +123,10 @@ struct HLSSegmenter {
             start = pts
         }
         current.append(muxer.mux(avcc: avcc, isKeyframe: isKeyframe, parameterSets: parameterSets, presentationTime: pts))
+        if current.count > maxSegmentBytes {
+            current = Data()
+            start = nil // wait for the next keyframe
+        }
     }
 }
 
@@ -106,8 +141,10 @@ struct WebRequest: Equatable {
     var method: String
     var path: String
     var query: [String: String]
+    /// Value of the `Host` header, if present.
+    var host: String? = nil
 
-    /// Parses the request line only; headers are irrelevant to this server.
+    /// Parses the request line and the Host header.
     static func parse(_ head: Data) -> WebRequest? {
         guard let text = String(data: head.prefix(8192), encoding: .utf8),
               let line = text.components(separatedBy: "\r\n").first else { return nil }
@@ -116,7 +153,13 @@ struct WebRequest: Equatable {
               let c = URLComponents(string: "http://x" + parts[1]) else { return nil }
         var q: [String: String] = [:]
         for item in c.queryItems ?? [] where q[item.name] == nil { q[item.name] = item.value ?? "" }
-        return WebRequest(method: String(parts[0]), path: c.path, query: q)
+        var host: String?
+        for h in text.components(separatedBy: "\r\n").dropFirst() {
+            guard let colon = h.firstIndex(of: ":"), h[..<colon].lowercased() == "host" else { continue }
+            host = h[h.index(after: colon)...].trimmingCharacters(in: .whitespaces)
+            break
+        }
+        return WebRequest(method: String(parts[0]), path: c.path, query: q, host: host)
     }
 
     static func route(_ r: WebRequest, token: String) -> WebRoute {
@@ -134,13 +177,70 @@ struct WebRequest: Equatable {
         }
     }
 
-    /// Constant-time in the token length (no early exit); empty expected token = open access.
+    /// No early exit on the bytes; the length difference is compared as a Bool (it used to be XORed
+    /// into 8 bits, which a length difference of 256 would cancel). Empty expected token = open access.
     static func tokenMatches(provided: String?, expected: String) -> Bool {
         if expected.isEmpty { return true }
         let a = Array((provided ?? "").utf8), b = Array(expected.utf8)
-        var diff = UInt8(truncatingIfNeeded: a.count ^ b.count)
+        let sameLength = a.count == b.count
+        var diff: UInt8 = 0
         for i in 0..<max(a.count, b.count) { diff |= (i < a.count ? a[i] : 0) ^ (i < b.count ? b[i] : 0) }
-        return diff == 0
+        return sameLength && diff == 0
+    }
+}
+
+/// Host-header validation: a web page on another origin that rebinds its DNS name to this machine
+/// still sends its own name in `Host`, so it is rejected.
+enum WebHostPolicy {
+    /// Lower-cased host with port, brackets and a trailing dot removed; nil if empty/malformed.
+    static func normalize(_ header: String?) -> String? {
+        guard var h = header?.trimmingCharacters(in: .whitespaces).lowercased(), !h.isEmpty else { return nil }
+        if h.hasPrefix("[") {
+            guard let close = h.firstIndex(of: "]") else { return nil }
+            h = String(h[h.index(after: h.startIndex)..<close])
+        } else if h.filter({ $0 == ":" }).count == 1, let colon = h.firstIndex(of: ":") {
+            h = String(h[..<colon])
+        }
+        while h.hasSuffix(".") { h.removeLast() }
+        return h.isEmpty ? nil : h
+    }
+
+    static let loopbackNames: Set<String> = ["localhost", "127.0.0.1", "::1"]
+
+    /// `localAddresses` are literal IPs of this machine; `hostnames` are names it answers to
+    /// (`<hostname>.local`). Only consulted when `allowLAN` is on.
+    static func isAllowed(hostHeader: String?, allowLAN: Bool, hostnames: [String], localAddresses: [String]) -> Bool {
+        guard let h = normalize(hostHeader) else { return false }
+        if loopbackNames.contains(h) { return true }
+        guard allowLAN else { return false }
+        return hostnames.contains { $0.lowercased() == h } || localAddresses.contains { $0.lowercased() == h }
+    }
+
+    /// Literal IPv4/IPv6 addresses of this machine's interfaces.
+    static func localAddresses() -> [String] {
+        var out: [String] = []
+        var ifap: UnsafeMutablePointer<ifaddrs>?
+        guard getifaddrs(&ifap) == 0, let first = ifap else { return out }
+        defer { freeifaddrs(ifap) }
+        var p: UnsafeMutablePointer<ifaddrs>? = first
+        while let i = p {
+            if let sa = i.pointee.ifa_addr, sa.pointee.sa_family == UInt8(AF_INET) || sa.pointee.sa_family == UInt8(AF_INET6) {
+                var buf = [CChar](repeating: 0, count: Int(NI_MAXHOST))
+                if getnameinfo(sa, socklen_t(sa.pointee.sa_len), &buf, socklen_t(buf.count), nil, 0, NI_NUMERICHOST) == 0 {
+                    var a = String(cString: buf)
+                    if let pct = a.firstIndex(of: "%") { a = String(a[..<pct]) } // strip zone id
+                    out.append(a)
+                }
+            }
+            p = i.pointee.ifa_next
+        }
+        return out
+    }
+
+    static func hostnames() -> [String] {
+        let h = ProcessInfo.processInfo.hostName.lowercased()
+        let first = h.split(separator: ".").first.map(String.init) ?? h
+        return [WebViewerPrefs.localHostname, h, first.isEmpty ? "" : first + ".local"].filter { !$0.isEmpty }
     }
 }
 
@@ -183,6 +283,7 @@ final class WebViewerServer: ObservableObject, SampleBufferRendering {
     private var listener: NWListener?
     private var segmenter = HLSSegmenter()
     private var token = ""
+    private var allowLAN = false
     private var connections = Set<ObjectIdentifier>()
 
     func start(port: Int, allowLAN: Bool, token: String) {
@@ -191,7 +292,11 @@ final class WebViewerServer: ObservableObject, SampleBufferRendering {
             guard let p = NWEndpoint.Port(rawValue: UInt16(clamping: port)), port > 0 else {
                 publish(error: "Invalid port"); return
             }
+            if WebViewerPrefs.tokenRequired(allowLAN: allowLAN) && token.isEmpty {
+                publish(error: "Set an access token before allowing other devices"); return
+            }
             self.token = token
+            self.allowLAN = allowLAN
             segmenter = HLSSegmenter()
             do {
                 let params = NWParameters.tcp
@@ -262,6 +367,9 @@ final class WebViewerServer: ObservableObject, SampleBufferRendering {
 
     private func respond(_ c: NWConnection, to req: WebRequest?) {
         guard let req else { return reply(c, 400, "Bad Request", "text/plain", Data("Bad request".utf8)) }
+        guard hostAllowed(req.host) else {
+            return reply(c, 421, "Misdirected Request", "text/plain", Data("Unexpected Host header".utf8))
+        }
         switch WebRequest.route(req, token: token) {
         case .page: reply(c, 200, "OK", "text/html; charset=utf-8", Data(WebViewerPage.html(token: token).utf8))
         case .playlist:
@@ -276,6 +384,13 @@ final class WebViewerServer: ObservableObject, SampleBufferRendering {
         case .methodNotAllowed: reply(c, 405, "Method Not Allowed", "text/plain", Data("GET only".utf8))
         case .badRequest: reply(c, 400, "Bad Request", "text/plain", Data("Bad request".utf8))
         }
+    }
+
+    private func hostAllowed(_ host: String?) -> Bool {
+        if WebHostPolicy.isAllowed(hostHeader: host, allowLAN: false, hostnames: [], localAddresses: []) { return true }
+        guard allowLAN else { return false }
+        return WebHostPolicy.isAllowed(hostHeader: host, allowLAN: true,
+                                       hostnames: WebHostPolicy.hostnames(), localAddresses: WebHostPolicy.localAddresses())
     }
 
     private func reply(_ c: NWConnection, _ code: Int, _ reason: String, _ type: String, _ body: Data) {

@@ -11,9 +11,17 @@ enum OverlayHint {
     /// Opens Settings; wired in `main.swift`.
     static var openSettings: (() -> Void)?
     private static var showing = false
+    /// Kinds already shown since launch; the hint appears at most once per kind per launch.
+    private static var shownThisLaunch = Set<Kind>()
 
-    /// Pure, for tests: show unless the user opted out or already cropped the matching picture.
-    static func shouldShow(suppressed: Bool, cropActive: Bool) -> Bool { !suppressed && !cropActive }
+    /// Pure, for tests: show unless the user opted out, already cropped the matching picture,
+    /// or has already seen this hint during this launch.
+    static func shouldShow(suppressed: Bool, cropActive: Bool, shownThisLaunch: Bool = false) -> Bool {
+        !suppressed && !cropActive && !shownThisLaunch
+    }
+
+    /// Forget the per-launch memory (tests only).
+    static func resetLaunchStateForTests() { shownThisLaunch = [] }
 
     static func text(for kind: Kind) -> (title: String, body: String, button: String) {
         switch kind {
@@ -35,7 +43,9 @@ enum OverlayHint {
         case .output: crop = OutputFramingPrefs.enabled
         case .captureWindow: crop = FramingPrefs.zoom > 1 || FramingPrefs.aspect.ratio != nil
         }
-        guard shouldShow(suppressed: d.bool(forKey: suppressKey), cropActive: crop) else { return }
+        guard shouldShow(suppressed: d.bool(forKey: suppressKey), cropActive: crop,
+                         shownThisLaunch: shownThisLaunch.contains(kind)) else { return }
+        shownThisLaunch.insert(kind)
         DispatchQueue.main.async {
             guard !showing else { return }
             showing = true

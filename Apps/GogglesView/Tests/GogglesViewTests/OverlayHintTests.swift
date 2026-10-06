@@ -8,6 +8,19 @@ final class OverlayHintTests: XCTestCase {
         XCTAssertFalse(OverlayHint.shouldShow(suppressed: false, cropActive: true))
     }
 
+    func testShownOncePerLaunch() {
+        XCTAssertFalse(OverlayHint.shouldShow(suppressed: false, cropActive: false, shownThisLaunch: true))
+        XCTAssertTrue(OverlayHint.shouldShow(suppressed: false, cropActive: false, shownThisLaunch: false))
+        // Second noteStarted in the same launch is a no-op (flag set synchronously on the first).
+        OverlayHint.resetLaunchStateForTests()
+        let key = OverlayHint.suppressKey
+        let saved = UserDefaults.standard.object(forKey: key)
+        defer { UserDefaults.standard.set(saved, forKey: key); OverlayHint.resetLaunchStateForTests() }
+        UserDefaults.standard.set(true, forKey: key) // suppressed: never shows, never flags
+        OverlayHint.noteStarted(.captureWindow)
+        UserDefaults.standard.set(false, forKey: key)
+    }
+
     func testTextDiffersPerKindAndNamesTheRightSetting() {
         let out = OverlayHint.text(for: .output), cap = OverlayHint.text(for: .captureWindow)
         XCTAssertTrue(out.body.contains("Output framing"))

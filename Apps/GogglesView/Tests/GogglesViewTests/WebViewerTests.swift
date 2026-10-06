@@ -47,7 +47,7 @@ struct WebViewerTests {
 
     @Test func requestParsingAndRouting() {
         let r = WebRequest.parse(Data("GET /live.m3u8?t=abc HTTP/1.1\r\nHost: x\r\n\r\n".utf8))
-        #expect(r == WebRequest(method: "GET", path: "/live.m3u8", query: ["t": "abc"]))
+        #expect(r == WebRequest(method: "GET", path: "/live.m3u8", query: ["t": "abc"], host: "x"))
         #expect(WebRequest.parse(Data("garbage\r\n\r\n".utf8)) == nil)
         #expect(WebRequest.parse(Data("GET nope HTTP/1.1\r\n\r\n".utf8)) == nil)
         func route(_ m: String, _ p: String, _ q: [String: String] = [:], _ tok: String = "") -> WebRoute {
@@ -72,6 +72,81 @@ struct WebViewerTests {
         #expect(!WebRequest.tokenMatches(provided: "abcd", expected: "abc"))
         #expect(!WebRequest.tokenMatches(provided: "ab", expected: "abc"))
         #expect(!WebRequest.tokenMatches(provided: nil, expected: "abc"))
+    }
+
+    @Test func tokenCompareIgnoresLengthWrapAround() {
+        // Lengths differing by exactly 256 used to cancel out in the 8-bit XOR.
+        let long = String(repeating: "a", count: 259)
+        #expect(!WebRequest.tokenMatches(provided: long, expected: "aaa"))
+        #expect(!WebRequest.tokenMatches(provided: "aaa", expected: long))
+        #expect(WebRequest.tokenMatches(provided: long, expected: long))
+        #expect(!WebRequest.tokenMatches(provided: "", expected: "x"))
+    }
+
+    @Test func hostHeaderParsing() {
+        let r = WebRequest.parse(Data("GET / HTTP/1.1\r\nAccept: */*\r\nhOsT:  Foo.local:8080 \r\n\r\n".utf8))
+        #expect(r?.host == "Foo.local:8080")
+        #expect(WebRequest.parse(Data("GET / HTTP/1.1\r\n\r\n".utf8))?.host == nil)
+    }
+
+    @Test func hostPolicyLocalhostOnly() {
+        func ok(_ h: String?) -> Bool { WebHostPolicy.isAllowed(hostHeader: h, allowLAN: false, hostnames: ["mac.local"], localAddresses: ["192.168.1.5"]) }
+        #expect(ok("localhost:8080") && ok("127.0.0.1:8080") && ok("[::1]:8080") && ok("::1") && ok("LOCALHOST"))
+        #expect(!ok(nil) && !ok("") && !ok("evil.example:8080") && !ok("localhost.evil.example"))
+        // LAN names and IPs are not accepted when LAN mode is off.
+        #expect(!ok("mac.local") && !ok("192.168.1.5:8080"))
+    }
+
+    @Test func hostPolicyLAN() {
+        func ok(_ h: String?) -> Bool { WebHostPolicy.isAllowed(hostHeader: h, allowLAN: true, hostnames: ["mac.local"], localAddresses: ["192.168.1.5", "fe80::1"]) }
+        #expect(ok("mac.local:8080") && ok("MAC.local.") && ok("192.168.1.5:8080") && ok("[fe80::1]:8080") && ok("localhost"))
+        #expect(!ok("attacker.example") && !ok("192.168.1.6") && !ok(nil) && !ok("mac.local.evil.example"))
+    }
+
+    @Test func serverRejectsForeignHostAndRequiresTokenForLAN() async throws {
+        let server = WebViewerServer()
+        server.start(port: 18091, allowLAN: false, token: "")
+        for _ in 0..<50 where !server.isRunning { try await Task.sleep(nanoseconds: 100_000_000) }
+        #expect(server.isRunning, "\(server.lastError ?? "")")
+        func status(host: String) async throws -> Int {
+            var req = URLRequest(url: URL(string: "http://127.0.0.1:18091/")!)
+            req.setValue(host, forHTTPHeaderField: "Host")
+            let (_, r) = try await URLSession.shared.data(for: req)
+            return (r as! HTTPURLResponse).statusCode
+        }
+        #expect(try await status(host: "evil.example") == 421)
+        #expect(try await status(host: "localhost:18091") == 200)
+        server.stop()
+        let lan = WebViewerServer()
+        lan.start(port: 18092, allowLAN: true, token: "")
+        try await Task.sleep(nanoseconds: 300_000_000)
+        #expect(!lan.isRunning)
+        #expect(lan.lastError != nil)
+    }
+
+    @Test func generatedTokensAreRandomHex() {
+        let a = WebViewerPrefs.generateToken(), b = WebViewerPrefs.generateToken()
+        #expect(a.count == 32 && a.allSatisfy(\.isHexDigit))
+        #expect(a != b)
+        #expect(WebViewerPrefs.tokenRequired(allowLAN: true) && !WebViewerPrefs.tokenRequired(allowLAN: false))
+    }
+
+    @Test func segmenterDropsRunawaySegmentWhenKeyframesStop() {
+        var s = HLSSegmenter(targetDuration: 2, maxSegmentBytes: 20_000)
+        let big = Data([0, 0, 0, 2, 0x65, 0x88])
+        let ps = [Data([0x67, 0x64, 0, 0x28]), Data([0x68, 0xEE, 0x3C, 0x80])]
+        s.push(avcc: big, isKeyframe: true, parameterSets: ps, pts: 0)
+        let frame = Data([0, 0, 0, 2, 0x41, 0x9A]) + Data(repeating: 0xAB, count: 500)
+        var maxPending = 0
+        for i in 1..<2000 {
+            s.push(avcc: frame, isKeyframe: false, parameterSets: [], pts: Double(i) / 30)
+            maxPending = max(maxPending, s.pendingBytes)
+        }
+        #expect(maxPending <= 20_000 + 2_000)
+        #expect(s.window.segments.isEmpty)
+        // After the drop, the next keyframe restarts a segment.
+        s.push(avcc: big, isKeyframe: true, parameterSets: ps, pts: 100)
+        #expect(s.pendingBytes > 0)
     }
 
     @Test func serverServesOverLoopback() async throws {
