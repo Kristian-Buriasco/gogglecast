@@ -52,6 +52,14 @@ A free, native macOS app that shows the live video feed from DJI Goggles 3 on a 
 
 Download the DMG from the Releases page, or build from source (below) / use `scripts/make-dmg.sh`. Releases are dev-signed, not notarized.
 
+Or with Homebrew:
+
+```bash
+brew install --cask Kristian-Buriasco/gogglesview/gogglesview
+```
+
+The cask lives in [homebrew-gogglesview](https://github.com/Kristian-Buriasco/homebrew-gogglesview) and is bumped by hand after each release.
+
 1. Copy `GogglesView.app` to `/Applications`. The build is signed with an Apple Development certificate (or ad-hoc), not notarized, so on first launch right-click the app and choose Open.
 2. On first launch the app registers a privileged helper daemon (`GogglesHelper`) via `SMAppService`. macOS requires one-time approval: System Settings > General > Login Items & Extensions, enable GogglesView. The helper owns the USB device; the app talks to it over XPC.
 3. Enable OTG on the goggles, connect them, start live view.
