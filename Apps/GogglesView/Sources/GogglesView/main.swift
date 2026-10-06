@@ -369,6 +369,7 @@ if args.contains("--run") || !args.dropFirst().contains(where: { $0.hasPrefix("-
     // Built once, before the picker: registering the helper is exactly what a
     // user needs to do before any device can show up.
     let settingsWindowController = SettingsWindowController()
+    OverlayHint.openSettings = { settingsWindowController.show() }
     let registry = SessionRegistry<GogglesSession>()
 
     /// The session an app-level command should act on.

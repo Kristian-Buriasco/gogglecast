@@ -49,6 +49,7 @@ struct NetworkStreamControl: View {
     private func toggle() { streamer.isStreaming ? stop() : start() }
 
     private func start() {
+        OverlayHint.noteStarted(.output)
         session.addKeyframeSafeConsumer(streamer)
         lastBytes = 0
         streamer.start(host: NetStreamPrefs.host, port: NetStreamPrefs.port)

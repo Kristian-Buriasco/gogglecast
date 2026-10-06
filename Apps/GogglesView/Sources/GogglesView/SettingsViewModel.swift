@@ -48,6 +48,7 @@ public final class SettingsViewModel: ObservableObject {
         didSet {
             UserDefaults.standard.set(captureWindowEnabled, forKey: CaptureWindowPrefs.enabledKey)
             applyCaptureWindow()
+            if captureWindowEnabled { OverlayHint.noteStarted(.captureWindow) }
         }
     }
     @Published public var captureWindowOnTop: Bool {

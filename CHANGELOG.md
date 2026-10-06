@@ -4,6 +4,9 @@ All notable changes to this project are documented here. Format based on [Keep a
 
 ## [Unreleased]
 
+### Added
+- A one-time notice the first time you start a stream (UDP, RTMP, SRT, NDI or the web viewer) or turn on the capture window: the goggles draw their own overlay (flight data, battery, storage warnings) into the picture they send, so it also shows up in OBS, recordings and streams. It offers to open Output framing (or Framing for the capture window) to crop it out, and has a "Don't show this again" checkbox. It stays quiet if you already crop.
+
 ## [0.5.1] - 2026-10-06
 
 ### Fixed

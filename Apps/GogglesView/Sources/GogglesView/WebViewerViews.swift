@@ -29,6 +29,7 @@ struct WebViewerControl: View {
 
     private func apply() {
         if enabled {
+            OverlayHint.noteStarted(.output)
             session.addKeyframeSafeConsumer(server)
             server.start(port: WebViewerPrefs.port, allowLAN: lan, token: token)
         } else {
