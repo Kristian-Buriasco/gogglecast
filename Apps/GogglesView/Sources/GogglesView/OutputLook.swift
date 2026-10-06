@@ -13,7 +13,12 @@ import SwiftUI
 
 /// A 3D color lookup table in the Adobe/Resolve `.cube` format (red varies fastest).
 struct CubeLUT: Equatable {
-    enum ParseError: Error, Equatable { case no3DTable, badSize, badData(line: Int), wrongCount(expected: Int, got: Int) }
+    enum ParseError: Error, Equatable { case no3DTable, badSize, badData(line: Int), wrongCount(expected: Int, got: Int), tooLarge }
+
+    /// Largest accepted file (a 129^3 table is ~50 MB of text) and value count.
+    static let maxFileBytes = 64 * 1024 * 1024
+    static let maxSize = 129
+    static let maxValues = maxSize * maxSize * maxSize * 3
 
     let size: Int
     /// size³ RGBA floats, normalized to 0...1, red index fastest.
@@ -32,17 +37,22 @@ struct CubeLUT: Equatable {
             case "TITLE": continue
             case "LUT_1D_SIZE": saw1D = true
             case "LUT_3D_SIZE":
-                guard parts.count == 2, let n = Int(parts[1]), (2...129).contains(n) else { throw ParseError.badSize }
+                guard parts.count == 2, let n = Int(parts[1]), (2...maxSize).contains(n) else { throw ParseError.badSize }
                 size = n
             case "DOMAIN_MIN", "DOMAIN_MAX":
-                guard parts.count == 4, let a = Float(parts[1]), let b = Float(parts[2]), let c = Float(parts[3]) else { throw ParseError.badData(line: i + 1) }
+                guard parts.count == 4, let a = Float(parts[1]), let b = Float(parts[2]), let c = Float(parts[3]),
+                      a.isFinite, b.isFinite, c.isFinite else { throw ParseError.badData(line: i + 1) }
                 if parts[0] == "DOMAIN_MIN" { domainMin = [a, b, c] } else { domainMax = [a, b, c] }
             default:
                 guard parts.count == 3, let r = Float(parts[0]), let g = Float(parts[1]), let b = Float(parts[2]) else {
                     if parts[0].first?.isLetter == true { continue } // unknown keyword
                     throw ParseError.badData(line: i + 1)
                 }
+                guard r.isFinite, g.isFinite, b.isFinite else { throw ParseError.badData(line: i + 1) }
                 values.append(contentsOf: [r, g, b])
+                // Stop as soon as there is more data than the declared (or maximum possible) table.
+                let limit = size > 0 ? size * size * size * 3 : maxValues
+                if values.count > limit { throw ParseError.wrongCount(expected: limit / 3, got: values.count / 3) }
             }
         }
         guard size > 0 else { throw saw1D ? ParseError.no3DTable : ParseError.badSize }
@@ -60,18 +70,27 @@ struct CubeLUT: Equatable {
         return CubeLUT(size: size, rgba: rgba)
     }
 
+    private static let identityLock = NSLock()
+    nonisolated(unsafe) private static var identities: [Int: [Float]] = [:]
+
+    /// The identity cube (RGBA floats, red fastest) for `size`, built once per size.
+    static func identityCube(size n: Int) -> [Float] {
+        identityLock.lock(); defer { identityLock.unlock() }
+        if let c = identities[n] { return c }
+        var out = [Float](); out.reserveCapacity(n * n * n * 4)
+        let d = Float(n - 1)
+        for b in 0..<n { for g in 0..<n { for r in 0..<n { out += [Float(r) / d, Float(g) / d, Float(b) / d, 1] } } }
+        identities[n] = out
+        return out
+    }
+
     /// Cube data for CIColorCube, faded between identity (0) and the full look (1).
     func cubeData(intensity: Float) -> Data {
         let t = min(max(intensity, 0), 1)
         var out = rgba
         if t < 1 {
-            let n = size
-            var idx = 0
-            for b in 0..<n { for g in 0..<n { for r in 0..<n {
-                let ident = [Float(r), Float(g), Float(b)].map { $0 / Float(n - 1) }
-                for c in 0..<3 { out[idx + c] = ident[c] + (rgba[idx + c] - ident[c]) * t }
-                idx += 4
-            } } }
+            let ident = Self.identityCube(size: size)
+            for i in 0..<out.count where i % 4 != 3 { out[i] = ident[i] + (rgba[i] - ident[i]) * t }
         }
         return out.withUnsafeBufferPointer { Data(buffer: $0) }
     }
@@ -105,10 +124,18 @@ enum LUTLibrary {
             .sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
     }
 
+    /// Reads a .cube file, refusing anything over `CubeLUT.maxFileBytes` before loading it.
+    static func readText(_ url: URL) throws -> String {
+        let size = (try url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+        guard size <= CubeLUT.maxFileBytes else { throw CubeLUT.ParseError.tooLarge }
+        return try String(contentsOf: url, encoding: .utf8)
+    }
+
     /// Validates and copies a .cube file into the library; returns the stored name.
+    /// Parses the whole table, so call it off the main thread.
     @discardableResult
     static func importFile(_ url: URL) throws -> String {
-        let text = try String(contentsOf: url, encoding: .utf8)
+        let text = try readText(url)
         _ = try CubeLUT.parse(text)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let name = url.deletingPathExtension().lastPathComponent.replacingOccurrences(of: "/", with: "-")
@@ -122,35 +149,53 @@ enum LUTLibrary {
 
     private static let lock = NSLock()
     private static var cache: (key: String, lut: CubeLUT)?
-    private static var filterCache: (key: String, data: Data)?
+    private static var failedKey: String?
+    private static var filterCache: (key: String, filter: CIFilter)?
+    /// Number of times a .cube file was actually read and parsed (tests).
+    nonisolated(unsafe) private(set) static var parseCount = 0
 
-    static func load(_ name: String) -> CubeLUT? {
-        guard !name.isEmpty else { return nil }
+    private static func key(for name: String) -> (url: URL, key: String) {
         let url = directory.appendingPathComponent(name + ".cube")
         let mtime = (try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate)?.timeIntervalSince1970 ?? 0
-        let key = "\(name)@\(mtime)"
-        lock.lock(); defer { lock.unlock() }
-        if let c = cache, c.key == key { return c.lut }
-        guard let text = try? String(contentsOf: url, encoding: .utf8), let lut = try? CubeLUT.parse(text) else { return nil }
-        cache = (key, lut); filterCache = nil
+        return (url, "\(directory.path)/\(name)@\(mtime)")
+    }
+
+    /// Caller holds `lock`.
+    private static func loadLocked(_ name: String, _ k: (url: URL, key: String)) -> CubeLUT? {
+        if let c = cache, c.key == k.key { return c.lut }
+        if failedKey == k.key { return nil } // invalid file: don't re-read it every frame
+        parseCount += 1
+        guard let text = try? readText(k.url), let lut = try? CubeLUT.parse(text) else {
+            failedKey = k.key; return nil
+        }
+        cache = (k.key, lut); failedKey = nil; filterCache = nil
         return lut
     }
 
+    static func load(_ name: String) -> CubeLUT? {
+        guard !name.isEmpty else { return nil }
+        let k = key(for: name)
+        lock.lock(); defer { lock.unlock() }
+        return loadLocked(name, k)
+    }
+
     /// A ready-to-use CIFilter for the selected look, nil when none is selected or it can't be read.
+    /// The configured filter is cached per (file version, intensity); callers get their own copy so
+    /// setting the input image is safe across threads.
     static func currentFilter() -> CIFilter? {
         let name = LookPrefs.name, intensity = LookPrefs.intensity
-        guard let lut = load(name), let f = CIFilter(name: "CIColorCubeWithColorSpace") else { return nil }
-        let key = "\(name)@\(intensity)"
-        lock.lock()
-        let data: Data
-        if let c = filterCache, c.key == key { data = c.data } else {
-            data = lut.cubeData(intensity: Float(intensity)); filterCache = (key, data)
-        }
-        lock.unlock()
+        guard !name.isEmpty else { return nil }
+        let k = key(for: name)
+        lock.lock(); defer { lock.unlock() }
+        guard let lut = loadLocked(name, k) else { return nil }
+        let fkey = "\(k.key)#\(intensity)"
+        if let c = filterCache, c.key == fkey { return c.filter.copy() as? CIFilter }
+        guard let f = CIFilter(name: "CIColorCubeWithColorSpace") else { return nil }
         f.setValue(lut.size, forKey: "inputCubeDimension")
-        f.setValue(data, forKey: "inputCubeData")
+        f.setValue(lut.cubeData(intensity: Float(intensity)), forKey: "inputCubeData")
         f.setValue(CGColorSpace(name: CGColorSpace.itur_709), forKey: "inputColorSpace")
-        return f
+        filterCache = (fkey, f)
+        return f.copy() as? CIFilter
     }
 }
 
@@ -237,7 +282,10 @@ final class OutputProcessor {
         }
         let r = plan.rect
         let sx = plan.out.width / r.width, sy = plan.out.height / r.height
-        image = image.transformed(by: CGAffineTransform(translationX: -r.minX, y: -r.minY).scaledBy(x: sx, y: sy))
+        // Translate first, then scale: p -> sx * (p - minX). (`scaledBy` on a translation would apply the
+        // scale first and leave the window off-centre.)
+        image = image.transformed(by: CGAffineTransform(translationX: -r.minX, y: -r.minY))
+            .transformed(by: CGAffineTransform(scaleX: sx, y: sy))
         ci.render(image, to: out, bounds: CGRect(origin: .zero, size: plan.out), colorSpace: CGColorSpace(name: CGColorSpace.itur_709))
         return out
     }
@@ -296,10 +344,14 @@ struct LookSettingsSection: View {
         panel.allowedContentTypes = [.init(filenameExtension: "cube") ?? .data]
         panel.allowsMultipleSelection = false
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        do {
-            name = try LUTLibrary.importFile(url); names = LUTLibrary.names(); message = nil
-        } catch {
-            message = "Couldn't read that file as a 3D .cube LUT."
+        message = "Reading look…"
+        // Large tables take a moment to parse; keep the UI responsive.
+        Task.detached {
+            let imported = try? LUTLibrary.importFile(url)
+            await MainActor.run {
+                if let imported { name = imported; names = LUTLibrary.names(); message = nil }
+                else { message = "Couldn't read that file as a 3D .cube LUT (max 64 MB, size 2 to 129)." }
+            }
         }
     }
 }
