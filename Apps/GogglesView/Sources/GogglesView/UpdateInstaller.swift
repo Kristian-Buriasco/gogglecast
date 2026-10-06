@@ -32,23 +32,32 @@ enum UpdateInstallScript {
     /// Single-quote for /bin/sh.
     static func quote(_ s: String) -> String { "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'" }
 
-    /// Waits for `pid` to exit, swaps the bundle (restoring the old one if the copy fails), clears quarantine, optionally relaunches.
-    static func make(pid: Int32, staged: String, dest: String, relaunch: Bool) -> String {
-        """
+    /// Waits for `pid` to exit, swaps the bundle, re-verifies the code signature of the copy at the
+    /// destination and rolls back to the old bundle if the copy or that check fails, then removes the
+    /// staging directory and itself and optionally relaunches. It never touches quarantine attributes:
+    /// Gatekeeper approval is never granted implicitly.
+    static func make(pid: Int32, staged: String, dest: String, relaunch: Bool, cleanup: String? = nil) -> String {
+        let cleanupCmd = cleanup.map { "rm -rf \(quote($0))" } ?? ":"
+        let open = relaunch ? "/usr/bin/open \"$DEST\"" : ""
+        return """
         #!/bin/sh
         STAGED=\(quote(staged))
         DEST=\(quote(dest))
+        cleanup() {
+          \(cleanupCmd)
+          rm -f "$0"
+        }
         while kill -0 \(pid) 2>/dev/null; do sleep 0.2; done
         OLD="$DEST.old"
         rm -rf "$OLD"
-        mv "$DEST" "$OLD" || exit 1
-        if /usr/bin/ditto "$STAGED" "$DEST"; then
-          /usr/bin/xattr -dr com.apple.quarantine "$DEST" 2>/dev/null
+        mv "$DEST" "$OLD" || { cleanup; exit 1; }
+        if /usr/bin/ditto "$STAGED" "$DEST" && /usr/bin/codesign --verify --strict --deep "$DEST" 2>/dev/null; then
           rm -rf "$OLD" "$STAGED"
         else
           rm -rf "$DEST"; mv "$OLD" "$DEST"
         fi
-        \(relaunch ? "/usr/bin/open \"$DEST\"" : "")
+        cleanup
+        \(open)
         """
     }
 }
@@ -56,6 +65,75 @@ enum UpdateInstallScript {
 enum UpdatePrefs2 {
     static let autoInstallKey = "updateAutoInstall"
     static let helperChangedKey = "updateHelperChanged"
+}
+
+/// What the staged update must be signed by, derived from the running app.
+enum SignaturePin {
+    /// Pin to this code requirement (text form), taken from the running app.
+    case requirement(String)
+    /// Running app is ad-hoc signed or unsigned: nothing to pin to, so no automatic install.
+    case none
+    /// Tests only: check integrity but not authenticity.
+    case integrityOnlyForTests
+}
+
+enum UpdateSignature {
+    /// `anchor apple generic and certificate leaf[subject.OU] = "<TEAM>"`; nil if `team` is not a plain team id.
+    static func teamRequirement(_ team: String) -> String? {
+        guard team.count == 10, team.allSatisfy({ $0.isASCII && ($0.isUppercase || $0.isNumber) }) else { return nil }
+        return "anchor apple generic and certificate leaf[subject.OU] = \"\(team)\""
+    }
+
+    private static func staticCode(_ url: URL) -> SecStaticCode? {
+        var code: SecStaticCode?
+        guard SecStaticCodeCreateWithPath(url as CFURL, [], &code) == errSecSuccess else { return nil }
+        return code
+    }
+
+    private static func signingInfo(_ code: SecStaticCode) -> [String: Any]? {
+        var dict: CFDictionary?
+        guard SecCodeCopySigningInformation(code, SecCSFlags(rawValue: kSecCSSigningInformation), &dict) == errSecSuccess else { return nil }
+        return dict as? [String: Any]
+    }
+
+    /// True when the code at `url` is ad-hoc signed (or has no usable signature at all).
+    static func isAdHocOrUnsigned(_ url: URL) -> Bool {
+        guard let code = staticCode(url), let info = signingInfo(code) else { return true }
+        let flags = (info[kSecCodeInfoFlags as String] as? UInt32) ?? 0
+        if flags & SecCodeSignatureFlags.adhoc.rawValue != 0 { return true }
+        return info[kSecCodeInfoIdentifier as String] == nil
+    }
+
+    /// The running app's designated requirement when it is signed with a real identity; otherwise
+    /// the team-id requirement; otherwise `.none`.
+    static func pin(forRunningApp url: URL) -> SignaturePin {
+        guard !isAdHocOrUnsigned(url), let code = staticCode(url) else { return .none }
+        var req: SecRequirement?
+        var text: CFString?
+        if SecCodeCopyDesignatedRequirement(code, [], &req) == errSecSuccess, let req,
+           SecRequirementCopyString(req, [], &text) == errSecSuccess, let text {
+            return .requirement(text as String)
+        }
+        if let team = signingInfo(code)?[kSecCodeInfoTeamIdentifier as String] as? String,
+           let r = teamRequirement(team) { return .requirement(r) }
+        return .none
+    }
+
+    /// Strict validity check of `url` against `requirement` (all architectures, nested code).
+    /// `requirement == nil` checks validity only.
+    static func satisfies(_ url: URL, requirement: String?) -> Bool {
+        guard let code = staticCode(url) else { return false }
+        var req: SecRequirement?
+        if let requirement {
+            guard SecRequirementCreateWithString(requirement as CFString, [], &req) == errSecSuccess, req != nil else { return false }
+        }
+        let flags = SecCSFlags(rawValue: kSecCSCheckAllArchitectures | kSecCSStrictValidate | kSecCSCheckNestedCode)
+        return SecStaticCodeCheckValidityWithErrors(code, flags, req, nil) == errSecSuccess
+    }
+
+    static func identifier(_ url: URL) -> String? {
+        staticCode(url).flatMap(signingInfo)?[kSecCodeInfoIdentifier as String] as? String
+    }
 }
 
 final class UpdateInstaller: ObservableObject {
@@ -66,21 +144,41 @@ final class UpdateInstaller: ObservableObject {
         case downloading
         case staged(version: String)
         case failed(String)
+        /// Automatic install isn't possible (e.g. ad-hoc signed build); the releases page was opened.
+        case manual(String)
     }
 
     @Published private(set) var state: State = .idle
+    /// Why the last Install & Restart was refused (recording or streaming in progress).
+    @Published private(set) var blockedReason: String?
     private var stagedApp: URL?
     private var stagedVersion = ""
     private var scriptSpawned = false
     private var terminateObserver: NSObjectProtocol?
 
+    /// Injection points for tests.
+    var isBusyProbe: () -> Bool = { SessionControlBoard.shared.anyActiveOutput }
+    var terminateApp: () -> Void = { NSApp.terminate(nil) }
+    var openURL: (URL) -> Void = { NSWorkspace.shared.open($0) }
+    var pinProvider: () -> SignaturePin = { UpdateSignature.pin(forRunningApp: Bundle.main.bundleURL) }
+
     var bundleURL: URL { Bundle.main.bundleURL }
 
-    func isRecordingNow() -> Bool { SessionControlBoard.shared.anyRecording }
+    /// True while anything is being recorded or sent (recorder, UDP, RTMP, SRT, NDI, web viewer, replay save).
+    func isRecordingNow() -> Bool { isBusyProbe() }
 
     /// Download, verify and stage `asset`. Does not touch the installed app.
     func stage(asset: UpdateAsset, version: String) {
         guard state != .downloading else { return }
+        let pin = pinProvider()
+        if case .none = pin {
+            state = .manual("This build isn't signed with a developer identity, so it can't verify an update's authenticity. Opened the releases page; download and install it manually.")
+            openURL(UpdatePrefs.releasesPage)
+            return
+        }
+        guard let want = asset.sha256, !want.isEmpty else {
+            state = .failed("The release publishes no checksum, so the update can't be verified. Download it manually from the releases page."); return
+        }
         guard FileManager.default.isWritableFile(atPath: bundleURL.deletingLastPathComponent().path) else {
             state = .failed("GogglesView's folder isn't writable. Download the release manually."); return
         }
@@ -88,29 +186,32 @@ final class UpdateInstaller: ObservableObject {
         Task.detached { [self] in
             do {
                 let (tmp, resp) = try await URLSession.shared.download(from: asset.url)
+                defer { try? FileManager.default.removeItem(at: tmp) }
                 guard (resp as? HTTPURLResponse)?.statusCode == 200 else { throw UpdateError("Download failed") }
-                let data = try Data(contentsOf: tmp, options: .mappedIfSafe)
-                if let want = asset.sha256 {
-                    let got = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
-                    guard got == want else { throw UpdateError("Checksum mismatch; update discarded") }
-                }
-                let app = try Self.extractApp(dmg: tmp, expectedVersion: version, current: Bundle.main.bundleURL)
-                await MainActor.run {
-                    self.stagedApp = app; self.stagedVersion = version
-                    self.state = .staged(version: version)
-                    self.armInstallOnQuit()
-                }
+                let app = try Self.extractApp(dmg: tmp, expectedVersion: version, pin: pin, expectedSHA256: want)
+                await MainActor.run { self.markStaged(app: app, version: version, arm: true) }
             } catch {
                 await MainActor.run { self.state = .failed((error as? UpdateError)?.message ?? error.localizedDescription) }
             }
         }
     }
 
-    /// Install and relaunch now.
+    func markStaged(app: URL, version: String, arm: Bool) {
+        stagedApp = app; stagedVersion = version
+        state = .staged(version: version)
+        if arm { armInstallOnQuit() }
+    }
+
+    /// Install and relaunch now. Refuses while anything is being recorded or sent.
     func installAndRestart() {
         guard case .staged = state else { return }
+        if isRecordingNow() {
+            blockedReason = "Not installing while recording or streaming. Stop it first."
+            return
+        }
+        blockedReason = nil
         spawnScript(relaunch: true)
-        NSApp.terminate(nil)
+        if scriptSpawned { terminateApp() }
     }
 
     /// Staged updates are applied on the next normal quit (no relaunch).
@@ -128,8 +229,10 @@ final class UpdateInstaller: ObservableObject {
         if Self.helperBinaryDiffers(old: bundleURL, new: staged) {
             UserDefaults.standard.set(stagedVersion, forKey: UpdatePrefs2.helperChangedKey)
         }
+        let work = staged.deletingLastPathComponent().deletingLastPathComponent()
         let script = UpdateInstallScript.make(pid: ProcessInfo.processInfo.processIdentifier,
-                                              staged: staged.path, dest: bundleURL.path, relaunch: relaunch)
+                                              staged: staged.path, dest: bundleURL.path, relaunch: relaunch,
+                                              cleanup: work.path)
         let path = FileManager.default.temporaryDirectory.appendingPathComponent("gogglesview-update-\(UUID().uuidString).sh")
         do {
             try script.write(to: path, atomically: true, encoding: .utf8)
@@ -140,6 +243,7 @@ final class UpdateInstaller: ObservableObject {
             try p.run()
         } catch {
             scriptSpawned = false
+            try? FileManager.default.removeItem(at: path)
             state = .failed("Couldn't start the installer: \(error.localizedDescription)")
         }
     }
@@ -154,46 +258,71 @@ final class UpdateInstaller: ObservableObject {
         try p.run(); p.waitUntilExit(); return p.terminationStatus
     }
 
-    static func extractApp(dmg: URL, expectedVersion: String, current: URL?) throws -> URL {
+    static func sha256Hex(of url: URL) throws -> String {
+        let h = try FileHandle(forReadingFrom: url)
+        defer { try? h.close() }
+        var hasher = SHA256()
+        while let d = try h.read(upToCount: 1 << 20), !d.isEmpty { hasher.update(data: d) }
+        return hasher.finalize().map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// Copies `dmg`, hashes that exact copy against `expectedSHA256`, mounts the copy, extracts the app
+    /// and verifies it against `pin`. On success only `<work>/out/GogglesView.app` remains (mount point
+    /// and DMG copy are removed); on any failure the whole work directory is removed.
+    static func extractApp(dmg: URL, expectedVersion: String, pin: SignaturePin, expectedSHA256: String,
+                           current: URL? = Bundle.main.bundleURL) throws -> URL {
         let fm = FileManager.default
         let work = fm.temporaryDirectory.appendingPathComponent("gogglesview-update-\(UUID().uuidString)")
         let mount = work.appendingPathComponent("mnt"), out = work.appendingPathComponent("out")
+        let dmgCopy = work.appendingPathComponent("u.dmg")
+        var mounted = false
+        var succeeded = false
+        defer {
+            if mounted { _ = try? run("/usr/bin/hdiutil", ["detach", "-force", mount.path]) }
+            if succeeded {
+                try? fm.removeItem(at: mount)
+                try? fm.removeItem(at: dmgCopy)
+            } else {
+                try? fm.removeItem(at: work)
+            }
+        }
         try fm.createDirectory(at: mount, withIntermediateDirectories: true)
         try fm.createDirectory(at: out, withIntermediateDirectories: true)
-        let dmgCopy = work.appendingPathComponent("u.dmg")
         try fm.copyItem(at: dmg, to: dmgCopy)
+        // Hash exactly what will be mounted, not the download's temp file.
+        guard try sha256Hex(of: dmgCopy) == expectedSHA256.lowercased() else {
+            throw UpdateError("Checksum mismatch; update discarded")
+        }
         guard try run("/usr/bin/hdiutil", ["attach", "-nobrowse", "-readonly", "-noverify", "-mountpoint", mount.path, dmgCopy.path]) == 0 else {
             throw UpdateError("Couldn't open the update disk image")
         }
-        defer { _ = try? run("/usr/bin/hdiutil", ["detach", "-force", mount.path]) }
+        mounted = true
         let src = mount.appendingPathComponent("GogglesView.app")
         guard fm.fileExists(atPath: src.path) else { throw UpdateError("Update does not contain GogglesView.app") }
         let dst = out.appendingPathComponent("GogglesView.app")
         guard try run("/usr/bin/ditto", [src.path, dst.path]) == 0 else { throw UpdateError("Couldn't copy the update") }
-        try verify(staged: dst, current: current, expectedVersion: expectedVersion)
+        try verify(staged: dst, current: current, pin: pin, expectedVersion: expectedVersion)
+        succeeded = true
         return dst
     }
 
-    /// Signature must be valid, same bundle id, same team (when the running app has one), and a newer version.
-    static func verify(staged: URL, current: URL?, expectedVersion: String) throws {
-        func info(_ url: URL) throws -> (id: String?, team: String?) {
-            var code: SecStaticCode?
-            guard SecStaticCodeCreateWithPath(url as CFURL, [], &code) == errSecSuccess, let code else {
-                throw UpdateError("Update is not a valid app")
+    /// The staged app must satisfy the pinned requirement (so it is signed by the same identity as the
+    /// running app, not merely validly signed), have the same bundle id, and be the expected newer version.
+    static func verify(staged: URL, current: URL?, pin: SignaturePin, expectedVersion: String) throws {
+        switch pin {
+        case .none:
+            throw UpdateError("This build can't verify update authenticity")
+        case .requirement(let r):
+            guard UpdateSignature.satisfies(staged, requirement: r) else {
+                throw UpdateError("Update isn't signed by the same identity as this app")
             }
-            guard SecStaticCodeCheckValidityWithErrors(code, SecCSFlags(rawValue: kSecCSCheckAllArchitectures | kSecCSStrictValidate | kSecCSCheckNestedCode), nil, nil) == errSecSuccess else {
+        case .integrityOnlyForTests:
+            guard UpdateSignature.satisfies(staged, requirement: nil) else {
                 throw UpdateError("Update's code signature is invalid")
             }
-            var dict: CFDictionary?
-            guard SecCodeCopySigningInformation(code, SecCSFlags(rawValue: kSecCSSigningInformation), &dict) == errSecSuccess,
-                  let d = dict as? [String: Any] else { throw UpdateError("Couldn't read update signature") }
-            return (d[kSecCodeInfoIdentifier as String] as? String, d[kSecCodeInfoTeamIdentifier as String] as? String)
         }
-        let new = try info(staged)
-        if let current {
-            let cur = try info(current)
-            guard new.id == cur.id else { throw UpdateError("Update has a different app identity") }
-            if let team = cur.team, new.team != team { throw UpdateError("Update is signed by a different team") }
+        if let current, let cid = UpdateSignature.identifier(current), UpdateSignature.identifier(staged) != cid {
+            throw UpdateError("Update has a different app identity")
         }
         let plist = NSDictionary(contentsOf: staged.appendingPathComponent("Contents/Info.plist"))
         let v = plist?["CFBundleShortVersionString"] as? String ?? ""

@@ -54,11 +54,15 @@ enum AMF0 {
     static func decode(_ b: [UInt8]) -> [Value] {
         var i = 0
         var out: [Value] = []
-        while i < b.count, let v = decodeValue(b, &i) { out.append(v) }
+        while i < b.count, let v = decodeValue(b, &i, depth: 0) { out.append(v) }
         return out
     }
 
-    private static func decodeValue(_ b: [UInt8], _ i: inout Int) -> Value? {
+    /// Nested objects/arrays deeper than this are rejected (hostile input must not overflow the stack).
+    static let maxDepth = 8
+
+    private static func decodeValue(_ b: [UInt8], _ i: inout Int, depth: Int) -> Value? {
+        guard depth <= maxDepth else { return nil }
         guard i < b.count else { return nil }
         let t = b[i]; i += 1
         switch t {
@@ -73,10 +77,10 @@ enum AMF0 {
         case 0x0C: return readString(b, &i, long: true).map(Value.string)
         case 0x05: return .null
         case 0x06: return .undefined
-        case 0x03: return readProps(b, &i).map(Value.object)
+        case 0x03: return readProps(b, &i, depth: depth + 1).map(Value.object)
         case 0x08:
             guard i + 4 <= b.count else { return nil }
-            i += 4; return readProps(b, &i).map(Value.ecmaArray)
+            i += 4; return readProps(b, &i, depth: depth + 1).map(Value.ecmaArray)
         default: return nil
         }
     }
@@ -91,12 +95,13 @@ enum AMF0 {
         return String(decoding: b[i..<i + n], as: UTF8.self)
     }
 
-    private static func readProps(_ b: [UInt8], _ i: inout Int) -> [Pair]? {
+    private static func readProps(_ b: [UInt8], _ i: inout Int, depth: Int) -> [Pair]? {
+        guard depth <= maxDepth else { return nil }
         var out: [Pair] = []
         while true {
             guard i + 3 <= b.count else { return nil }
             if b[i] == 0, b[i + 1] == 0, b[i + 2] == 0x09 { i += 3; return out }
-            guard let k = readString(b, &i, long: false), let v = decodeValue(b, &i) else { return nil }
+            guard let k = readString(b, &i, long: false), let v = decodeValue(b, &i, depth: depth) else { return nil }
             out.append(Pair(k, v))
         }
     }
@@ -173,6 +178,9 @@ enum RTMPChunk {
             if fmt <= 1 {
                 st.len = Int(b[i + 3]) << 16 | Int(b[i + 4]) << 8 | Int(b[i + 5])
                 st.type = b[i + 6]
+                // A fmt 0/1 header that declares a shorter message than what is already buffered
+                // would make `take` negative; the partial message is abandoned.
+                if st.len < st.buf.count { st.buf = [] }
             }
             if fmt == 0 { st.sid = UInt32(b[i + 7]) | UInt32(b[i + 8]) << 8 | UInt32(b[i + 9]) << 16 | UInt32(b[i + 10]) << 24 }
             i += hdr
@@ -182,7 +190,7 @@ enum RTMPChunk {
                 tsField = UInt32(b[i]) << 24 | UInt32(b[i + 1]) << 16 | UInt32(b[i + 2]) << 8 | UInt32(b[i + 3])
                 i += 4
             }
-            let take = min(chunkSize, st.len - st.buf.count)
+            let take = max(0, min(chunkSize, st.len - st.buf.count))
             guard need(take) else { return nil }
             if st.buf.isEmpty { // first chunk of a message sets the timestamp
                 if fmt == 0 { st.ts = tsField; st.delta = 0 }
@@ -270,16 +278,22 @@ final class RTMPPublisher: ObservableObject, SampleBufferRendering {
 
     private static let chunkSize = 4096
     private static let maxBacklog = 3_000_000
+    /// The send backlog must shrink at least once within this window or the link is considered dead.
+    static let stallTimeout: TimeInterval = 5
+    /// A connection that has not reached `publishing` within this window is abandoned.
+    static let connectTimeout: TimeInterval = 15
 
     private let queue = DispatchQueue(label: "RTMPPublisher")
     private var conn: NWConnection?
-    private var phase = Phase.idle
+    private var phase = Phase.idle { didSet { if phase != oldValue { phaseSince = Date() } } }
+    private var phaseSince = Date()
     private var target: RTMPTarget?
     private var streamKey = ""
     private var rx: [UInt8] = []
     private var reader = RTMPChunk.Reader()
     private var streamID: UInt32 = 0
     private var backlog = 0
+    private var lastProgress = Date()
     private var sentTotal: UInt64 = 0
     private var needsKey = true
     private var sentParams: [Data] = []
@@ -287,53 +301,136 @@ final class RTMPPublisher: ObservableObject, SampleBufferRendering {
     private var baseTime: Double?
     private var received = 0, lastAck = 0, windowSize = 2_500_000
 
+    // Reconnect state (queue-confined). `userEnabled` is true from start() until stop().
+    private var userEnabled = false
+    private var wantURL = "", wantKey = ""
+    private var attempt = 0
+    private var reconnectItem: DispatchWorkItem?
+    private var watchdog: DispatchSourceTimer?
+    /// Mirrors `phase == .publishing` so `enqueue` can skip the frame copy without hopping queues.
+    private let accepting = NSLock()
+    private var acceptingFrames = false
+    private func setAccepting(_ v: Bool) { accepting.lock(); acceptingFrames = v; accepting.unlock() }
+    private var isAccepting: Bool { accepting.lock(); defer { accepting.unlock() }; return acceptingFrames }
+
+    init() {
+        OutputActivityBoard.shared.register(self) { [weak self] in self?.isStreaming == true }
+    }
+
+    deinit { OutputActivityBoard.shared.unregister(self) }
+
     func start(url: String, streamKey: String) {
         queue.async { [self] in
             stopLocked()
-            guard let t = RTMPTarget.parse(url), let port = NWEndpoint.Port(rawValue: UInt16(clamping: t.port)) else {
+            guard RTMPTarget.parse(url) != nil else {
                 setStatus("Idle", error: "Invalid RTMP URL (expected rtmp://host/app)"); return
             }
             guard !streamKey.isEmpty else { setStatus("Idle", error: "Stream key is empty"); return }
-            target = t; self.streamKey = streamKey
-            let c = NWConnection(host: NWEndpoint.Host(t.host), port: port, using: t.secure ? .tls : .tcp)
-            conn = c
-            phase = .handshake
-            c.stateUpdateHandler = { [weak self, weak c] st in
-                guard let self, let c else { return }
-                self.queue.async {
-                    guard c === self.conn else { return }
-                    switch st {
-                    case .ready: self.sendHandshake(c)
-                    case .failed(let e): self.fail(e.localizedDescription)
-                    case .waiting(let e): self.setStatus("Connecting", error: self.redact(e.localizedDescription))
-                    default: break
-                    }
-                }
-            }
+            wantURL = url; wantKey = streamKey
+            userEnabled = true; attempt = 0
             DispatchQueue.main.async { self.isStreaming = true; self.bytesSent = 0 }
-            setStatus("Connecting", error: nil)
-            c.start(queue: queue)
+            connect()
         }
     }
 
     func stop() { queue.async { [self] in stopLocked() } }
 
-    private func stopLocked() {
+    private func connect() {
+        guard userEnabled, let t = RTMPTarget.parse(wantURL),
+              let port = NWEndpoint.Port(rawValue: UInt16(clamping: t.port)) else { return }
+        resetConnectionState()
+        target = t; streamKey = wantKey
+        let c = NWConnection(host: NWEndpoint.Host(t.host), port: port, using: t.secure ? .tls : .tcp)
+        conn = c
+        phase = .handshake
+        lastProgress = Date()
+        c.stateUpdateHandler = { [weak self, weak c] st in
+            guard let self, let c else { return }
+            self.queue.async {
+                guard c === self.conn else { return }
+                switch st {
+                case .ready: self.sendHandshake(c)
+                case .failed(let e): self.fail(e.localizedDescription)
+                case .waiting(let e): self.setStatus("Connecting", error: self.redact(e.localizedDescription))
+                default: break
+                }
+            }
+        }
+        startWatchdog()
+        setStatus("Connecting", error: nil)
+        c.start(queue: queue)
+    }
+
+    /// Tears down the socket and per-connection protocol state; leaves the user's intent alone.
+    private func resetConnectionState() {
+        watchdog?.cancel(); watchdog = nil
         conn?.stateUpdateHandler = nil
         conn?.cancel()
         conn = nil
         phase = .idle
+        setAccepting(false)
         rx = []; reader = RTMPChunk.Reader(); streamID = 0; backlog = 0; sentTotal = 0
         needsKey = true; sentParams = []; sentMeta = false; baseTime = nil
         received = 0; lastAck = 0; windowSize = 2_500_000
-        streamKey = ""
+    }
+
+    private func stopLocked() {
+        userEnabled = false
+        reconnectItem?.cancel(); reconnectItem = nil
+        resetConnectionState()
+        streamKey = ""; wantKey = ""; wantURL = ""
         DispatchQueue.main.async { self.isStreaming = false; self.isLive = false; self.status = "Idle" }
     }
 
+    /// Connection lost or rejected. While the user still has the stream enabled this retries with backoff.
     private func fail(_ message: String) {
         let m = redact(message)
-        stopLocked()
-        DispatchQueue.main.async { self.lastError = m; self.status = "Failed" }
+        guard userEnabled else {
+            stopLocked()
+            DispatchQueue.main.async { self.lastError = m; self.status = "Failed" }
+            return
+        }
+        resetConnectionState()
+        let delay = ReconnectBackoff.delay(attempt: attempt)
+        attempt += 1
+        let label = "Reconnecting in \(Int(delay)) s"
+        DispatchQueue.main.async { self.isLive = false; self.lastError = m; self.status = label }
+        reconnectItem?.cancel()
+        let item = DispatchWorkItem { [weak self] in
+            guard let self, self.userEnabled, self.conn == nil else { return }
+            self.connect()
+        }
+        reconnectItem = item
+        queue.asyncAfter(deadline: .now() + delay, execute: item)
+    }
+
+    // MARK: liveness
+
+    /// Pure: stalled when bytes are queued and none has drained for `timeout` seconds.
+    static func isStalled(backlog: Int, lastProgress: Date, now: Date, timeout: TimeInterval = stallTimeout) -> Bool {
+        backlog > 0 && now.timeIntervalSince(lastProgress) >= timeout
+    }
+
+    private func startWatchdog() {
+        let t = DispatchSource.makeTimerSource(queue: queue)
+        t.schedule(deadline: .now() + 1, repeating: 1)
+        t.setEventHandler { [weak self] in
+            guard let self, self.conn != nil else { return }
+            let now = Date()
+            if Self.isStalled(backlog: self.backlog, lastProgress: self.lastProgress, now: now) {
+                self.fail("Connection stalled (no data accepted for \(Int(Self.stallTimeout)) s)")
+            } else if self.phase != .publishing, now.timeIntervalSince(self.phaseSince) >= Self.connectTimeout {
+                self.fail("Timed out waiting for the server")
+            }
+        }
+        watchdog = t
+        t.resume()
+    }
+
+    /// Pure: a createStream result must be a finite number in 0..<2^32.
+    static func validStreamID(_ n: Double) -> UInt32? {
+        guard n.isFinite, n >= 0, n < 4_294_967_296 else { return nil }
+        return UInt32(n)
     }
 
     private func redact(_ s: String) -> String { redactStreamKey(s, key: streamKey) }
@@ -407,8 +504,10 @@ final class RTMPPublisher: ObservableObject, SampleBufferRendering {
                 sendCommand("FCPublish", txn: 3, [.null, .string(streamKey)])
                 sendCommand("createStream", txn: 4, [.null])
             case "_result" where phase == .creating && txn == 4:
-                guard v.count > 3, let id = v[3].number else { fail("createStream returned no stream id"); return }
-                streamID = UInt32(id)
+                guard v.count > 3, let n = v[3].number, let id = Self.validStreamID(n) else {
+                    fail("createStream returned no valid stream id"); return
+                }
+                streamID = id
                 sendCommand("publish", txn: 5, [.null, .string(streamKey), .string("live")], stream: streamID)
             case "_error":
                 fail("Server rejected command (\(describe(v)))")
@@ -416,6 +515,8 @@ final class RTMPPublisher: ObservableObject, SampleBufferRendering {
                 guard let code = v.last?.properties?.first(where: { $0.key == "code" })?.value.string else { return }
                 if code == "NetStream.Publish.Start" {
                     phase = .publishing
+                    attempt = 0
+                    setAccepting(true)
                     DispatchQueue.main.async { self.isLive = true; self.status = "Live"; self.lastError = nil }
                 } else if code.contains("Failed") || code.contains("Rejected") || code.contains("BadName") || code.contains("Unpublish") {
                     fail("Server status: \(code)")
@@ -436,6 +537,7 @@ final class RTMPPublisher: ObservableObject, SampleBufferRendering {
 
     private func raw(_ bytes: [UInt8]) {
         guard let c = conn else { return }
+        if backlog == 0 { lastProgress = Date() }
         backlog += bytes.count
         let n = bytes.count
         c.send(content: Data(bytes), completion: .contentProcessed { [weak self, weak c] err in
@@ -443,6 +545,7 @@ final class RTMPPublisher: ObservableObject, SampleBufferRendering {
             self.queue.async {
                 guard c === self.conn else { return }
                 self.backlog = max(0, self.backlog - n)
+                self.lastProgress = Date()
                 if let err { self.fail(err.localizedDescription); return }
                 self.sentTotal += UInt64(n)
                 let t = self.sentTotal
@@ -494,6 +597,7 @@ final class RTMPPublisher: ObservableObject, SampleBufferRendering {
     // MARK: SampleBufferRendering
 
     func enqueue(_ sampleBuffer: CMSampleBuffer) {
+        guard isAccepting else { return } // not connected: skip the copy entirely
         guard let avcc = NetworkStreamer.avccData(sampleBuffer) else { return }
         let isKey = NetworkStreamer.isKeyframe(sampleBuffer)
         var w = 0, h = 0, fps = 30.0

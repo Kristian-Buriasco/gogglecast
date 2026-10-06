@@ -172,6 +172,11 @@ final class WebViewerServer: ObservableObject, SampleBufferRendering {
     @Published private(set) var isRunning = false
     @Published private(set) var lastError: String?
 
+    init() {
+        OutputActivityBoard.shared.register(self) { [weak self] in self?.isRunning == true }
+    }
+    deinit { OutputActivityBoard.shared.unregister(self) }
+
     private static let maxConnections = 32
 
     private let queue = DispatchQueue(label: "WebViewerServer")

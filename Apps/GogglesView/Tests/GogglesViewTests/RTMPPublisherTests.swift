@@ -77,6 +77,88 @@ struct RTMPPublisherTests {
         #expect(p.first { $0.key == "width" }?.value.number == 1920)
     }
 
+    // MARK: hostile input (fake byte stream, no network)
+
+    /// fmt 0 chunk header (csid < 64) followed by `payload`.
+    private func fmt0(csid: UInt8, len: Int, type: UInt8 = 9, payload: [UInt8]) -> [UInt8] {
+        [csid & 0x3F, 0, 0, 0, UInt8(len >> 16 & 0xFF), UInt8(len >> 8 & 0xFF), UInt8(len & 0xFF), type, 1, 0, 0, 0] + payload
+    }
+
+    @Test func readerSurvivesShrinkingLengthMidMessage() {
+        var r = RTMPChunk.Reader()
+        // First chunk of a 300-byte message: 128 bytes arrive (default chunk size).
+        #expect(r.feed(fmt0(csid: 6, len: 300, payload: [UInt8](repeating: 1, count: 128))).isEmpty)
+        // Same csid restarts with a header declaring only 10 bytes (< 128 buffered): must not trap.
+        let m = r.feed(fmt0(csid: 6, len: 10, payload: [UInt8](repeating: 2, count: 10)))
+        #expect(m.count == 1)
+        #expect(m.first?.payload == [UInt8](repeating: 2, count: 10))
+    }
+
+    @Test func readerHandlesGarbageWithoutCrashing() {
+        var r = RTMPChunk.Reader()
+        var rng = SystemRandomNumberGenerator()
+        for _ in 0..<500 {
+            let n = Int.random(in: 1...400, using: &rng)
+            _ = r.feed((0..<n).map { _ in UInt8.random(in: 0...255, using: &rng) })
+        }
+        // Zero-length and tiny-length headers on many csids.
+        var r2 = RTMPChunk.Reader()
+        for csid in 3..<40 { _ = r2.feed(fmt0(csid: UInt8(csid), len: 0, payload: [])) }
+        for csid in 3..<40 { _ = r2.feed(fmt0(csid: UInt8(csid), len: 200, payload: [1, 2, 3]) + fmt0(csid: UInt8(csid), len: 1, payload: [])) }
+    }
+
+    @Test func amfNestingIsDepthLimited() {
+        let open: [UInt8] = [0x03, 0, 1, 0x61]
+        let deep = [UInt8]((0..<50_000).flatMap { _ in open })
+        #expect(AMF0.decode(deep).isEmpty)
+        let ecma = [UInt8]((0..<50_000).flatMap { _ in [UInt8(0x08), 0, 0, 0, 1, 0, 1, 0x61] })
+        #expect(AMF0.decode(ecma).isEmpty)
+        // Shallow nesting still decodes.
+        let v = AMF0.Value.object([AMF0.Pair("a", .object([AMF0.Pair("b", .object([AMF0.Pair("c", .null)]))]))])
+        #expect(AMF0.decode(AMF0.encode(v)) == [v])
+    }
+
+    @Test func createStreamIdIsValidated() {
+        #expect(RTMPPublisher.validStreamID(1) == 1)
+        #expect(RTMPPublisher.validStreamID(0) == 0)
+        #expect(RTMPPublisher.validStreamID(4_294_967_295) == 4_294_967_295)
+        #expect(RTMPPublisher.validStreamID(.nan) == nil)
+        #expect(RTMPPublisher.validStreamID(.infinity) == nil)
+        #expect(RTMPPublisher.validStreamID(-1) == nil)
+        #expect(RTMPPublisher.validStreamID(4_294_967_296) == nil)
+        #expect(RTMPPublisher.validStreamID(1e300) == nil)
+    }
+
+    @Test func backoffDoublesAndCaps() {
+        let d = (0..<8).map { ReconnectBackoff.delay(attempt: $0) }
+        #expect(d == [1, 2, 4, 8, 15, 15, 15, 15])
+        #expect(ReconnectBackoff.delay(attempt: -3) == 1)
+        #expect(ReconnectBackoff.delay(attempt: 10_000) == 15)
+    }
+
+    @Test func stallDetection() {
+        let t0 = Date(timeIntervalSince1970: 1000)
+        #expect(!RTMPPublisher.isStalled(backlog: 0, lastProgress: t0, now: t0 + 60))
+        #expect(!RTMPPublisher.isStalled(backlog: 10, lastProgress: t0, now: t0 + 4.9))
+        #expect(RTMPPublisher.isStalled(backlog: 10, lastProgress: t0, now: t0 + 5))
+    }
+
+    @Test func activityBoardCountsOutputsAndBusyJobs() {
+        let board = OutputActivityBoard()
+        #expect(!board.anyActive)
+        final class Dummy { var on = false }
+        let d = Dummy()
+        board.register(d) { [weak d] in d?.on == true }
+        #expect(!board.anyActive)
+        d.on = true
+        #expect(board.anyActive)
+        d.on = false
+        board.beginBusy()
+        #expect(board.anyActive)
+        board.endBusy()
+        #expect(!board.anyActive)
+    }
+
     /// Needs GV_H264_FILE (Annex-B, x264 with aud=1) and a receiver, e.g.
     /// ffmpeg -listen 1 -i rtmp://127.0.0.1:19350/live/test -c copy /tmp/out.flv
     @Test func liveAgainstReceiver() async throws {

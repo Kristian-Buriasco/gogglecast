@@ -134,8 +134,12 @@ final class SessionControlBoard {
 
     func unregister(_ session: AnyObject) { entries[ObjectIdentifier(session)] = nil }
 
-    /// True while any window is recording or streaming; auto-updates wait on this.
+    /// True while any window is recording or sending over UDP.
     var anyRecording: Bool {
         entries.values.contains { $0.recorder?.isRecording == true || $0.streamer?.isStreaming == true }
     }
+
+    /// True while anything is being recorded or sent: recorder, UDP, RTMP, SRT, NDI, the web viewer
+    /// or a replay save. Auto-updates wait on this.
+    var anyActiveOutput: Bool { anyRecording || OutputActivityBoard.shared.anyActive }
 }

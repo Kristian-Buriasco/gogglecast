@@ -33,6 +33,11 @@ final class NetworkStreamer: ObservableObject, SampleBufferRendering {
     private var inFlight = 0
     private var pendingBytes: UInt64 = 0
     private var active = false
+    private var userEnabled = false
+    private var wantHost = ""
+    private var wantPort: NWEndpoint.Port?
+    private var attempt = 0
+    private var reconnectItem: DispatchWorkItem?
 
     func start(host: String, port: Int) {
         queue.async { [self] in
@@ -40,36 +45,67 @@ final class NetworkStreamer: ObservableObject, SampleBufferRendering {
             guard let nwPort = NWEndpoint.Port(rawValue: UInt16(clamping: port)), port > 0 else {
                 publish(error: "Invalid port"); return
             }
-            muxer = MPEGTSMuxer()
-            let conn = NWConnection(host: NWEndpoint.Host(host), port: nwPort, using: .udp)
-            conn.stateUpdateHandler = { [weak self, weak conn] state in
-                guard let self, let conn else { return }
-                self.queue.async {
-                    guard conn === self.connection else { return }
-                    switch state {
-                    case .failed(let e): self.publish(error: e.localizedDescription); self.stopLocked()
-                    case .waiting(let e): self.publish(error: e.localizedDescription)
-                    case .ready: self.publish(error: nil)
-                    default: break
-                    }
-                }
-            }
-            connection = conn
-            active = true
-            conn.start(queue: queue)
+            wantHost = host; wantPort = nwPort; attempt = 0
+            userEnabled = true
+            connect()
             DispatchQueue.main.async { self.isStreaming = true; self.bytesSent = 0; self.lastError = nil }
         }
     }
 
+    private func connect() {
+        guard userEnabled, let nwPort = wantPort else { return }
+        muxer = MPEGTSMuxer()
+        let conn = NWConnection(host: NWEndpoint.Host(wantHost), port: nwPort, using: .udp)
+        conn.stateUpdateHandler = { [weak self, weak conn] state in
+            guard let self, let conn else { return }
+            self.queue.async {
+                guard conn === self.connection else { return }
+                switch state {
+                case .failed(let e):
+                    self.publish(error: e.localizedDescription)
+                    self.dropConnection()
+                    self.scheduleRestart()
+                case .waiting(let e): self.publish(error: e.localizedDescription)
+                case .ready: self.attempt = 0; self.publish(error: nil)
+                default: break
+                }
+            }
+        }
+        connection = conn
+        active = true
+        conn.start(queue: queue)
+    }
+
+    /// Backoff restart (1, 2, 4 ... capped at 15 s) while the user still has the stream enabled.
+    private func scheduleRestart() {
+        guard userEnabled else { return }
+        let delay = ReconnectBackoff.delay(attempt: attempt)
+        attempt += 1
+        reconnectItem?.cancel()
+        let item = DispatchWorkItem { [weak self] in
+            guard let self, self.userEnabled, self.connection == nil else { return }
+            self.connect()
+        }
+        reconnectItem = item
+        queue.asyncAfter(deadline: .now() + delay, execute: item)
+    }
+
     func stop() { queue.async { [self] in stopLocked() } }
 
-    private func stopLocked() {
+    private func dropConnection() {
         active = false
         connection?.stateUpdateHandler = nil
         connection?.cancel()
         connection = nil
         inFlight = 0
         pendingBytes = 0
+    }
+
+    private func stopLocked() {
+        userEnabled = false
+        reconnectItem?.cancel()
+        reconnectItem = nil
+        dropConnection()
         DispatchQueue.main.async { self.isStreaming = false }
     }
 
@@ -122,9 +158,10 @@ final class NetworkStreamer: ObservableObject, SampleBufferRendering {
     static func avccData(_ sb: CMSampleBuffer) -> Data? {
         guard let bb = CMSampleBufferGetDataBuffer(sb) else { return nil }
         let n = CMBlockBufferGetDataLength(bb)
+        guard n > 0 else { return nil }
         var data = Data(count: n)
         let st = data.withUnsafeMutableBytes {
-            CMBlockBufferCopyDataBytes(bb, atOffset: 0, dataLength: n, destination: $0.baseAddress!)
+            $0.baseAddress.map { CMBlockBufferCopyDataBytes(bb, atOffset: 0, dataLength: n, destination: $0) } ?? kCMBlockBufferStructureAllocationFailedErr
         }
         return st == kCMBlockBufferNoErr ? data : nil
     }
