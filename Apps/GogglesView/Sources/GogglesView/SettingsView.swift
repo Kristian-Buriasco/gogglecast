@@ -57,7 +57,10 @@ struct SettingsView: View {
                         card { MenuBarItemSettingsToggle() }
                     case .display:
                         card { osdSection }
+                        card { StabilizerSettingsSection() }
                         card { FramingSettingsSection() }
+                        card { OutputFramingSettingsSection() }
+                        card { LookSettingsSection() }
                         card { OrientationSettingsSection() }
                         card { captureWindowSection }
                         card { MiniWindowSettingsSection() }

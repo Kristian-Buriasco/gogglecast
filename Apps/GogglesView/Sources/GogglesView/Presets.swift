@@ -23,6 +23,8 @@ enum SettingsPreset: String, CaseIterable, Identifiable {
         ReplayPrefs.enabledKey, ReplayPrefs.secondsKey,
         FramingPrefs.aspectKey, FramingPrefs.zoomKey, FramingPrefs.panXKey, FramingPrefs.panYKey,
         FramingPrefs.gridKey, FramingPrefs.brightnessKey, FramingPrefs.contrastKey, FramingPrefs.saturationKey,
+        OutputFramingPrefs.enabledKey, OutputFramingPrefs.aspectKey, OutputFramingPrefs.zoomKey,
+        OutputFramingPrefs.panXKey, OutputFramingPrefs.panYKey,
     ]
     // Orientation (rotation/flip) is mount-specific, so presets deliberately leave it alone;
     // host/port/folder/prefix are user data, not mode.

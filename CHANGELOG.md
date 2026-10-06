@@ -4,6 +4,14 @@ All notable changes to this project are documented here. Format based on [Keep a
 
 ## [Unreleased]
 
+### Added
+- Live stabilization (Settings > Display): electronic stabilization of the live picture with an adjustable strength. It only uses motion seen so far, so it adds a few ms of processing but no frames of delay. Zooms in 4 to 10% to hide the edges; doesn't correct rotation.
+- Color looks: import `.cube` 3D LUTs and apply one, with an intensity slider, to the preview and/or to recordings, replay and streams.
+- Output framing: a separate crop (aspect 16:9, 4:3, 1:1 or 9:16, zoom, position) for recordings, replay and streams, independent of the preview framing. A new 9:16 aspect is also available for the preview.
+
+### Changed
+- Recording uses the shared keyframe encoder from the start when an output crop or look is active, since those only exist in the re-encoded stream.
+
 ## [0.4.0] - 2026-10-05
 
 ### Added

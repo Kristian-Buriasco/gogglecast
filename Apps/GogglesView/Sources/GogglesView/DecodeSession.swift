@@ -77,6 +77,7 @@ final class DecodeSession: ObservableObject {
     private var decoderReady = false
     private let frameLock = NSLock()
     private var latestDecoded: CVPixelBuffer?
+    private let stabilizer = Stabilizer()
     private(set) var teardownCount = 0
 
     /// Fired (on whatever queue `handle`/`recordExternalFailure` is called
@@ -138,12 +139,21 @@ final class DecodeSession: ObservableObject {
     }
 
     /// Re-encodes the displayed picture with a keyframe every second (see `ReencodeHub`).
-    lazy var reencodeHub = ReencodeHub(source: { [weak self] in self?.latestDecodedFrame() })
+    private let outputProcessor = OutputProcessor()
+    lazy var reencodeHub = ReencodeHub(
+        source: { [weak self] in self?.outputFrame() },
+        onIdle: { [weak self] in self?.outputProcessor.reset() })
+
+    /// The picture that leaves the app (recordings, replay, streams): decoded frame with the output crop and look.
+    private func outputFrame() -> CVPixelBuffer? {
+        guard let frame = latestDecodedFrame() else { return nil }
+        return outputProcessor.process(frame)
+    }
 
     /// For consumers that must be able to start cleanly at any time (replay, network outputs).
     /// Gets the re-encoded stream, or the raw one when re-encoding is turned off in Settings.
     func addKeyframeSafeConsumer(_ consumer: SampleBufferRendering) {
-        if ReencodePrefs.enabled {
+        if ReencodePrefs.enabled || OutputProcessor.isActive {
             consumerLock.lock()
             extraConsumers.removeAll { $0.value == nil || $0.value === consumer }
             consumerLock.unlock()
@@ -285,11 +295,12 @@ final class DecodeSession: ObservableObject {
     }
 
     /// Decoder output (VideoToolbox thread): remember the picture and hand it to every display layer.
-    private func decoded(status: OSStatus, image: CVImageBuffer?, pts: CMTime) {
-        guard status == noErr, let image else {
+    private func decoded(status: OSStatus, image decodedImage: CVImageBuffer?, pts: CMTime) {
+        guard status == noErr, var image = decodedImage else {
             if status != noErr { recordFailure(DecodeSessionError.decoderFailed(status)) }
             return
         }
+        if CFGetTypeID(image) == CVPixelBufferGetTypeID() { image = stabilizer.process(image as! CVPixelBuffer) }
         frameLock.lock(); latestDecoded = image; frameLock.unlock()
         var fd: CMVideoFormatDescription?
         guard CMVideoFormatDescriptionCreateForImageBuffer(allocator: nil, imageBuffer: image, formatDescriptionOut: &fd) == noErr,

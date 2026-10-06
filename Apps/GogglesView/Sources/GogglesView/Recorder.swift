@@ -146,11 +146,19 @@ final class Recorder: ObservableObject, SampleBufferRendering {
         sessionStart = nil; segmentBytes = 0; sessionElapsed = 0; finished = []; pendingMarkers = []
         armed = true
         usingHub = false
+        var relayToSubscribe: (ReencodeHub, HubRelay)?
+        if let hub = keyframeHub, OutputProcessor.isActive {
+            // Output crop / look only exist in the re-encoded stream, so record that from the start.
+            usingHub = true
+            let relay = HubRelay(); relay.recorder = self; hubRelay = relay
+            relayToSubscribe = (hub, relay)
+        }
         framesSeenWhileArmed = 0
         armedAt = Date()
         Logging.recorder.info("armed, waiting for a start frame: \(url.lastPathComponent, privacy: .public)")
         startTime = nil; lastPTS = nil
         lock.unlock()
+        if let (hub, relay) = relayToSubscribe { DispatchQueue.main.async { hub.subscribe(relay) } }
         DispatchQueue.main.async { self.lastError = nil; self.elapsed = 0; self.markers = []; self.isRecording = true }
     }
 

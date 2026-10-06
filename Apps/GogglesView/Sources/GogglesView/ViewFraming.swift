@@ -5,7 +5,7 @@ import CoreMedia
 import SwiftUI
 
 enum FramingAspect: String, CaseIterable, Identifiable {
-    case fit, fill, r16x9, r4x3, r1x1
+    case fit, fill, r16x9, r4x3, r1x1, r9x16
     var id: String { rawValue }
     var title: String {
         switch self {
@@ -14,6 +14,7 @@ enum FramingAspect: String, CaseIterable, Identifiable {
         case .r16x9: return "16:9"
         case .r4x3: return "4:3"
         case .r1x1: return "1:1"
+        case .r9x16: return "9:16"
         }
     }
     /// Width/height of the crop window; nil = use the whole view.
@@ -23,6 +24,7 @@ enum FramingAspect: String, CaseIterable, Identifiable {
         case .r16x9: return 16.0 / 9
         case .r4x3: return 4.0 / 3
         case .r1x1: return 1
+        case .r9x16: return 9.0 / 16
         }
     }
 }
@@ -126,12 +128,15 @@ enum FramingPrefs {
 
     /// nil when all adjustments are neutral (no filter cost).
     static func colorFilters() -> [CIFilter]? {
-        guard brightness != 0 || contrast != 1 || saturation != 1,
-              let f = CIFilter(name: "CIColorControls") else { return nil }
-        f.setValue(brightness, forKey: kCIInputBrightnessKey)
-        f.setValue(contrast, forKey: kCIInputContrastKey)
-        f.setValue(saturation, forKey: kCIInputSaturationKey)
-        return [f]
+        var filters: [CIFilter] = []
+        if brightness != 0 || contrast != 1 || saturation != 1, let f = CIFilter(name: "CIColorControls") {
+            f.setValue(brightness, forKey: kCIInputBrightnessKey)
+            f.setValue(contrast, forKey: kCIInputContrastKey)
+            f.setValue(saturation, forKey: kCIInputSaturationKey)
+            filters.append(f)
+        }
+        if LookPrefs.applyPreview, let lut = LUTLibrary.currentFilter() { filters.append(lut) }
+        return filters.isEmpty ? nil : filters
     }
 }
 
@@ -222,7 +227,7 @@ struct FramingSettingsSection: View {
             slider("Contrast", $contrast, 0.5...2, format: "%.2f")
             slider("Saturation", $saturation, 0...2, format: "%.2f")
             Button("Reset") { FramingPrefs.resetAll() }
-            Text("Scroll or pinch to zoom, drag to pan, double-click to reset. Affects the main and capture windows only, not recordings.")
+            Text("Scroll or pinch to zoom, drag to pan, double-click to reset. Affects the main and capture windows only; recordings and streams use Output framing below.")
                 .font(.caption2).foregroundStyle(.secondary)
         }
     }

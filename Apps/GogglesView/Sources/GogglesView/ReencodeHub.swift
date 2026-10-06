@@ -28,6 +28,7 @@ final class ReencodeHub {
     /// Picture currently on screen. Called on the main queue by the timer, or by `pollOnce()` in tests.
     private let source: () -> CVPixelBuffer?
     private let bitrateMbps: () -> Int
+    private let onIdle: () -> Void
     private let lock = NSLock()
     private var subscribers: [WeakSub] = []
     private var timer: DispatchSourceTimer?
@@ -43,8 +44,10 @@ final class ReencodeHub {
 
     private struct WeakSub { weak var value: SampleBufferRendering? }
 
-    init(source: @escaping () -> CVPixelBuffer?, bitrateMbps: @escaping () -> Int = { ReencodePrefs.bitrateMbps }) {
+    init(source: @escaping () -> CVPixelBuffer?, bitrateMbps: @escaping () -> Int = { ReencodePrefs.bitrateMbps },
+         onIdle: @escaping () -> Void = {}) {
         self.source = source
+        self.onIdle = onIdle
         self.bitrateMbps = bitrateMbps
     }
 
@@ -87,6 +90,7 @@ final class ReencodeHub {
         timer?.cancel(); timer = nil
         teardownEncoder()
         lastSurface = nil
+        onIdle()
     }
 
     // MARK: Encoding
