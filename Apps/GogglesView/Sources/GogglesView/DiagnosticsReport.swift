@@ -123,6 +123,7 @@ enum DiagnosticsReport {
         let helper = """
         registration: SMAppService.daemon: \(HelperRegistration.describe(HelperRegistration.status))
         app expects protocol version: \(GogglesXPC.currentProtocolVersion)
+        connection health: \(HealthDiagnostics.summaryLine)
         """
         let defaults = UserDefaults.standard
         let pairs: [(String, Any)] = settingsKeys.compactMap { k in defaults.object(forKey: k).map { (k, $0) } }

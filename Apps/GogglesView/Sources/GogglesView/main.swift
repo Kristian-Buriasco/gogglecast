@@ -424,6 +424,10 @@ if args.contains("--run") || !args.dropFirst().contains(where: { $0.hasPrefix("-
     disconnectMenuItem.target = disconnectMenuTarget
     disconnectMenuItem.isEnabled = false
     gogglesMenu.addItem(disconnectMenuItem)
+    let healthMenuTarget = MenuActionTarget { HealthWindow.show() }
+    let healthMenuItem = NSMenuItem(title: "Connection Health…", action: #selector(MenuActionTarget.invoke), keyEquivalent: "")
+    healthMenuItem.target = healthMenuTarget
+    gogglesMenu.addItem(healthMenuItem)
     gogglesMenuItem.submenu = gogglesMenu
 
     let windowMenuItem = NSMenuItem()
@@ -594,7 +598,7 @@ if args.contains("--run") || !args.dropFirst().contains(where: { $0.hasPrefix("-
     // `app.run()` is called exactly once for the whole process; every window
     // after this point is created from main-queue callbacks while it spins.
     withExtendedLifetime((appDelegate, settingsWindowController, settingsMenuTarget, reconnectMenuTarget,
-                         openAnotherMenuTarget, disconnectMenuTarget, menuBarController, registry)) {
+                         openAnotherMenuTarget, disconnectMenuTarget, healthMenuTarget, menuBarController, registry)) {
         app.run()
     }
     exit(0)
