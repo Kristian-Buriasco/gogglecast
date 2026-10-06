@@ -624,15 +624,18 @@ func launchMainWindow(
 }
 if let idx = args.firstIndex(of: "--doc-shot"), idx + 2 < args.count {
     // Dev aid for documentation screenshots with fake data (see DocShots.swift):
-    // `GogglesView --doc-shot <clip-gallery|mini-window|menu-bar|live-synthetic> <out.png>`
+    // `GOGGLESVIEW_DEV_SHOTS=1 GogglesView --doc-shot <clip-gallery|mini-window|menu-bar|live-synthetic> <out.png>`
+    DocShots.requireEnabled(flag: "--doc-shot")
     DocShots.run(name: args[idx + 1], out: URL(fileURLWithPath: args[idx + 2]))
 }
 if let idx = args.firstIndex(of: "--settings-shot"), idx + 2 < args.count {
-    // Dev aid for documentation screenshots: `GogglesView --settings-shot <Tab> <out.png> [height]`
+    // Dev aid for documentation screenshots:
+    // `GOGGLESVIEW_DEV_SHOTS=1 GogglesView --settings-shot <Tab> <out.png> [height]`
     // opens only the Settings window on that tab, writes it to a PNG and exits. No helper, no XPC.
+    DocShots.requireEnabled(flag: "--settings-shot")
     let tab = args[idx + 1], out = URL(fileURLWithPath: args[idx + 2])
     let height = idx + 3 < args.count ? CGFloat(Double(args[idx + 3]) ?? 580) : 580
-    UserDefaults.standard.set(tab, forKey: "settingsTab")
+    DocShots.overridePrefs(["settingsTab": tab]) // in-memory only; the real defaults are untouched
     SettingsView.heightOverride = height
     UpdateChecker.versionOverride = ProcessInfo.processInfo.environment["GOGGLESVIEW_SHOT_VERSION"]
     let app = NSApplication.shared

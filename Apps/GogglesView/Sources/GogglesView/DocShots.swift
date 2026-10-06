@@ -5,11 +5,35 @@ import CoreImage
 import SwiftUI
 
 /// Dev aid for documentation screenshots of windows that normally need live goggles.
-/// `GogglesView --doc-shot <clip-gallery|mini-window|menu-bar|live-synthetic> <out.png>`
-/// Uses generated pictures and a temporary recordings folder; no helper, no XPC. Defaults written
-/// into the unbundled binary's own domain are removed again before exiting. Not used in normal runs.
+/// `GOGGLESVIEW_DEV_SHOTS=1 GogglesView --doc-shot <clip-gallery|mini-window|menu-bar|live-synthetic> <out.png>`
+/// (and `--settings-shot`, see main.swift). Both flags are ignored with a message unless
+/// `GOGGLESVIEW_DEV_SHOTS=1` is set. Uses generated pictures and a temporary recordings folder; no
+/// helper, no XPC. Preference overrides go into the in-memory argument domain only, so the user's
+/// real defaults (recording folder, mini-window, settings tab) are never changed, written or deleted.
+/// Not used in normal runs.
 enum DocShots {
     static let ci = CIContext()
+
+    static let devShotsEnvKey = "GOGGLESVIEW_DEV_SHOTS"
+
+    /// Pure: the dev-shot flags only run when explicitly enabled.
+    static func isEnabled(environment: [String: String] = ProcessInfo.processInfo.environment) -> Bool {
+        environment[devShotsEnvKey] == "1"
+    }
+
+    /// Exits with a message when the dev-shot flags are used without the opt-in variable.
+    static func requireEnabled(flag: String) {
+        guard !isEnabled() else { return }
+        print("\(flag) is a development aid; run it with \(devShotsEnvKey)=1 to enable it.")
+        exit(2)
+    }
+
+    /// Overrides preferences for this process only (NSArgumentDomain: highest precedence, never persisted).
+    static func overridePrefs(_ values: [String: Any], defaults d: UserDefaults = .standard) {
+        var arg = d.volatileDomain(forName: UserDefaults.argumentDomain)
+        for (k, v) in values { arg[k] = v }
+        d.setVolatileDomain(arg, forName: UserDefaults.argumentDomain)
+    }
 
     // MARK: synthetic pictures
 
@@ -135,12 +159,10 @@ enum DocShots {
     // MARK: entry
 
     static func run(name: String, out: URL) -> Never {
-        let d = UserDefaults.standard
         let app = NSApplication.shared
         app.setActivationPolicy(.regular)
         var tmp: URL?
         func finish(_ ok: Bool) -> Never {
-            for k in [RecordingPrefs.folderKey, MiniWindowPrefs.enabledKey, "NSWindow Frame \(MiniWindowPrefs.frameName)"] { d.removeObject(forKey: k) }
             if let tmp { try? FileManager.default.removeItem(at: tmp) }
             if ok { cropTransparent(out) }
             print(ok ? "wrote \(out.path)" : "doc-shot failed")
@@ -167,13 +189,13 @@ enum DocShots {
                 let date = now.addingTimeInterval(-Double(i) * 86_400 * 1.3 - 3600)
                 try? FileManager.default.setAttributes([.creationDate: date, .modificationDate: date], ofItemAtPath: u.path)
             }
-            d.set(dir.path, forKey: RecordingPrefs.folderKey)
+            overridePrefs([RecordingPrefs.folderKey: dir.path])
             ClipGalleryWindowController.shared.show()
             window = NSApp.windows.first { $0.title == "Clip Gallery" }
             window?.setContentSize(NSSize(width: 820, height: 620))
             delay = 3
         case "mini-window":
-            d.set(true, forKey: MiniWindowPrefs.enabledKey)
+            overridePrefs([MiniWindowPrefs.enabledKey: true])
             MiniWindowController.shared.sync(session: session)
             window = NSApp.windows.first { $0.title == "GogglesView Mini" }
         case "menu-bar":
