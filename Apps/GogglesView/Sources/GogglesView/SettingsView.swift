@@ -16,6 +16,9 @@ import SwiftUI
 // ─────────────────────────────────────────────────────────────────────────
 
 struct SettingsView: View {
+    /// Taller window for `--settings-shot`, so a whole tab fits in one picture. Nil in normal use.
+    static var heightOverride: CGFloat?
+
     @ObservedObject var viewModel: SettingsViewModel
     @ObservedObject private var profileContext = ProfileContext.shared
 
@@ -97,7 +100,7 @@ struct SettingsView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .frame(width: 780, height: 580, alignment: .topLeading)
+        .frame(width: 780, height: Self.heightOverride ?? 580, alignment: .topLeading)
         .background(AppChrome.backgroundColor)
         .foregroundStyle(.white)
         .onAppear { viewModel.refresh() }

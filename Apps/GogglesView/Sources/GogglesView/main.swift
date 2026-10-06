@@ -621,6 +621,26 @@ func launchMainWindow(
     session.start()
     return session
 }
+if let idx = args.firstIndex(of: "--settings-shot"), idx + 2 < args.count {
+    // Dev aid for documentation screenshots: `GogglesView --settings-shot <Tab> <out.png> [height]`
+    // opens only the Settings window on that tab, writes it to a PNG and exits. No helper, no XPC.
+    let tab = args[idx + 1], out = URL(fileURLWithPath: args[idx + 2])
+    let height = idx + 3 < args.count ? CGFloat(Double(args[idx + 3]) ?? 580) : 580
+    UserDefaults.standard.set(tab, forKey: "settingsTab")
+    SettingsView.heightOverride = height
+    let app = NSApplication.shared
+    app.setActivationPolicy(.regular)
+    let controller = SettingsWindowController()
+    controller.setHeight(height)
+    controller.show()
+    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+        let ok = controller.writeSnapshot(to: out)
+        print(ok ? "wrote \(out.path)" : "snapshot failed")
+        exit(ok ? 0 : 1)
+    }
+    app.run()
+    exit(0)
+}
 if args.contains("--force-state") {
     // Task 3.4 exit criterion ("verified by forcing each one"): opens a
     // window showing `GogglesConnectionView` with its `uiState` directly

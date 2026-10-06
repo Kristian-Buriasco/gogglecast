@@ -71,6 +71,17 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
     /// refreshing the real `SMAppService` status first -- covers the case
     /// where the user changed the Login Item's approval state in System
     /// Settings while this window was closed.
+    /// Dev aid for `--settings-shot`: the window including its title bar, as a PNG.
+    func writeSnapshot(to url: URL) -> Bool {
+        guard let frame = window.contentView?.superview,
+              let rep = frame.bitmapImageRepForCachingDisplay(in: frame.bounds) else { return false }
+        frame.cacheDisplay(in: frame.bounds, to: rep)
+        guard let png = rep.representation(using: .png, properties: [:]) else { return false }
+        return (try? png.write(to: url)) != nil
+    }
+
+    func setHeight(_ h: CGFloat) { window.setContentSize(NSSize(width: 780, height: h)) }
+
     func show() {
         viewModel.refresh()
         window.makeKeyAndOrderFront(nil)

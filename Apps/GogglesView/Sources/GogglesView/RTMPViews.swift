@@ -42,7 +42,7 @@ struct RTMPSettingsSection: View {
             TextField("Server URL", text: $url, prompt: Text("rtmp://live.twitch.tv/app"))
             SecureField("Stream key", text: $key)
             Toggle("Start automatically", isOn: $autoStart)
-            Text("The stream key is stored unencrypted in this app's preferences and is never logged. Changes apply on next start.")
+            Text("The stream key is stored in the macOS Keychain and is never logged. Changes apply on next start.")
                 .font(.caption).foregroundStyle(.secondary)
             Text("The goggles' H.264 stream is passed through untouched: its bitrate (~10-20 Mbps) and keyframe interval cannot be changed. Twitch and YouTube typically want at most ~8 Mbps and a 2 s keyframe interval, so the ingest may reject or degrade it. Untested against a real ingest; use a self-hosted RTMP server for best results.")
                 .font(.caption).foregroundStyle(.secondary)

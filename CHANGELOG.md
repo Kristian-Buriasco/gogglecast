@@ -4,6 +4,8 @@ All notable changes to this project are documented here. Format based on [Keep a
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-06
+
 ### Added
 - Live stabilization (Settings > Display): electronic stabilization of the live picture with an adjustable strength. It only uses motion seen so far, so it adds a few ms of processing but no frames of delay. Zooms in 4 to 10% to hide the edges; doesn't correct rotation.
 - Color looks: import `.cube` 3D LUTs and apply one, with an intensity slider, to the preview and/or to recordings, replay and streams.
@@ -11,6 +13,10 @@ All notable changes to this project are documented here. Format based on [Keep a
 
 ### Changed
 - Recording uses the shared keyframe encoder from the start when an output crop or look is active, since those only exist in the re-encoded stream.
+- The RTMP settings note now says the stream key is kept in the Keychain (it used to say unencrypted preferences).
+
+### Developer
+- `GogglesView --settings-shot <Tab> <out.png> [height]` writes the Settings window on a tab to a PNG without the helper, for documentation screenshots.
 
 ## [0.4.0] - 2026-10-05
 
