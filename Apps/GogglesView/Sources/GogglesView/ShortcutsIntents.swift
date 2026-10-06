@@ -59,6 +59,10 @@ enum ShortcutsMapping {
         case .startStream: return "Network stream started"
         case .stopStream: return "Network stream stopped"
         case .showWindow: return "Window shown"
+        case .copyFrame: return "Frame copied"
+        case .raceOn: return "Race mode on"
+        case .raceOff: return "Race mode off"
+        case .raceToggle: return "Race mode toggled"
         }
     }
 
