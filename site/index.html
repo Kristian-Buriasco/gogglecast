@@ -72,7 +72,7 @@
   .top nav a:hover { color: var(--ink); text-decoration: underline; }
 
   /* hero: copy offset to the left and anchored low, the picture bleeding off the right edge */
-  .hero { min-height: calc(100dvh - 60px); display: grid; grid-template-columns: minmax(0, 6fr) minmax(0, 7fr); gap: 40px; align-items: end; padding-bottom: 40px; }
+  .hero { min-height: min(calc(100dvh - 60px), 620px); padding-top: 56px; display: grid; grid-template-columns: minmax(0, 6fr) minmax(0, 7fr); gap: 40px; align-items: end; padding-bottom: 40px; }
   .hero h1 { font-size: var(--t-display); margin-bottom: 24px; }
   .hero .lede { font-size: var(--t-m); line-height: 1.4; max-width: 30ch; margin-bottom: 28px; }
   .dl { display: inline-flex; align-items: center; gap: 12px; background: var(--ink); color: var(--on-ink); font-weight: 500; text-decoration: none; padding: 14px 20px; border-radius: 10px; transition: background-color .15s; }
