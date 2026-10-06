@@ -42,8 +42,11 @@ final class UpdateChecker: ObservableObject {
     @Published private(set) var checking = false
     @Published private(set) var latestAsset: UpdateAsset?
 
+    /// Only set by `--settings-shot`, which runs outside an app bundle.
+    static var versionOverride: String?
+
     static var currentVersion: String {
-        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0"
+        versionOverride ?? Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0"
     }
 
     /// Pure: classify a GitHub "latest release" response.

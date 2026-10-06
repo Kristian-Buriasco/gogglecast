@@ -628,6 +628,7 @@ if let idx = args.firstIndex(of: "--settings-shot"), idx + 2 < args.count {
     let height = idx + 3 < args.count ? CGFloat(Double(args[idx + 3]) ?? 580) : 580
     UserDefaults.standard.set(tab, forKey: "settingsTab")
     SettingsView.heightOverride = height
+    UpdateChecker.versionOverride = ProcessInfo.processInfo.environment["GOGGLESVIEW_SHOT_VERSION"]
     let app = NSApplication.shared
     app.setActivationPolicy(.regular)
     let controller = SettingsWindowController()

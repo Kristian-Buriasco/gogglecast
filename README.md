@@ -14,7 +14,15 @@ A free, native macOS app that shows the live video feed from DJI Goggles 3 on a 
 ![Live view with the stats overlay](docs/images/live-view.png)
 
 <p>
-<img src="docs/images/settings.png" width="49%" alt="Settings"> <img src="docs/images/picker.png" width="49%" alt="Goggles picker">
+<img src="docs/images/picker.png" width="49%" alt="Goggles picker"> <img src="docs/images/waiting-keyframe.png" width="49%" alt="Waiting for a keyframe notice">
+</p>
+
+<p>
+<img src="docs/images/recording.png" width="49%" alt="Settings, Recording tab"> <img src="docs/images/streaming.png" width="49%" alt="Settings, Streaming tab">
+</p>
+
+<p>
+<img src="docs/images/display.png" width="49%" alt="Settings, stabilization, framing and output framing"> <img src="docs/images/general.png" width="49%" alt="Settings, presets and updates">
 </p>
 
 ## Features
