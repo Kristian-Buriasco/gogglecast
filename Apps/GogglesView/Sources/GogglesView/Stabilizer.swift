@@ -61,7 +61,7 @@ final class Stabilizer {
     private var outPool: CVPixelBufferPool?
     private var smallPool: CVPixelBufferPool?
     private var poolKey: (w: Int, h: Int, fmt: OSType)?
-    private static let analysisWidth = 384
+    private static let analysisWidth = 640
 
     /// Smoothed time spent per frame, for diagnostics.
     private(set) var costMs: Double?
@@ -110,7 +110,7 @@ final class Stabilizer {
             .concatenating(CGAffineTransform(scaleX: zoom, y: zoom))
             .concatenating(CGAffineTransform(translationX: cx, y: cy))
         ci.render(image.transformed(by: t), to: out, bounds: CGRect(x: 0, y: 0, width: w, height: h),
-                  colorSpace: CGColorSpace(name: CGColorSpace.itur_709))
+                  colorSpace: image.colorSpace ?? CGColorSpace(name: CGColorSpace.itur_709))
         copyAttachments(from: input, to: out)
 
         let ms = Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000
@@ -148,8 +148,7 @@ final class Stabilizer {
 
     private func makeBuffer(from pool: CVPixelBufferPool) -> CVPixelBuffer? {
         var b: CVPixelBuffer?
-        let aux: [CFString: Any] = [kCVPixelBufferPoolAllocationThresholdKey: 8]
-        guard CVPixelBufferPoolCreatePixelBufferWithAuxAttributes(nil, pool, aux as CFDictionary, &b) == kCVReturnSuccess else { return nil }
+        guard CVPixelBufferPoolCreatePixelBuffer(nil, pool, &b) == kCVReturnSuccess else { return nil }
         return b
     }
 
