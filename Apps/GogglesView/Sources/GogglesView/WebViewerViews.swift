@@ -17,6 +17,8 @@ struct WebViewerControl: View {
                 .foregroundStyle(server.lastError != nil ? Color.orange : server.isRunning ? Color.green : Color.primary)
         }
         .help(server.lastError ?? (server.isRunning ? "Web viewer on port \(port)" : "Start web viewer"))
+        .accessibilityLabel("Web viewer")
+        .accessibilityValue(server.lastError ?? (server.isRunning ? "Running on port \(port)" : "Stopped"))
         .onAppear { apply() }
         .onChange(of: enabled) { _ in apply() }
         .onChange(of: port) { _ in if enabled { apply() } }

@@ -15,6 +15,8 @@ struct SRTStreamControl: View {
         }
         .buttonStyle(.plain)
         .disabled(!available && !out.isStreaming)
+        .accessibilityLabel("SRT stream")
+        .accessibilityValue(AccessibilityLabels.streamState(isStreaming: out.isStreaming, connected: out.connected, error: out.lastError))
         .help(!available ? "libsrt not found (brew install srt, or set the path in Settings > Streaming)"
               : out.lastError ?? (out.isStreaming ? (out.connected ? "SRT connected" : "SRT waiting for peer") : "Start SRT stream"))
         .onAppear { available = SRTOutput.isAvailable() }
@@ -80,6 +82,8 @@ struct NDIStreamControl: View {
         }
         .buttonStyle(.plain)
         .disabled(!available && !out.isStreaming)
+        .accessibilityLabel("NDI output")
+        .accessibilityValue(AccessibilityLabels.streamState(isStreaming: out.isStreaming, connected: out.isStreaming, error: out.lastError))
         .help(!available ? "NDI runtime not found (install NDI Tools or the NDI SDK)"
               : out.lastError ?? (out.isStreaming ? "Sending NDI source \(NDIPrefs.sourceName)" : "Start NDI output (experimental)"))
         .onAppear { available = NDIOutput.isAvailable() }

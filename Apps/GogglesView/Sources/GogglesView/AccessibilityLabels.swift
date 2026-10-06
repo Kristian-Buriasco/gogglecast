@@ -13,6 +13,25 @@ enum AccessibilityLabels {
         return parts.joined(separator: ", ")
     }
 
+    /// "60 percent" / "3 seconds": value text for sliders, with a spoken unit.
+    static func quantity(_ value: Int, unit: String) -> String {
+        "\(value) \(unit)"
+    }
+
+    static func onOff(_ isOn: Bool) -> String { isOn ? "On" : "Off" }
+
+    /// Spoken status for a self-test row, so state isn't conveyed by icon colour alone.
+    static func checkStatus(pass: Bool, fail: Bool) -> String {
+        pass ? "Passed" : fail ? "Failed" : "Not checked"
+    }
+
+    /// Value for a stream toggle: the error text, "Stopped", "Waiting for peer" or "Connected".
+    static func streamState(isStreaming: Bool, connected: Bool, error: String?) -> String {
+        if let error, !error.isEmpty { return error }
+        guard isStreaming else { return "Stopped" }
+        return connected ? "Connected" : "Waiting for peer"
+    }
+
     static func recordState(isRecording: Bool, elapsed: String?) -> String {
         isRecording ? "Recording" + (elapsed.map { " \($0)" } ?? "") : "Not recording"
     }

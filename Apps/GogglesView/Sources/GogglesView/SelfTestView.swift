@@ -160,6 +160,7 @@ struct SelfTestView: View {
         HStack(alignment: .top, spacing: 8) {
             Image(systemName: r.status == .pass ? "checkmark.circle.fill" : r.status == .fail ? "xmark.octagon.fill" : "circle.dotted")
                 .foregroundStyle(r.status == .pass ? .green : r.status == .fail ? .red : .secondary)
+                .accessibilityLabel(AccessibilityLabels.checkStatus(pass: r.status == .pass, fail: r.status == .fail))
             VStack(alignment: .leading, spacing: 2) {
                 Text(r.title).font(.callout.weight(.medium))
                 if let d = r.detail { Text(d).font(.caption).foregroundStyle(.secondary) }

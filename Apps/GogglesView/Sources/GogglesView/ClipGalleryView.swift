@@ -22,7 +22,7 @@ struct ClipGalleryView: View {
             }
         }
         .frame(minWidth: 520, minHeight: 360)
-        .toolbar { Button { model.reload() } label: { Image(systemName: "arrow.clockwise") }.help("Refresh") }
+        .toolbar { Button { model.reload() } label: { Image(systemName: "arrow.clockwise") }.help("Refresh").accessibilityLabel("Refresh clips") }
         .onAppear { model.reload() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in model.reload() }
         .sheet(item: $trimming, onDismiss: { model.reload() }) { clip in
@@ -41,7 +41,7 @@ private struct ClipCell: View {
         VStack(alignment: .leading, spacing: 4) {
             ZStack {
                 Color.black.opacity(0.15)
-                if let t = clip.thumbnail { Image(nsImage: t).resizable().scaledToFit() }
+                if let t = clip.thumbnail { Image(nsImage: t).resizable().scaledToFit().accessibilityHidden(true) }
                 else { ProgressView().controlSize(.small) }
             }
             .aspectRatio(16 / 9, contentMode: .fit)
@@ -53,6 +53,14 @@ private struct ClipCell: View {
         .background(AnchorView(view: $anchor))
         .contentShape(Rectangle())
         .onTapGesture(count: 2) { NSWorkspace.shared.open(clip.url) }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityHint("Opens the recording")
+        .accessibilityAction(named: "Open") { NSWorkspace.shared.open(clip.url) }
+        .accessibilityAction(named: "Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting([clip.url]) }
+        .accessibilityAction(named: "Share") { share() }
+        .accessibilityAction(named: "Trim") { onTrim() }
+        .accessibilityAction(named: "Move to Trash") { onTrash() }
         .contextMenu {
             Button("Open") { NSWorkspace.shared.open(clip.url) }
             Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting([clip.url]) }

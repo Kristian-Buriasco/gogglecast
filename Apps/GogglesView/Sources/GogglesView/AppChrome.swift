@@ -193,6 +193,7 @@ struct StatusPill: View {
             Circle()
                 .fill(AppChrome.dotColor(for: category))
                 .frame(width: 7, height: 7)
+                .accessibilityHidden(true)
             Text("GogglesView — \(text)")
                 .font(.caption)
                 .foregroundStyle(.primary)

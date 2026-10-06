@@ -112,7 +112,7 @@ struct SettingsView: View {
             ForEach(Tab.allCases) { t in
                 Button { tab.wrappedValue = t } label: {
                     HStack(spacing: 10) {
-                        Image(systemName: t.icon).frame(width: 20)
+                        Image(systemName: t.icon).frame(width: 20).accessibilityHidden(true)
                         Text(t.rawValue)
                         Spacer()
                     }
@@ -170,6 +170,7 @@ struct SettingsView: View {
                 Circle()
                     .fill(viewModel.statusColor)
                     .frame(width: 8, height: 8)
+                    .accessibilityHidden(true)
                 Text(viewModel.statusDescription)
                     .font(.caption)
                     .accessibilityIdentifier("helperStatusText")

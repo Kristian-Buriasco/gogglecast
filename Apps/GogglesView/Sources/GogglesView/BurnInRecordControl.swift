@@ -29,6 +29,9 @@ struct BurnInRecordControl: View {
             .disabled(!isLive && !recorder.isRecording)
             .keyboardShortcut("b", modifiers: [.command, .shift])
             .help(helpText)
+            .accessibilityLabel(recorder.isRecording ? "Stop burn-in recording" : "Start burn-in recording")
+            .accessibilityValue(AccessibilityLabels.recordState(isRecording: recorder.isRecording, elapsed: recorder.isRecording ? Self.formatElapsed(recorder.elapsed) : nil))
+            .accessibilityHint("Records a re-encoded copy with the logo and text burned in")
             .accessibilityIdentifier("burnInRecordButton")
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in

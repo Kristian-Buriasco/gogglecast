@@ -74,6 +74,7 @@ struct PresetsSettingsSection: View {
                     ForEach(SettingsPreset.allCases) { Text($0.rawValue).tag($0) }
                 }
                 .labelsHidden()
+                .accessibilityLabel("Preset")
                 .frame(width: 140)
                 Button("Apply") { selection.apply(); message = "Applied \(selection.rawValue)." }
                 Button("Reset all to defaults") { SettingsPreset.resetAll(); message = "Reset to defaults." }

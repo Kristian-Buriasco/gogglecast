@@ -89,6 +89,7 @@ private struct MiniWindowContent: View {
                             .symbolRenderingMode(.palette).foregroundStyle(.white, .black.opacity(0.6))
                     }
                     .buttonStyle(.plain).padding(8).help("Close mini window")
+                    .accessibilityLabel("Close mini window")
                 }
             }
             .onHover { hovering = $0 }

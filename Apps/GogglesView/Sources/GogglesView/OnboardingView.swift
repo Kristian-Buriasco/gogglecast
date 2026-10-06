@@ -13,6 +13,7 @@ struct SetupChecklistView: View {
                     Image(systemName: Self.symbol(item.status))
                         .foregroundStyle(Self.color(item.status))
                         .frame(width: 18)
+                        .accessibilityLabel(Self.statusText(item.status))
                     VStack(alignment: .leading, spacing: 3) {
                         Text(item.title).font(.callout.weight(.medium))
                         if let fix = item.fix {
@@ -37,6 +38,13 @@ struct SetupChecklistView: View {
         case .pass: return "checkmark.circle.fill"
         case .fail: return "xmark.octagon.fill"
         case .unknown: return "questionmark.circle"
+        }
+    }
+    private static func statusText(_ s: SetupChecklist.Status) -> String {
+        switch s {
+        case .pass: return "Passed"
+        case .fail: return "Needs attention"
+        case .unknown: return "Not checked"
         }
     }
     private static func color(_ s: SetupChecklist.Status) -> Color {

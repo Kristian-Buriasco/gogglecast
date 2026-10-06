@@ -23,6 +23,7 @@ struct AutomationSettingsSection: View {
                     }
                 }
                 .labelsHidden()
+                .accessibilityLabel("Example automation URL")
                 .font(.caption.monospaced())
                 Button(copied ? "Copied" : "Copy example") {
                     NSPasteboard.general.clearContents()

@@ -46,6 +46,7 @@ struct DevicePickerView: View {
             .foregroundStyle(.secondary)
             .disabled(onOpenSettings == nil)
             .help(onOpenSettings == nil ? "Settings isn't available in this build." : "Open Settings")
+            .accessibilityLabel("Settings")
             .accessibilityIdentifier("settingsButton")
 
             Spacer()
@@ -144,6 +145,7 @@ private struct DevicePickerCandidateRow: View {
                     .font(.system(size: 28))
                     .foregroundStyle(.white)
                     .frame(width: 40)
+                    .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 3) {
                     if let nick = ProfileStore.shared.nickname(for: candidate.serial) {
@@ -162,6 +164,7 @@ private struct DevicePickerCandidateRow: View {
 
                 Image(systemName: "chevron.right")
                     .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
             }
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
