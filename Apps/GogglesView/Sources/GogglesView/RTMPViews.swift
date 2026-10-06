@@ -14,6 +14,8 @@ struct RTMPStreamControl: View {
                                  : publisher.isStreaming ? Color.yellow : Color.primary)
         }
         .help(publisher.lastError.map { "RTMP: \($0)" } ?? "RTMP: \(publisher.status)")
+        .accessibilityLabel("RTMP stream")
+        .accessibilityValue(publisher.lastError ?? (publisher.isLive ? "Live" : publisher.isStreaming ? "Connecting" : "Stopped"))
         .onAppear { if autoStart { start() } }
         .onDisappear { stop() }
     }

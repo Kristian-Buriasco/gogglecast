@@ -114,10 +114,17 @@ private struct HandleRow: View {
             Text(label).frame(width: 40, alignment: .leading)
             VStack(spacing: 0) {
                 Slider(value: Binding(get: { value }, set: set), in: range)
+                    .accessibilityLabel("\(label) time")
+                    .accessibilityValue("\(Int(value.rounded())) seconds")
                 if !markers.isEmpty {
                     GeometryReader { g in
                         ForEach(Array(markers.enumerated()), id: \.offset) { _, m in
                             Rectangle().fill(Color.orange).frame(width: 2, height: 8)
+                                .accessibilityElement()
+                                .accessibilityLabel("Marker \(m.label)")
+                                .accessibilityAddTraits(.isButton)
+                                .accessibilityHint("Moves the \(label.lowercased()) handle to this marker")
+                                .accessibilityAction { set(m.t) }
                                 .position(x: 8 + (g.size.width - 16) * CGFloat(m.t / max(range.upperBound, 0.001)), y: 4)
                                 .onTapGesture { set(m.t) }
                                 .help(m.label)

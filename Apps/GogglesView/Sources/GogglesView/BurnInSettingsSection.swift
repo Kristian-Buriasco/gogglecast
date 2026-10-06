@@ -75,6 +75,8 @@ struct BurnInSettingsSection: View {
             }
         }
         .frame(width: 96, height: 54)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(image == nil ? "Logo preview, no logo selected" : "Logo preview")
         .id(logoFile)
     }
 
@@ -84,7 +86,10 @@ struct BurnInSettingsSection: View {
             Slider(value: Binding(get: { Double(value.wrappedValue) },
                                   set: { value.wrappedValue = BurnInPrefs.clamp(Int($0.rounded()), to: range) }),
                    in: Double(range.lowerBound)...Double(range.upperBound))
+                .accessibilityLabel(title)
+                .accessibilityValue("\(value.wrappedValue)\(suffix)")
             Text("\(value.wrappedValue)\(suffix)").font(.caption.monospacedDigit()).frame(width: 90, alignment: .trailing)
+                .accessibilityHidden(true)
         }
     }
 

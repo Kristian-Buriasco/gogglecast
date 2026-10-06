@@ -63,7 +63,8 @@ struct SessionLogsView: View {
         .toolbar {
             Button { NSWorkspace.shared.open(SessionLogsWindowController.ensuredDirectory()) } label: { Image(systemName: "folder") }
                 .help("Open logs folder")
-            Button { model.reload() } label: { Image(systemName: "arrow.clockwise") }.help("Refresh")
+                .accessibilityLabel("Open logs folder")
+            Button { model.reload() } label: { Image(systemName: "arrow.clockwise") }.help("Refresh").accessibilityLabel("Refresh logs")
         }
         .onAppear { model.reload() }
         .alert("Session log", isPresented: Binding(get: { model.error != nil }, set: { if !$0 { model.error = nil } })) {

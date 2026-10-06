@@ -236,7 +236,10 @@ struct FramingSettingsSection: View {
         HStack {
             Text(title).frame(width: 80, alignment: .leading)
             Slider(value: value, in: range)
+                .accessibilityLabel(title)
+                .accessibilityValue(String(format: format, value.wrappedValue))
             Text(String(format: format, value.wrappedValue)).monospacedDigit().frame(width: 48, alignment: .trailing)
+                .accessibilityHidden(true)
         }
     }
 }
