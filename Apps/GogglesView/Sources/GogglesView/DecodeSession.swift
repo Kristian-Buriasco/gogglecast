@@ -93,6 +93,15 @@ final class DecodeSession: ObservableObject {
     /// Fired once per teardown (the 30th consecutive failure).
     var onTeardown: (() -> Void)?
 
+    /// Connection-health observer; non-nil only while the health window is
+    /// open. Receives decode failures, parameter sets and decode latency
+    /// (frames arrive through `addConsumer`).
+    var healthMonitor: HealthMonitor? {
+        get { consumerLock.lock(); defer { consumerLock.unlock() }; return _healthMonitor }
+        set { consumerLock.lock(); _healthMonitor = newValue; consumerLock.unlock() }
+    }
+    private var _healthMonitor: HealthMonitor?
+
     init() {}
 
     deinit { invalidateDecoder() }
@@ -174,6 +183,7 @@ final class DecodeSession: ObservableObject {
     func handle(nalData: Data, nalType: UInt8, isParameterSet: Bool, hostTime: UInt64) {
         onRawNAL?(nalData, nalType, isParameterSet, hostTime)
         if isParameterSet {
+            healthMonitor?.parameterSet()
             handleParameterSet(nalData)
             return
         }
@@ -483,6 +493,7 @@ final class DecodeSession: ObservableObject {
         consecutiveFailures += 1
         Logging.decode.error("dropped sample (\(self.consecutiveFailures, privacy: .public)/\(DecodeSession.maxConsecutiveFailures, privacy: .public) consecutive): \(String(describing: error), privacy: .public)")
         onDroppedSample?(error)
+        healthMonitor?.decodeFailure()
         if consecutiveFailures >= DecodeSession.maxConsecutiveFailures {
             tearDown()
         }

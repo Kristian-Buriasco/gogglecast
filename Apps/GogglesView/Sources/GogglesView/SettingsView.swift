@@ -92,6 +92,7 @@ struct SettingsView: View {
                         card { OnboardingSettingsSection() }
                         card { SelfTestSettingsSection() }
                         card { BenchmarkSettingsSection() }
+                        card { ConnectionHealthSettingsSection() }
 
                     }
                 }
