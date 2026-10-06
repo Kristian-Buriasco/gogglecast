@@ -185,7 +185,7 @@
       <div>
         <h1>See what your goggles see</h1>
         <p class="lede">The DJI Goggles 3 live feed on your Mac, over USB-C. Record it, replay it, send it to OBS.</p>
-        <a class="dl" id="dl" href="https://github.com/Kristian-Buriasco/gogglecast/releases/latest">Download GogglesView 0.4.0 (2.3 MB)</a>
+        <a class="dl" id="dl" href="https://github.com/Kristian-Buriasco/gogglecast/releases/latest">Download GogglesView 0.5.0 (2.4 MB)</a>
         <a class="alt" href="https://github.com/Kristian-Buriasco/gogglecast">Free and GPL-3.0. Apple Silicon, macOS 14 or later. Read the source.</a>
       </div>
       <div class="screen"><img src="images/live-view.png" alt="GogglesView window showing a live feed with the stats overlay" width="1931" height="1091"></div>
@@ -243,9 +243,9 @@
           </ul>
         </article>
         <article class="tile c">
-          <p class="eyebrow soon">Next release, 0.5</p>
+          <p class="eyebrow soon">New in 0.5</p>
           <h3>Stabilize, grade, crop for export</h3>
-          <p>Electronic stabilization that adds no frames of delay, .cube LUT looks, and a separate crop for what you record and stream. All in the code, not yet in a download and not yet tried on live goggles.</p>
+          <p>Electronic stabilization that adds no frames of delay, .cube LUT looks, and a separate crop for what you record and stream. Covered by tests, not yet tried much on live goggles, so tell me what looks off.</p>
         </article>
         <article class="tile d">
           <p class="eyebrow">Control</p>
@@ -270,6 +270,14 @@
           <p>General, Display, Recording, Streaming and Advanced. Presets switch a whole set of options at once, and each pair of goggles can keep its own saved profile that applies when it connects.</p>
           <p>The same window runs the update check, the diagnostics report and the latency benchmark.</p>
         </div>
+      </div>
+      <div class="steps more">
+        <div>
+          <h3>Stabilize, grade and crop in Settings</h3>
+          <p>Live stabilization has one strength slider. Color looks take any 3D .cube file, with an intensity control and separate switches for the preview and for what you record and stream.</p>
+          <p>Output framing has its own aspect, zoom and position, so the preview can stay 16:9 while the file or stream is a vertical 9:16 crop.</p>
+        </div>
+        <div class="screen"><img src="images/display-tab.png" alt="The Display tab showing live stabilization, framing and color, and output framing" width="1080" height="1373" loading="lazy"></div>
       </div>
     </section>
 
