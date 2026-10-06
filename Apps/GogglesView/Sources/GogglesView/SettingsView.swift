@@ -93,6 +93,7 @@ struct SettingsView: View {
                         card { SelfTestSettingsSection() }
                         card { BenchmarkSettingsSection() }
                         card { ConnectionHealthSettingsSection() }
+                        card { SignalAlertSettingsSection() }
 
                     }
                 }
