@@ -42,29 +42,43 @@ struct RecordingExtrasSettingsSection: View {
 
     var body: some View {
         Section("Recording extras") {
-            field("Split every (minutes)", $splitMinutes, range: 0...120,
-                  caption: "0 = off. Starts a new -partN file at the next keyframe; recording continues. Ignored in loop mode.")
-            field("Split at size (MB)", $splitMegabytes, range: 0...100_000,
-                  caption: "0 = off. Also splits when a file reaches this size.")
-            field("Loop: keep last (minutes)", $loopKeep, range: 0...100_000,
-                  caption: "0 = off. Splits into segments of N/6 minutes and deletes this session's oldest segments beyond N minutes. Other files are never touched.")
-            field("Auto-delete after (days)", $autoDeleteDays, range: 0...3650,
-                  caption: "0 = off. At launch, moves recordings (.mov/.mp4/.json starting with your prefix) older than this to the Trash.")
+            field("Split every", $splitMinutes, range: 0...120, step: 5, unit: "min",
+                  caption: "Starts a new -partN file at the next clean cut point; recording continues. Ignored in loop mode.")
+            field("Split at size", $splitMegabytes, range: 0...100_000, step: 500, unit: "MB",
+                  caption: "Also splits when a file reaches this size.")
+            field("Loop recording: keep only the last", $loopKeep, range: 0...100_000, step: 5, unit: "min",
+                  caption: "Older parts are permanently deleted (not moved to the Trash). Recording is split into parts of one sixth of this length, and only parts from the current recording are deleted.")
+            field("Auto-delete after", $autoDeleteDays, range: 0...3650, step: 1, unit: "days",
+                  caption: "At launch, moves recordings (.mov, .mp4 and .json files starting with your prefix) older than this to the Trash. Files from the last 24 hours and instant replay clips are never touched.")
+        }
+        .onChange(of: autoDeleteDays) { old, new in
+            guard old == 0, new > 0 else { return }
+            if !Self.confirmAutoDelete(days: new) { autoDeleteDays = 0 }
         }
     }
 
-    private func field(_ title: String, _ value: Binding<Int>, range: ClosedRange<Int>, caption: String) -> some View {
+    /// Asks before auto-delete is switched on, because it removes files without a prompt later.
+    static func confirmAutoDelete(days: Int) -> Bool {
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "Move old recordings to the Trash?"
+        alert.informativeText = RecordingExtras.autoDeleteConfirmation(days: days, folder: RecordingPrefs.directory)
+        alert.addButton(withTitle: "Continue")
+        alert.addButton(withTitle: "Cancel")
+        return alert.runModal() == .alertFirstButtonReturn
+    }
+
+    private func field(_ title: String, _ value: Binding<Int>, range: ClosedRange<Int>, step: Int,
+                       unit: String, caption: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            HStack {
-                Text(title)
-                Spacer()
-                TextField("", value: value, format: .number)
-                    .multilineTextAlignment(.trailing)
-                    .frame(width: 70)
-                    .onChange(of: value.wrappedValue) { v in
-                        let c = min(max(v, range.lowerBound), range.upperBound)
-                        if c != v { value.wrappedValue = c }
-                    }
+            Stepper(value: value, in: range, step: step) {
+                HStack {
+                    Text(title)
+                    Spacer()
+                    Text(RecordingExtras.valueLabel(value.wrappedValue, unit: unit))
+                        .monospacedDigit()
+                        .foregroundStyle(value.wrappedValue == 0 ? .secondary : .primary)
+                }
             }
             Text(caption).font(.caption).foregroundStyle(.secondary)
         }

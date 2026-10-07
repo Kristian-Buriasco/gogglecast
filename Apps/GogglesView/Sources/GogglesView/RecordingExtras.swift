@@ -63,8 +63,35 @@ enum RecordingExtras {
 
     static func isAutoDeleteCandidate(fileName: String, prefix: String, modified: Date, now: Date, days: Int) -> Bool {
         guard days > 0, fileName.hasPrefix(prefix + "-"),
+              // Instant replay clips are saved by hand, so they are never removed automatically.
+              !fileName.hasPrefix(prefix + "-replay-"),
               deletableExtensions.contains((fileName as NSString).pathExtension.lowercased()) else { return false }
-        return now.timeIntervalSince(modified) > TimeInterval(days) * 86_400
+        // Never touch anything modified in the last 24 hours, whatever the setting.
+        return now.timeIntervalSince(modified) > max(TimeInterval(days) * 86_400, minAge)
+    }
+
+    /// Files younger than this are never auto-deleted.
+    static let minAge: TimeInterval = 86_400
+
+    static func autoDeleteMessage(count: Int) -> String {
+        "Moved \(count) old recording\(count == 1 ? "" : "s") to the Trash"
+    }
+
+    /// "Off" for 0, otherwise the value with its unit (`valueLabel(30, unit: "min")` is "30 min").
+    static func valueLabel(_ value: Int, unit: String) -> String {
+        value <= 0 ? "Off" : "\(value) \(unit)"
+    }
+
+    static func autoDeleteConfirmation(days: Int, folder: URL) -> String {
+        "GogglesView will move recordings older than \(days) day\(days == 1 ? "" : "s") in \(folder.path) to the Trash every time it launches. Continue?"
+    }
+
+    /// What loop mode may delete after a segment rotated: nothing unless that segment was finalised.
+    static func loopDeletions(finished: [(url: URL, duration: TimeInterval)], keepSeconds: TimeInterval,
+                              lastSegmentCompleted: Bool) -> [URL] {
+        guard lastSegmentCompleted else { return [] }
+        let n = segmentsToDelete(durations: finished.map(\.duration), keepSeconds: keepSeconds)
+        return finished.prefix(n).map(\.url)
     }
 
     /// Moves old recordings to the Trash; returns the trashed count.
@@ -90,7 +117,19 @@ enum RecordingExtras {
     static func runLaunchCleanupOnce() {
         guard !didRunLaunchCleanup else { return }
         didRunLaunchCleanup = true
-        DispatchQueue.global(qos: .utility).async { autoDeleteOld() }
+        DispatchQueue.global(qos: .utility).async { runCleanup() }
+    }
+
+    /// Runs the auto-delete and tells the user when something was moved. `notify` is called off the main thread.
+    static func runCleanup(clean: () -> Int = { autoDeleteOld() }, notify: (String) -> Void = RecordingExtras.defaultNotify) {
+        let n = clean()
+        if n > 0 { notify(autoDeleteMessage(count: n)) }
+    }
+
+    static let defaultNotify: (String) -> Void = { text in
+        #if canImport(AppKit)
+        ToastHUD.shared.show(text, duration: 6)
+        #endif
     }
 }
 

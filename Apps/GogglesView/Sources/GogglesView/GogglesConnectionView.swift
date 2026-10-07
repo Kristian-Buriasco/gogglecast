@@ -52,11 +52,11 @@ struct GogglesConnectionView: View {
     @State private var noteGeneration = 0
 
     /// Shows the note for 3 s (longer while the pointer is over it).
-    private func showNote(_ text: String, revealing url: URL? = nil) {
+    private func showNote(_ text: String, revealing url: URL? = nil, for seconds: TimeInterval = 3) {
         screenshotNote = text
         screenshotNoteURL = url
         noteGeneration += 1
-        scheduleNoteDismissal(generation: noteGeneration, after: 3)
+        scheduleNoteDismissal(generation: noteGeneration, after: seconds)
     }
 
     private func scheduleNoteDismissal(generation: Int, after delay: TimeInterval) {
@@ -98,6 +98,8 @@ struct GogglesConnectionView: View {
             }
             if let err = recorder.lastError {
                 Text(err).font(.caption2).foregroundStyle(.red).lineLimit(1)
+            } else if let note = recorder.diskNote {
+                Text(note).font(.caption2).foregroundStyle(.orange).lineLimit(1)
             }
             Button { RecordingPrefs.openFolder() } label: {
                 Image(systemName: "folder").foregroundStyle(Color.secondary)
@@ -192,10 +194,38 @@ struct GogglesConnectionView: View {
         .onChange(of: recorder.isRecording) { _, recording in
             AutomationRecordingState.shared.set(recording, for: session)
         }
+        .onChange(of: recorder.failure) { _, failure in
+            guard let failure else { return }
+            session.removeConsumer(recorder)
+            showRecordingFailure(failure.message)
+        }
+        .onChange(of: recorder.autoStop) { _, stop in
+            guard let stop else { return }
+            session.removeConsumer(recorder)
+            NotificationCenter.default.post(name: .gogglesRecordingStopped, object: session,
+                                            userInfo: stop.url.map { ["path": $0.path] })
+            showNote(stop.message, revealing: stop.url, for: 8)
+            ToastHUD.shared.show(stop.message, duration: 6)
+        }
+    }
+
+    /// Plain-language alert with a shortcut to the Recording settings.
+    private func showRecordingFailure(_ message: String) {
+        DispatchQueue.main.async {
+            RecordingAlerts.presentFailure(message, onOpenSettings: onOpenSettings)
+        }
+    }
+
+    /// "Saved to ~/Movies/GogglesView", with a Show in Finder action.
+    private func noteSaved(_ url: URL) {
+        let folder = (url.deletingLastPathComponent().path as NSString).abbreviatingWithTildeInPath
+        showNote("Saved to \(folder)", revealing: url, for: 8)
     }
 
     private func startRecording() {
         session.addConsumer(recorder)
+        // Set before arming: the recorder needs the hub to record the re-encoded stream from the first frame.
+        recorder.keyframeHub = session.reencodeHub
         let url = UniqueFileURL.reserve(Recorder.defaultURL())
         recorder.metadataProvider = { [coordinator, session] in
             let info = coordinator.deviceInfo
@@ -206,9 +236,11 @@ struct GogglesConnectionView: View {
         }
         do {
             try recorder.start(to: url)
-            recorder.keyframeHub = session.reencodeHub
             NotificationCenter.default.post(name: .gogglesRecordingStarted, object: session, userInfo: ["path": url.path])
-        } catch { session.removeConsumer(recorder) }
+        } catch {
+            session.removeConsumer(recorder)
+            showRecordingFailure(error.localizedDescription)
+        }
     }
 
     private func stopRecording(wait: Bool) {
@@ -217,6 +249,7 @@ struct GogglesConnectionView: View {
         let sem = DispatchSemaphore(value: 0)
         recorder.stop { url in
             NotificationCenter.default.post(name: .gogglesRecordingStopped, object: session, userInfo: url.map { ["path": $0.path] })
+            if !wait, let url { DispatchQueue.main.async { noteSaved(url) } }
             sem.signal()
         }
         // On quit, block briefly so the .mov is finalized before exit.

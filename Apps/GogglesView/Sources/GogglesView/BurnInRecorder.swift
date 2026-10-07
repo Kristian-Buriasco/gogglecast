@@ -515,6 +515,7 @@ private final class BurnInJob {
     private func setUpWriter(width: Int, height: Int) -> Bool {
         do {
             let w = try AVAssetWriter(outputURL: url, fileType: url.pathExtension == "mp4" ? .mp4 : .mov)
+            w.movieFragmentInterval = Recorder.fragmentInterval
             var compression: [String: Any] = [
                 AVVideoAverageBitRateKey: settings.bitrateMbps * 1_000_000,
                 AVVideoMaxKeyFrameIntervalDurationKey: 1.0,
