@@ -182,6 +182,15 @@ final class SignalAlertController {
         bag.removeAll()
     }
 
+    /// The Mac is going to sleep: the stream will drop and come back, which is not worth an alert.
+    /// Stays quiet until the next live picture (the observers stay in place).
+    func suspendForSleep() {
+        policy.userDisconnected()
+        lastKind = nil
+        timer?.invalidate(); timer = nil
+        stopSound()
+    }
+
     private func stateChanged(_ kind: GogglesUIStateKind) {
         defer { lastKind = kind }
         guard SignalAlertPrefs.enabled() else { return }

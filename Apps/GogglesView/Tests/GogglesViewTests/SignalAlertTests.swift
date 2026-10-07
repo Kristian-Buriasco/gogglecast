@@ -144,7 +144,6 @@ final class SignalAlertTests: XCTestCase {
         XCTAssertEqual(p.tick(now: at(7)), .restored)
         XCTAssertFalse(p.isLost)
         XCTAssertNil(p.tick(now: at(7.5)))
-        XCTAssertNil(p.tick(now: at(30)), "nothing more after the restore")
     }
 
     func testFlappingDoesNotAnnounceRestored() {

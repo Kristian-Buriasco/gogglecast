@@ -519,7 +519,6 @@ if args.contains("--run") || !args.dropFirst().contains(where: { $0.hasPrefix("-
         )
         if !didRunFirstSessionSetup {
             didRunFirstSessionSetup = true
-            UpdateInstaller.finishPendingHelperUpdate()
             UpdateChecker.shared.checkOnLaunchIfDue()
         }
         app.activate(ignoringOtherApps: true)
@@ -607,6 +606,8 @@ if args.contains("--run") || !args.dropFirst().contains(where: { $0.hasPrefix("-
         showWithoutSession: { presentPicker() }
     )
     RaceModeController.shared.install(sessions: { registry.all })
+    // Sleep and wake handling, plus no idle sleep or App Nap while recording or streaming.
+    PowerEvents.shared.install(sessions: { registry.all }, isBusy: { SessionControlBoard.shared.anyActiveOutput })
     presentPicker()
 
     // "Stop and disconnect" from the close-window prompt.
@@ -644,6 +645,9 @@ if args.contains("--run") || !args.dropFirst().contains(where: { $0.hasPrefix("-
     helpMenu.addItem(setupAssistantItem)
     helpMenuItem.submenu = helpMenu
     app.helpMenu = helpMenu
+    // Before the first connection (and so before any startStreaming): re-registering stops the
+    // running helper, which must not happen while a stream is starting.
+    UpdateInstaller.shared.runPendingHelperUpdate()
     OnboardingWindow.showIfFirstRun()  // after the picker so it opens on top
 
     client.connect()

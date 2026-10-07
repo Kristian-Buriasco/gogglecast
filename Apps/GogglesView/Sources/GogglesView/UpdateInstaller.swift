@@ -2,6 +2,7 @@ import Foundation
 import AppKit
 import CryptoKit
 import Security
+import ServiceManagement
 import SwiftUI
 
 /// The DMG attached to a GitHub release, plus its published SHA-256 when the API provides one.
@@ -339,12 +340,56 @@ final class UpdateInstaller: ObservableObject {
         return SHA256.hash(data: a) != SHA256.hash(data: b)
     }
 
+    enum HelperUpdateResult: Equatable {
+        case notNeeded
+        case reRegistered
+        /// A plain-language reason the background service could not be restarted.
+        case failed(String)
+    }
+
     /// Launch hook: if the last update replaced the helper, re-register so launchd runs the new binary.
-    static func finishPendingHelperUpdate() {
-        let d = UserDefaults.standard
-        guard let v = d.string(forKey: UpdatePrefs2.helperChangedKey), v == UpdateChecker.currentVersion else { return }
-        d.removeObject(forKey: UpdatePrefs2.helperChangedKey)
-        _ = try? HelperRegistration.unregister()
-        _ = try? HelperRegistration.register()
+    /// Run it before anything starts streaming: unregistering stops the running helper.
+    /// The pending marker is kept after a failure, so the next launch tries again.
+    @discardableResult
+    static func finishPendingHelperUpdate(
+        defaults d: UserDefaults = .standard,
+        currentVersion: String = UpdateChecker.currentVersion,
+        unregister: () throws -> SMAppService.Status = { try HelperRegistration.unregister() },
+        register: () throws -> SMAppService.Status = { try HelperRegistration.register() }
+    ) -> HelperUpdateResult {
+        guard let v = d.string(forKey: UpdatePrefs2.helperChangedKey), v == currentVersion else { return .notNeeded }
+        // Unregistering a service that is not registered can throw; that is not a failure here.
+        do { _ = try unregister() } catch {
+            Logging.xpc.info("helper unregister before re-register: \(String(describing: error), privacy: .public)")
+        }
+        do {
+            let status = try register()
+            switch status {
+            case .enabled:
+                d.removeObject(forKey: UpdatePrefs2.helperChangedKey)
+                return .reRegistered
+            case .requiresApproval:
+                return .failed("macOS is waiting for your approval. In System Settings > General > Login Items & Extensions, switch on GogglesView.")
+            default:
+                return .failed(HelperRegistration.plainDescription(status))
+            }
+        } catch {
+            Logging.xpc.error("helper re-register after update failed: \(String(describing: error), privacy: .public)")
+            ConnectionTrace.shared.record("helper re-register after update failed: \(error)")
+            return .failed(error.localizedDescription)
+        }
+    }
+
+    /// Why the background service could not be restarted after the last update (nil when fine).
+    @Published private(set) var helperUpdateError: String?
+
+    /// Runs the pending helper update and remembers a failure for the Settings status line and the
+    /// setup assistant.
+    func runPendingHelperUpdate() {
+        if case .failed(let reason) = Self.finishPendingHelperUpdate() {
+            helperUpdateError = "The update installed, but the background service didn't restart: \(reason.hasSuffix(".") ? reason : reason + ".") Try Re-register under Background service in Settings."
+        } else {
+            helperUpdateError = nil
+        }
     }
 }

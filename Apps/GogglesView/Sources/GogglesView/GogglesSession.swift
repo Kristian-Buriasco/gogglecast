@@ -173,6 +173,19 @@ final class GogglesSession: NSObject, RegistrableSession, NSWindowDelegate {
         }
     }
 
+    /// Mac is going to sleep: mark a running recording and keep the signal alert quiet.
+    func powerWillSleep() {
+        guard !isTornDown else { return }
+        SessionControlBoard.shared.recorder(for: decodeSession)?.addMarker(label: PowerEvents.sleepMarkerLabel)
+        signalAlert?.suspendForSleep()
+    }
+
+    /// Mac woke up: the link to the goggles is probably stale, so reconnect.
+    func powerDidWake() {
+        guard !isTornDown else { return }
+        coordinator.reconnect()
+    }
+
     func focus() {
         if window.isMiniaturized { window.deminiaturize(nil) }
         window.makeKeyAndOrderFront(nil)
