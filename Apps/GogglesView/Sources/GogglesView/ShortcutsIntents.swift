@@ -97,6 +97,7 @@ enum ShortcutsRunner {
             throw ShortcutsError(message: ShortcutsMapping.invalidDeviceMessage)
         }
         let result = AutomationController.shared.perform(request)
+        if case .unavailable(let message) = result { throw ShortcutsError(message: message) }
         if let msg = ShortcutsMapping.failureMessage(disabled: result == .disabled,
                                                      noTarget: result == .noTarget,
                                                      device: request.device) {

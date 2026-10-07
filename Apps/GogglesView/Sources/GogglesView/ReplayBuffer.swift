@@ -19,6 +19,17 @@ enum ReplayPrefs {
     static func isAvailable(reencode: Bool, outputActive: Bool) -> Bool { reencode || outputActive }
 
     static let unavailableMessage = "Instant replay needs the keyframe encoder. Turn it on in Settings > Streaming."
+    static let offMessage = "Instant replay is off. Turn it on in Settings > Recording."
+
+    /// Why a "save replay" request cannot work right now, or nil when it can.
+    static func blockedMessage(enabled: Bool, reencode: Bool, outputActive: Bool) -> String? {
+        if !enabled { return offMessage }
+        if !isAvailable(reencode: reencode, outputActive: outputActive) { return unavailableMessage }
+        return nil
+    }
+    static var currentBlockedMessage: String? {
+        blockedMessage(enabled: enabled, reencode: ReencodePrefs.enabled, outputActive: OutputProcessor.isActive)
+    }
 
     /// The window the memory cap really allows at a given bitrate (the buffer holds at most `byteCap` bytes).
     static func achievableSeconds(requested: Int, bitrateMbps: Int, byteCap: Int = ReplayBuffer.byteCap) -> Int {
