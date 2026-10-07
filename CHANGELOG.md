@@ -4,8 +4,48 @@ All notable changes to this project are documented here. Format based on [Keep a
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-07
+
 ### Added
-- A one-time notice the first time you start a stream (UDP, RTMP, SRT, NDI or the web viewer) or turn on the capture window: the goggles draw their own overlay (flight data, battery, storage warnings) into the picture they send, so it also shows up in OBS, recordings and streams. It offers to open Output framing (or Framing for the capture window) to crop it out, and has a "Don't show this again" checkbox. It stays quiet if you already crop.
+- Setup assistant: replaces the Welcome window with four live checks (background service approved, goggles seen on USB, OTG and cable, video arriving), one plain sentence and one button each. It updates without a restart, opens on first launch, and is offered from Help, Settings, the menu bar and every failure screen.
+- Signal-lost alert: a notification and an optional repeating sound when video stops for a few seconds, with a "restored" alert once it has been back for 2 s. Works with the window hidden. Settings > Advanced.
+- Clip gallery search and tags: search by file name, note, tag or goggles (⌘F), filter by date, goggles and favourites, five sort orders, tags, a note and a star per clip, multi-select with bulk tagging and trash. Tags are stored in a `.gvmeta.json` file next to each clip. Recordings now note the goggles name and serial.
+- Shortcuts actions (App Intents): start, stop and toggle recording, save replay, screenshot, add marker, start and stop the network stream, toggle freeze, show window, and get status. Needs the app installed in /Applications; plain `swift run` builds have no actions.
+- Race mode: one switch (Settings > Display, Goggles menu, menu bar, `gogglesview://race/on`) that turns off the stabilizer, preview color looks, grid, stats overlay and mini window for the lowest-latency preview. A RACE badge shows while it is on.
+- Connection health window (Goggles > Connection Health…): frames per second, bitrate, frame gaps, drops, decode latency and a verdict with practical suggestions for cable, port and OTG problems. Collects nothing while closed.
+- Copy frame (⇧⌘C, menu bar, `gogglesview://screenshot/copy`, AppleScript `copy frame`) puts the current picture on the clipboard. The screenshot note has a Show in Finder link.
+- A one-time notice the first time you start a stream (UDP, RTMP, SRT, NDI or the web viewer) or turn on the capture window: the goggles draw their own overlay (flight data, battery, storage warnings) into the picture, so it also shows up in OBS, recordings and streams. It offers to open Output framing (or Framing for the capture window) to crop it out.
+- Recordings are crash-safe: files are written in 2 s fragments, so a crash, force-quit, power loss or unplugged drive leaves a playable file. Recording failures now show a plain-language alert, a "Saved to…" note with Show in Finder appears when a recording stops, and recording stops cleanly when free space drops below 500 MB.
+
+### Changed
+- Plain-language wording throughout: "Connecting to your goggles…" replaces claim, RNDIS and handshaking text; "background service" replaces "helper"; the window's Close button is now Hide, and closing the window while recording or streaming asks what to do; Retry, Copy diagnostics and Open setup assistant appear on every failure screen.
+- `gogglesview://` URL commands are off by default (Settings > Advanced > Automation) because any web page could trigger them. When on, each command shows a short on-screen notice and is limited to a few per second. AppleScript and Shortcuts are not affected.
+- Instant replay needs the keyframe encoder and says so when it is off; the settings text shows the real window (about 107 s at 20 Mbps, not 120 s).
+- Auto-delete skips files modified in the last 24 hours, never touches replay clips, asks before it is first turned on, and reports what it trashed. Loop recording says its old parts are permanently deleted.
+- Recordings made while stabilization is on use the re-encoded stream so they contain the stabilized picture.
+- RTMP and UDP streams reconnect automatically with backoff after a drop; RTMP also detects a stalled connection. The installer refuses to update while any output (RTMP, SRT, NDI, web viewer, replay save) is active.
+- A failed update helper re-registration is shown in Settings and the setup assistant instead of being ignored.
+
+### Fixed
+- The app's silence watchdog never fired because the helper's once-a-second stats counted as activity; the connection state flapped between live and connecting during a real dropout and ran stream hooks and auto-start recordings falsely. Only video now counts, and hook events are debounced.
+- A stuck decoder (after a dropped frame or reconnect) now asks the goggles for a new keyframe and reconnects if none arrives, and the waiting card is shown instead of a frozen picture.
+- Output zoom was off-centre and panned to the wrong region; the transform is fixed.
+- Sleep and wake: the Mac going to sleep drops a marker in a running recording and the app reconnects on wake; the app holds an activity assertion while recording or streaming so it is not throttled.
+- A bounded queue between the helper and the main thread: if the main thread stalls, input is dropped to the next keyframe instead of growing without limit.
+- Helper: a failed claim after replug, wake or a booting goggles is now retried with backoff instead of staying failed; repeated USB transfer errors stop the pipeline instead of looping; after silence or a dropped-frame burst the helper waits for a fresh keyframe; a window opened late gets the cached stream head so it shows a picture.
+- Instant replay no longer empties itself when the keyframe encoder is off, and raw recordings can split or loop by switching to the re-encoded stream when no keyframe arrives.
+- A slow disk no longer silently drops frames and corrupts a passthrough recording: it switches to the re-encoded stream and tells you.
+- The network frame-rate counter restarted correctly after a helper reconnect.
+
+### Security
+- Updates are verified against the running app's designated code requirement (or its team requirement), the checksum is mandatory and computed on the exact file that is mounted, an ad-hoc signed app never auto-installs, and the work folder is cleaned up. The quarantine flag is no longer cleared.
+- RTMP: fixed crashes on a hostile or buggy server (negative chunk size, deeply nested AMF, out-of-range stream id).
+- Local web viewer: checks the Host header (blocks DNS rebinding), creates an access token automatically, refuses LAN mode without one, compares tokens in constant time and bounds its segment size.
+- LUT import limits file size and rejects non-numeric data; hook script paths are stored in the Keychain and hooks run in their own process group that is killed on timeout; the developer screenshot flags need `GOGGLESVIEW_DEV_SHOTS=1` and no longer touch real preferences.
+
+### Known limits
+- Most of this is verified by tests and synthetic footage only. Keyframe recovery, sleep and wake, the signal alert and the Shortcuts actions have not yet been tried on live goggles.
+- The setup assistant's USB detection and the Shortcuts discovery need a check on a real install.
 
 ## [0.5.1] - 2026-10-06
 
