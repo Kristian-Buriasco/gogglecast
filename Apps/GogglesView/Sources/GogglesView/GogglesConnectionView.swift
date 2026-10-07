@@ -197,6 +197,13 @@ struct GogglesConnectionView: View {
     private func startRecording() {
         session.addConsumer(recorder)
         let url = UniqueFileURL.reserve(Recorder.defaultURL())
+        recorder.metadataProvider = { [coordinator, session] in
+            let info = coordinator.deviceInfo
+            return ClipRecordInfo(
+                gogglesName: ProfileStore.shared.nickname(for: info?.serial) ?? info?.product,
+                gogglesSerial: info?.serial,
+                width: session.dimensions.map { Int($0.width) }, height: session.dimensions.map { Int($0.height) })
+        }
         do {
             try recorder.start(to: url)
             recorder.keyframeHub = session.reencodeHub

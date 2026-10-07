@@ -13,9 +13,11 @@ struct Clip: Identifiable, Equatable {
     var duration: Double?
     var thumbnail: NSImage?
     var markers: [ClipMarker] = []
+    /// Loaded lazily from the `.gvmeta.json` sidecar; nil = none (or not loaded yet).
+    var metadata: ClipMetadata?
     var id: URL { url }
     var name: String { url.lastPathComponent }
-    static func == (a: Clip, b: Clip) -> Bool { a.url == b.url && a.duration == b.duration && a.thumbnail === b.thumbnail }
+    static func == (a: Clip, b: Clip) -> Bool { a.url == b.url && a.duration == b.duration && a.thumbnail === b.thumbnail && a.metadata == b.metadata }
 }
 
 enum ClipLibrary {
@@ -47,6 +49,13 @@ enum ClipLibrary {
 
     static func sidecarURL(for clip: URL) -> URL {
         clip.deletingPathExtension().appendingPathExtension("markers.json")
+    }
+
+    /// Moves a clip and its sidecars (markers, metadata) to the Trash. `trash` is injectable for tests.
+    static func trashFiles(for clip: URL, trash: (URL) throws -> Void = { try FileManager.default.trashItem(at: $0, resultingItemURL: nil) }) {
+        let companions = ClipMetadataStore.companions(of: clip)
+        try? trash(clip)
+        for u in companions { try? trash(u) }
     }
 
     /// `<name>-trim.<ext>`, then `-trim-2`, `-trim-3`... never an existing path.
@@ -93,14 +102,35 @@ enum ClipLibrary {
 final class ClipLibraryModel: ObservableObject {
     @Published var clips: [Clip] = []
     private var loading = Set<URL>()
+    private var metadataGeneration = 0
 
     func reload() {
         let old = Dictionary(uniqueKeysWithValues: clips.map { ($0.url, $0) })
         clips = ClipLibrary.scan().map { c in
             var c = c
-            if let o = old[c.url], o.size == c.size { c.duration = o.duration; c.thumbnail = o.thumbnail }
+            if let o = old[c.url] {
+                c.metadata = o.metadata
+                if o.size == c.size { c.duration = o.duration; c.thumbnail = o.thumbnail }
+            }
             return c
         }
+        loadMetadata()
+    }
+
+    /// Reads every `.gvmeta.json` off the main thread and merges the result in.
+    private func loadMetadata() {
+        metadataGeneration += 1
+        let gen = metadataGeneration, urls = clips.map(\.url)
+        Task.detached(priority: .utility) {
+            var found: [URL: ClipMetadata] = [:]
+            for u in urls { if let m = ClipMetadataStore.read(for: u) { found[u] = m } }
+            await self.applyMetadata(found, generation: gen)
+        }
+    }
+
+    private func applyMetadata(_ found: [URL: ClipMetadata], generation: Int) {
+        guard generation == metadataGeneration else { return }
+        for i in clips.indices where clips[i].metadata != found[clips[i].url] { clips[i].metadata = found[clips[i].url] }
     }
 
     func loadMediaIfNeeded(_ clip: Clip) {
@@ -116,9 +146,18 @@ final class ClipLibraryModel: ObservableObject {
         }
     }
 
-    func trash(_ clip: Clip) {
-        try? FileManager.default.trashItem(at: clip.url, resultingItemURL: nil)
-        try? FileManager.default.trashItem(at: ClipLibrary.sidecarURL(for: clip.url), resultingItemURL: nil)
+    /// Applies `change` to the sidecar of each url (read-modify-write) and updates the list in place.
+    func updateMetadata(for urls: [URL], _ change: (inout ClipMetadata) -> Void) {
+        for u in urls {
+            let m = ClipMetadataStore.update(for: u, change)
+            if let i = clips.firstIndex(where: { $0.url == u }) { clips[i].metadata = m.isEmpty ? nil : m }
+        }
+    }
+
+    func trash(_ clip: Clip) { trash([clip]) }
+
+    func trash(_ list: [Clip]) {
+        for c in list { ClipLibrary.trashFiles(for: c.url) }
         reload()
     }
 }

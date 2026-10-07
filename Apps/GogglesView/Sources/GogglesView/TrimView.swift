@@ -58,7 +58,7 @@ final class TrimModel: ObservableObject {
                 timer.invalidate()
                 guard let self else { return }
                 self.exporting = false
-                if s.status == .completed { done(out) } else { self.error = s.error?.localizedDescription ?? "Export failed" }
+                if s.status == .completed { ClipMetadataStore.carryOver(from: self.clip.url, to: out); done(out) } else { self.error = s.error?.localizedDescription ?? "Export failed" }
             }
         }
     }
