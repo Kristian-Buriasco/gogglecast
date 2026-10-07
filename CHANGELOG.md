@@ -4,6 +4,21 @@ All notable changes to this project are documented here. Format based on [Keep a
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-10-07
+
+### Added
+- Back up settings (Settings > General): export your preferences to one JSON file and import them on another Mac. Secrets and identifiers (stream keys, passphrases, tokens, webhook and script paths, goggles profiles, folder paths, window positions) are never exported, and switches that open the app to the network (web viewer, URL commands, automatic installs) are not imported.
+- Troubleshooting card at the top of Settings > General with a one-line health state and buttons for the setup assistant, Reconnect, Connection health and diagnostics. Benchmark, self test and session log moved under "Developer tools" in Settings > Advanced.
+
+### Changed
+- Saving an instant replay (menu bar, hotkey, AppleScript, Shortcuts, `gogglesview://replay/save`) now says why when it can't: "Instant replay is off. Turn it on in Settings > Recording.", the keyframe encoder message, or "The replay buffer is still filling." It used to do nothing without saying so.
+- Plainer captions for live stabilization, color looks, output framing, RTMP, NDI and the web viewer ("Off by default. Anyone on your network can watch while it is on."), and a friendlier empty clip gallery.
+- The color look on the preview updates as soon as you change it, without resizing or reopening the window.
+
+### Known limits
+- Not yet tried on live goggles: unplug and replug, sleep and wake, the signal alert, RTMP and SRT outputs, the setup assistant flow and the Shortcuts actions.
+
+
 ## [0.6.1] - 2026-10-07
 
 Found during the first run of 0.6 on real goggles with a drone linked.
