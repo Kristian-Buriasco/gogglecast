@@ -308,6 +308,50 @@ final class OutputProcessor {
     }
 }
 
+/// Runs `OutputProcessor` work (a synchronous Core Image render) on its own serial queue so the
+/// main queue, which polls for frames every few milliseconds, never waits for it.
+///
+/// Each call hands back the newest finished picture (once; `nil` when none is new) and starts at
+/// most one new job from `source`, so work never piles up: a slow render just skips pictures.
+/// The pictures arrive one poll later than a synchronous call would give them.
+final class OutputFrameStage {
+    private let queue: DispatchQueue
+    private let lock = NSLock()
+    private var ready: CVPixelBuffer?
+    private var inFlight = false
+    private var generation = 0
+
+    init(label: String = "gogglesview.output-processor") {
+        queue = DispatchQueue(label: label, qos: .userInitiated)
+    }
+
+    func next(source: () -> CVPixelBuffer?, process: @escaping (CVPixelBuffer) -> CVPixelBuffer?) -> CVPixelBuffer? {
+        lock.lock()
+        let out = ready
+        ready = nil
+        let busy = inFlight
+        let gen = generation
+        lock.unlock()
+        if !busy, let frame = source() {
+            lock.lock(); inFlight = true; lock.unlock()
+            queue.async { [self] in
+                let result = process(frame)
+                lock.lock()
+                // A reset while the job ran makes its result stale.
+                if gen == generation { ready = result }
+                inFlight = false
+                lock.unlock()
+            }
+        }
+        return out
+    }
+
+    /// Drops any finished picture (output went idle or the processor was reset).
+    func reset() {
+        lock.lock(); ready = nil; generation += 1; lock.unlock()
+    }
+}
+
 // MARK: - Settings
 
 #if canImport(SwiftUI) && canImport(AppKit)

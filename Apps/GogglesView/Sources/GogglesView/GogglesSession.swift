@@ -89,6 +89,7 @@ final class GogglesSession: NSObject, RegistrableSession, NSWindowDelegate {
         coordinator.onNALUnit = { [weak decodeSession] data, nalType, isParameterSet, hostTime in
             decodeSession?.handle(nalData: data, nalType: nalType, isParameterSet: isParameterSet, hostTime: hostTime)
         }
+        coordinator.onInputDropped = { [weak decodeSession] in decodeSession?.noteInputDropped() }
         self.coordinator = coordinator
         self.decodeSession = decodeSession
 
@@ -142,6 +143,11 @@ final class GogglesSession: NSObject, RegistrableSession, NSWindowDelegate {
         EventHookInstaller.install(coordinator: coordinator)
         signalAlert = SignalAlertController(coordinator: coordinator, deviceLabel: { [weak self] in self?.window.title ?? "Goggles" })
         SessionLogger.attach(coordinator: coordinator, decodeSession: decodeSession).store(in: &cancellables)
+        // A decoder without a keyframe shows the "waiting for the first picture" card even when the
+        // helper says live, and makes the coordinator ask for a keyframe (then reconnect).
+        decodeSession.$isWaitingForKeyframe
+            .sink { [weak coordinator] waiting in coordinator?.setDecoderWaitingForKeyframe(waiting) }
+            .store(in: &cancellables)
 
         coordinator.$deviceInfo
             .compactMap { $0 }
@@ -165,6 +171,19 @@ final class GogglesSession: NSObject, RegistrableSession, NSWindowDelegate {
         client.startStreaming(deviceId: deviceId) { [deviceId] ok, error in
             print("[run \(deviceId)] startStreaming -> ok=\(ok) error=\(error.map { String(describing: $0) } ?? "nil")")
         }
+    }
+
+    /// Mac is going to sleep: mark a running recording and keep the signal alert quiet.
+    func powerWillSleep() {
+        guard !isTornDown else { return }
+        SessionControlBoard.shared.recorder(for: decodeSession)?.addMarker(label: PowerEvents.sleepMarkerLabel)
+        signalAlert?.suspendForSleep()
+    }
+
+    /// Mac woke up: the link to the goggles is probably stale, so reconnect.
+    func powerDidWake() {
+        guard !isTornDown else { return }
+        coordinator.reconnect()
     }
 
     func focus() {
@@ -199,6 +218,7 @@ final class GogglesSession: NSObject, RegistrableSession, NSWindowDelegate {
         client.stopStreaming(deviceId: deviceId)
         coordinator.detach()
         coordinator.onNALUnit = nil
+        coordinator.onInputDropped = nil
         EventHookInstaller.uninstall(deviceId: deviceId)
         MiniWindowController.shared.detach(session: decodeSession)
         captureWindowController.hide()

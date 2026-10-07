@@ -108,6 +108,7 @@ struct UpdateSettingsSection: View {
     @ObservedObject private var installer = UpdateInstaller.shared
 
     private var status: String {
+        if let e = installer.helperUpdateError { return e }
         if case .failed(let m) = installer.state { return m }
         if case .manual(let m) = installer.state { return m }
         if let b = installer.blockedReason, case .staged = installer.state { return b }

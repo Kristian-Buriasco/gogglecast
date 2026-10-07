@@ -85,6 +85,8 @@ final class SetupAssistantModel: ObservableObject {
     init(env: SetupAssistantEnvironment) {
         self.env = env
         steps = computeSteps()
+        // The background service failed to restart after an update: show it on its step.
+        errorMessage = UpdateInstaller.shared.helperUpdateError
     }
 
     var isComplete: Bool { SetupDiagnosis.isComplete(steps) }
@@ -105,7 +107,7 @@ final class SetupAssistantModel: ObservableObject {
         if updated[0].state == .done, updated[1].state == .done, env.states().isEmpty {
             env.ensureSession()
         }
-        if updated[0].state == .done { errorMessage = nil }
+        if updated[0].state == .done, UpdateInstaller.shared.helperUpdateError == nil { errorMessage = nil }
     }
 
     func perform(_ action: SetupDiagnosis.Step.Action) {

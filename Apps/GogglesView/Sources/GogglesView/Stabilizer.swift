@@ -53,8 +53,89 @@ struct PathSmoother {
     mutating func reset() { path = .zero; smooth = .zero }
 }
 
+/// Spots a break in the frame timeline (the clock went backwards, or frames stopped for a while),
+/// where the previous frame is no longer a valid reference for motion measurement. Also keeps a
+/// smoothed frame interval so the cost budget knows the real frame rate.
+struct FrameClockWatch {
+    static let maxGapNs: Int64 = 1_000_000_000
+    private var last: Int64?
+    private(set) var intervalMs: Double?
+
+    /// Feeds one timestamp (nanoseconds). Returns true when the timeline jumped.
+    mutating func note(_ ns: Int64) -> Bool {
+        defer { last = ns }
+        guard let last else { return false }
+        let delta = ns - last
+        if delta <= 0 || delta > Self.maxGapNs { return true }
+        let ms = Double(delta) / 1_000_000
+        // Ignore implausible intervals when estimating the rate (bursts, short stalls).
+        if ms >= 4, ms <= 200 { intervalMs = intervalMs.map { $0 * 0.9 + ms * 0.1 } ?? ms }
+        return false
+    }
+}
+
+/// Stops stabilizing when it costs too much of the frame interval, so decoded frames do not queue
+/// behind it. Hysteresis: once over budget it stays off for a growing pause, then tries again.
+struct StabilizerBudget {
+    static let defaultIntervalMs = 1000.0 / 60.0
+    static let limitFraction = 0.8
+    static let minSamples = 5
+    static let firstPauseMs = 2_000.0
+    static let maxPauseMs = 16_000.0
+
+    private(set) var smoothedMs: Double?
+    private(set) var bypassUntilMs: Double?
+    private var samples = 0
+    private var goodSamples = 0
+    private var pauseMs = StabilizerBudget.firstPauseMs
+
+    /// True while stabilization is switched off for exceeding the budget.
+    func isBypassed(atMs nowMs: Double) -> Bool {
+        guard let until = bypassUntilMs else { return false }
+        return nowMs < until
+    }
+
+    /// Records the cost of one stabilized frame. `intervalMs` is the real frame interval when known.
+    mutating func record(costMs: Double, intervalMs: Double?, atMs nowMs: Double) {
+        let interval = intervalMs ?? Self.defaultIntervalMs
+        smoothedMs = smoothedMs.map { $0 * 0.9 + costMs * 0.1 } ?? costMs
+        samples += 1
+        guard samples >= Self.minSamples, let smoothed = smoothedMs else { return }
+        if smoothed > interval * Self.limitFraction {
+            bypassUntilMs = nowMs + pauseMs
+            pauseMs = min(pauseMs * 2, Self.maxPauseMs)
+            smoothedMs = nil; samples = 0; goodSamples = 0
+        } else {
+            goodSamples += 1
+            if goodSamples >= 60 { pauseMs = Self.firstPauseMs }
+        }
+    }
+}
+
+/// Lets the Settings screen say that stabilization is paused (any open window).
+final class StabilizerStatus: ObservableObject {
+    static let shared = StabilizerStatus()
+    @Published private(set) var paused = false
+    private var pausedIds = Set<ObjectIdentifier>()
+
+    func set(_ id: ObjectIdentifier, paused isPaused: Bool) {
+        DispatchQueue.main.async {
+            if isPaused { self.pausedIds.insert(id) } else { self.pausedIds.remove(id) }
+            let now = !self.pausedIds.isEmpty
+            if now != self.paused { self.paused = now }
+        }
+    }
+}
+
 final class Stabilizer {
     private let lock = NSLock()
+    /// Guards the small cross-thread state below, so readers never wait for a frame to finish.
+    private let statLock = NSLock()
+    private var _costMs: Double?
+    private var budget = StabilizerBudget()
+    private var clockWatch = FrameClockWatch()
+    private var resetRequested = false
+    private var reportedBypass = false
     private let ci = CIContext(options: [.cacheIntermediates: false])
     private var smoother = PathSmoother(strength: StabilizerPrefs.defaultStrength)
     private var previousSmall: CVPixelBuffer?
@@ -63,20 +144,63 @@ final class Stabilizer {
     private var poolKey: (w: Int, h: Int, fmt: OSType)?
     private static let analysisWidth = 640
 
-    /// Smoothed time spent per frame, for diagnostics.
-    private(set) var costMs: Double?
+    deinit { StabilizerStatus.shared.set(ObjectIdentifier(self), paused: false) }
+
+    /// Smoothed time spent per frame, for diagnostics. Safe to read from any thread.
+    var costMs: Double? { statLock.lock(); defer { statLock.unlock() }; return _costMs }
+
+    /// True while stabilization is skipped because it was costing too much of the frame interval.
+    var isBypassed: Bool {
+        statLock.lock(); defer { statLock.unlock() }
+        return budget.isBypassed(atMs: Self.nowMs())
+    }
+
+    private static func nowMs() -> Double { Double(DispatchTime.now().uptimeNanoseconds) / 1_000_000 }
+
+    /// Forget the previous frame and the camera path: the next frame starts a new session
+    /// (decoder reset, reconnect, timestamp jump). Safe to call from any thread.
+    func reset() {
+        statLock.lock(); resetRequested = true; statLock.unlock()
+    }
+
+    /// Feeds the frame's timestamp (nanoseconds); a jump in the timeline resets the path.
+    func noteTimestamp(_ ns: Int64) {
+        statLock.lock()
+        if clockWatch.note(ns) { resetRequested = true }
+        statLock.unlock()
+    }
 
     /// Returns a stabilized copy of `input`, or `input` itself when off or when anything fails.
     func process(_ input: CVPixelBuffer) -> CVPixelBuffer {
         guard StabilizerPrefs.enabled, !RaceModePrefs.enabled else {
             lock.lock(); if previousSmall != nil { previousSmall = nil; smoother.reset() }; lock.unlock()
+            publishBypass(false)
             return input
         }
+        statLock.lock()
+        let bypass = budget.isBypassed(atMs: Self.nowMs())
+        if bypass { resetRequested = true }
+        statLock.unlock()
+        publishBypass(bypass)
+        if bypass { return input }
         return process(input, strength: StabilizerPrefs.strength)
+    }
+
+    private func publishBypass(_ on: Bool) {
+        statLock.lock()
+        let changed = reportedBypass != on
+        reportedBypass = on
+        statLock.unlock()
+        if changed { StabilizerStatus.shared.set(ObjectIdentifier(self), paused: on) }
     }
 
     func process(_ input: CVPixelBuffer, strength: Double) -> CVPixelBuffer {
         lock.lock(); defer { lock.unlock() }
+        statLock.lock()
+        let doReset = resetRequested
+        resetRequested = false
+        statLock.unlock()
+        if doReset { previousSmall = nil; smoother.reset() }
         let start = DispatchTime.now().uptimeNanoseconds
         let w = CVPixelBufferGetWidth(input), h = CVPixelBufferGetHeight(input)
         guard w > 64, h > 64 else { return input }
@@ -114,7 +238,10 @@ final class Stabilizer {
         copyAttachments(from: input, to: out)
 
         let ms = Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000
-        costMs = costMs.map { $0 * 0.9 + ms * 0.1 } ?? ms
+        statLock.lock()
+        _costMs = _costMs.map { $0 * 0.9 + ms * 0.1 } ?? ms
+        budget.record(costMs: ms, intervalMs: clockWatch.intervalMs, atMs: Self.nowMs())
+        statLock.unlock()
         return out
     }
 
@@ -163,6 +290,7 @@ final class Stabilizer {
 struct StabilizerSettingsSection: View {
     @AppStorage(StabilizerPrefs.enabledKey) private var enabled = false
     @AppStorage(StabilizerPrefs.strengthKey) private var strength = StabilizerPrefs.defaultStrength
+    @ObservedObject private var status = StabilizerStatus.shared
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -172,6 +300,10 @@ struct StabilizerSettingsSection: View {
                 Text("Strength")
                 Slider(value: $strength, in: 0...1).disabled(!enabled)
                 Text("\(Int(strength * 100))%").monospacedDigit().frame(width: 40, alignment: .trailing)
+            }
+            if status.paused {
+                Text("Stabilization is paused because this Mac can't keep up with the frame rate. It tries again every few seconds.")
+                    .font(.caption).foregroundStyle(.orange)
             }
             Text("Electronic stabilization: removes shake from the picture without waiting for future frames, so it adds processing time (a few ms) but no frames of delay. It zooms in 4 to 10% to hide the edges, doesn't correct rotation, and applies to recordings and streams made from the live picture. Stronger = smoother but a little more lag on real pans.")
                 .font(.caption).foregroundStyle(.secondary)

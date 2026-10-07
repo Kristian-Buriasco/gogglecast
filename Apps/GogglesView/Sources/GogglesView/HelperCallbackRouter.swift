@@ -9,19 +9,23 @@ public struct HelperDeviceHandlers {
     public var onNALUnit: ((Data, UInt8, Bool, UInt64) -> Void)?
     public var onStats: ((StreamStats) -> Void)?
     public var onBatteryChanged: ((Int?) -> Void)?
+    /// Fired (on main) once when the client starts dropping NALs because delivery fell behind.
+    public var onInputDropped: (() -> Void)?
 
     public init(
         onDeviceChanged: ((DeviceInfo?) -> Void)? = nil,
         onHelperStateChanged: ((Int, String?) -> Void)? = nil,
         onNALUnit: ((Data, UInt8, Bool, UInt64) -> Void)? = nil,
         onStats: ((StreamStats) -> Void)? = nil,
-        onBatteryChanged: ((Int?) -> Void)? = nil
+        onBatteryChanged: ((Int?) -> Void)? = nil,
+        onInputDropped: (() -> Void)? = nil
     ) {
         self.onDeviceChanged = onDeviceChanged
         self.onHelperStateChanged = onHelperStateChanged
         self.onNALUnit = onNALUnit
         self.onStats = onStats
         self.onBatteryChanged = onBatteryChanged
+        self.onInputDropped = onInputDropped
     }
 }
 

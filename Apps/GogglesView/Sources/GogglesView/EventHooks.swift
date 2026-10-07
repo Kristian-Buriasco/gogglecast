@@ -54,6 +54,35 @@ enum EventHookLogic {
     }
 }
 
+/// Turns raw live/not-live flips into stream events only after the new state held steady for
+/// `stableFor` seconds, so a flapping signal does not run the hooks over and over. Pure: the
+/// caller supplies the clock. A stream that was never announced live never produces "lost".
+struct StreamEventDebouncer {
+    static let defaultStableFor: TimeInterval = 3
+
+    let stableFor: TimeInterval
+    /// What the hooks were last told (false until the first announced live).
+    private(set) var announcedLive = false
+    private var pending: (live: Bool, since: Date)?
+
+    init(stableFor: TimeInterval = StreamEventDebouncer.defaultStableFor) { self.stableFor = stableFor }
+
+    /// The state kind changed (or was re-reported). Returns an event only via `tick`.
+    mutating func observe(_ kind: GogglesUIStateKind, at now: Date) {
+        let live = kind == .live
+        if live == announcedLive { pending = nil; return }
+        if pending?.live != live { pending = (live, now) }
+    }
+
+    /// Call periodically. Returns the event once the pending state has been stable long enough.
+    mutating func tick(at now: Date) -> AppEvent? {
+        guard let p = pending, now.timeIntervalSince(p.since) >= stableFor else { return nil }
+        pending = nil
+        announcedLive = p.live
+        return p.live ? .streamLive : .streamLost
+    }
+}
+
 enum EventHookConfig {
     static let batteryKey = "hookBatteryThreshold"
     static let defaultBattery = 15
@@ -243,6 +272,8 @@ final class EventBus {
 /// state/battery observers per open goggles window (keyed by deviceId, which
 /// is added to those events' payloads); the recording/replay/screenshot
 /// notification bridge is app-wide and installed once.
+private final class StreamDebouncerBox { var value = StreamEventDebouncer() }
+
 enum EventHookInstaller {
     private static var perDevice: [String: Set<AnyCancellable>] = [:]
     private static var notificationBag = Set<AnyCancellable>()
@@ -254,11 +285,13 @@ enum EventHookInstaller {
     static func install(coordinator: GogglesConnectionCoordinator) {
         let deviceId = coordinator.deviceId
         var bag = Set<AnyCancellable>()
-        var lastKind: GogglesUIStateKind?
+        // Debounced: a flapping signal must not fire streamLost/streamLive hooks on every flip.
+        let debouncer = StreamDebouncerBox()
         coordinator.$uiState.sink { state in
-            let k = state.kind
-            if let e = EventHookLogic.streamEvent(from: lastKind, to: k) { EventBus.shared.post(e, payload: ["deviceId": deviceId]) }
-            lastKind = k
+            debouncer.value.observe(state.kind, at: Date())
+        }.store(in: &bag)
+        Timer.publish(every: 0.5, on: .main, in: .common).autoconnect().sink { _ in
+            if let e = debouncer.value.tick(at: Date()) { EventBus.shared.post(e, payload: ["deviceId": deviceId]) }
         }.store(in: &bag)
 
         var lastBattery: Int?

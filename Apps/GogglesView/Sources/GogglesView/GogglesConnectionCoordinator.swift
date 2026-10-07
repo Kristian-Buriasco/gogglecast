@@ -53,6 +53,15 @@ public final class GogglesConnectionCoordinator: ObservableObject {
     /// reached at least once.
     @Published public private(set) var waitingForKeyframeEnteredAt: Date?
 
+    /// True while the decoder has no keyframe to start from (set by the session's decoder).
+    /// With the helper reporting `.live` this means "connected but no picture yet".
+    @Published public private(set) var decoderWaitingForKeyframe = false
+    /// Called when the helper client dropped input because the main queue fell behind.
+    public var onInputDropped: (() -> Void)?
+    private var keyframeRecovery = KeyframeRecoveryPolicy()
+    /// Test hook: sees every recovery action the coordinator takes.
+    var onRecoveryAction: ((KeyframeRecoveryPolicy.Action) -> Void)?
+
     private let client: HelperClient
     /// Multi-device picker design item 7: which device this coordinator
     /// drives. One coordinator == one device's connection lifecycle, for
@@ -199,16 +208,20 @@ public final class GogglesConnectionCoordinator: ObservableObject {
                 self?.handleHelperStateChanged(raw, detail: detail)
             },
             onNALUnit: { [weak self] data, nalType, isParameterSet, hostTime in
-                self?.handleActivitySignal()
+                self?.handleActivitySignal(isVideoSlice: !isParameterSet)
                 self?.onNALUnit?(data, nalType, isParameterSet, hostTime)
             },
             onStats: { [weak self] stats in
+                // Stats tick every second whether or not video flows, so they
+                // must not count as activity (that would blind the watchdog).
                 self?.stats = stats
-                self?.handleActivitySignal()
             },
             onBatteryChanged: { [weak self] percent in
                 self?.batteryPercent = percent
                 self?.onBatteryChanged?(percent)
+            },
+            onInputDropped: { [weak self] in
+                self?.onInputDropped?()
             }
         ), for: deviceId)
     }
@@ -274,6 +287,7 @@ public final class GogglesConnectionCoordinator: ObservableObject {
         if case .handshaking = mapped {
             handshakingEnteredAt = now()
         }
+        if mapped.kind == .live { lastActivityAt = now() }
     }
 
     /// Any real inbound-data signal (a decoded NAL, or a stats snapshot --
@@ -285,9 +299,11 @@ public final class GogglesConnectionCoordinator: ObservableObject {
     /// past `.stalled` to `.handshaking`, `current.kind` is no longer
     /// `.live`/`.stalled`, so the watchdog's own switch leaves it alone by
     /// design -- this is the other half of that same design decision).
-    private func handleActivitySignal() {
+    /// A real NAL arrived. Only video NALs (not a lone parameter set)
+    /// recover a silence-escalated `.handshaking` back to `.live`.
+    private func handleActivitySignal(isVideoSlice: Bool) {
         lastActivityAt = now()
-        if case .handshaking = uiState {
+        if isVideoSlice, case .handshaking = uiState {
             uiState = .live
         }
     }
@@ -298,8 +314,31 @@ public final class GogglesConnectionCoordinator: ObservableObject {
     /// the coordinator's own clock). `internal`, not `private`, so
     /// `GogglesUIStateTests` can drive it directly with a fabricated time
     /// instead of waiting on the real `Timer`.
+    /// What the UI should show: the helper's state, except that `.live` with a decoder that
+    /// still waits for its first keyframe is shown as "waiting for the first picture".
+    public var displayState: GogglesUIState {
+        if uiState.kind == .live, decoderWaitingForKeyframe { return .waitingForKeyframe }
+        return uiState
+    }
+
+    public func setDecoderWaitingForKeyframe(_ waiting: Bool) {
+        guard waiting != decoderWaitingForKeyframe else { return }
+        if waiting, uiState.kind == .live { waitingForKeyframeEnteredAt = now() }
+        decoderWaitingForKeyframe = waiting
+    }
+
     func tick(currentTime: Date? = nil) {
         let t = currentTime ?? now()
+        switch keyframeRecovery.update(waiting: decoderWaitingForKeyframe && uiState.kind == .live, now: t) {
+        case .none: break
+        case .requestKeyframe:
+            onRecoveryAction?(.requestKeyframe)
+            requestKeyframe()
+        case .reconnect:
+            onRecoveryAction?(.reconnect)
+            ConnectionTrace.shared.record("[\(deviceId)] no keyframe after \(keyframeRecovery.escalateAfter)s, reconnecting")
+            reconnect()
+        }
         let elapsed = t.timeIntervalSince(lastActivityAt)
         let updated = GogglesUIStateMachine.applySilenceWatchdog(current: uiState, secondsSinceLastActivity: elapsed)
         if updated != uiState {
