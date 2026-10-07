@@ -480,6 +480,9 @@ public final class HelperClient: NSObject {
             self.connection = nil
             self.exportedClient = nil
             self.fpsCounter.stop()
+            // The helper forgot every stream with the connection; without this the fps counter
+            // would never restart (it only starts when the set is empty).
+            self.streamingDeviceIds = []
             self.connectionState = .disconnected
             guard self.wantsConnected else { return }
             Logging.xpc.info("scheduling reconnect in \(self.reconnectDelay, format: .fixed(precision: 1))s")
@@ -591,8 +594,41 @@ public final class HelperClient: NSObject {
         let targets = route(deviceId, { $0.onNALUnit }, legacy: { onNALUnit })
         guard !targets.isEmpty else { return }
         fpsCounter.recordFrame()
-        deliverOnMain { targets.forEach { $0(data, nalType, isParameterSet, hostTime) } }
+        let size = data.count
+        let verdict = admitNAL(deviceId, bytes: size, startsKeyframe: isParameterSet || nalType == 5)
+        if case .drop(let first) = verdict {
+            if first {
+                Logging.client.error("[\(deviceId, privacy: .public)] main queue is behind, dropping video until the next keyframe")
+                let notify = router.handlers(for: deviceId)?.onInputDropped
+                if let notify { deliverOnMain { notify() } }
+            }
+            return
+        }
+        deliverOnMain { [weak self] in
+            self?.finishedNAL(deviceId, bytes: size)
+            targets.forEach { $0(data, nalType, isParameterSet, hostTime) }
+        }
     }
+
+    private let backpressureLock = NSLock()
+    private var backpressure: [String: NALBackpressure] = [:]
+
+    private func admitNAL(_ deviceId: String, bytes: Int, startsKeyframe: Bool) -> NALBackpressure.Verdict {
+        backpressureLock.lock(); defer { backpressureLock.unlock() }
+        var gate = backpressure[deviceId] ?? NALBackpressure(limit: nalBacklogLimit)
+        let verdict = gate.admit(bytes: bytes, startsKeyframe: startsKeyframe)
+        backpressure[deviceId] = gate
+        return verdict
+    }
+
+    private func finishedNAL(_ deviceId: String, bytes: Int) {
+        backpressureLock.lock()
+        backpressure[deviceId]?.delivered(bytes: bytes)
+        backpressureLock.unlock()
+    }
+
+    /// Pending-bytes limit before NALs are dropped (see `NALBackpressure`). Settable for tests.
+    var nalBacklogLimit = 8 * 1024 * 1024
 
     func handleStats(_ deviceId: String, _ stats: StreamStats) {
         let targets = route(deviceId, { $0.onStats }, legacy: { onStats })

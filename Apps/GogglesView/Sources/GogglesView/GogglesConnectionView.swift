@@ -156,7 +156,9 @@ struct GogglesConnectionView: View {
         }
         .onAppear { SessionControlBoard.shared.register(recorder: recorder, for: session) }
         .onChange(of: isLive) { live in
-            if live && RecordingPrefs.autoStart && !recorder.isRecording { startRecording() }
+            guard live, RecordingPrefs.autoStart, !recorder.isRecording else { return }
+            // Only for real video: wait until a picture was decoded in the last second.
+            session.whenPictureFlowing { if isLive && !recorder.isRecording { startRecording() } }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
             stopRecording(wait: true)
@@ -427,7 +429,7 @@ struct GogglesConnectionView: View {
     }
 
     private var videoOpacity: Double {
-        switch coordinator.uiState {
+        switch coordinator.displayState {
         case .live: return 1
         case .stalled: return 0.4
         default: return 0
@@ -438,7 +440,7 @@ struct GogglesConnectionView: View {
 
     @ViewBuilder
     private var overlay: some View {
-        let state = coordinator.uiState
+        let state = coordinator.displayState
         if case .waitingForKeyframe = state {
             WaitingForKeyframeCard(
                 enteredAt: coordinator.waitingForKeyframeEnteredAt ?? Date(),

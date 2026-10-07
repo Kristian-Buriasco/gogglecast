@@ -307,17 +307,109 @@ struct GogglesConnectionCoordinatorTests {
         #expect(coordinator.uiState == .live)
     }
 
-    @Test("stats callback also counts as activity for the watchdog")
-    func statsCallbackCountsAsActivity() {
+    private let sampleStats = StreamStats(fps: 30, bitrateKbps: 4000, drops: 0, cumulativeFrames: 100, cumulativeBytes: 100_000, cumulativeDrops: 0)
+
+    @Test("stats callbacks do NOT count as activity: the helper sends them every second even with no video")
+    func statsCallbackIsNotActivity() {
         let (client, coordinator, clock) = makeCoordinator()
         client.sendConnectionState(.connected)
         client.sendHelperState("test-device", GogglesXPC.GogglesState.live.rawValue, nil)
 
         clock.advance(1.9)
-        client.sendStats("test-device", StreamStats(fps: 30, bitrateKbps: 4000, drops: 0, cumulativeFrames: 100, cumulativeBytes: 100_000, cumulativeDrops: 0))
-        clock.advance(1.9) // 1.9s since the stats refresh, well under the 2s threshold
+        client.sendStats("test-device", sampleStats)
+        clock.advance(1.9) // 3.8s since the last real activity, stats in between
+        coordinator.tick()
+        #expect(coordinator.uiState == .stalled)
+        client.sendStats("test-device", sampleStats)
+        clock.advance(1.9) // 5.7s total
+        coordinator.tick()
+        #expect(coordinator.uiState.kind == .handshaking)
+    }
+
+    @Test("stats never flip a silence-escalated handshaking back to live; only real video does")
+    func statsDoNotFlipHandshakingToLive() {
+        let (client, coordinator, clock) = makeCoordinator()
+        client.sendConnectionState(.connected)
+        client.sendHelperState("test-device", GogglesXPC.GogglesState.live.rawValue, nil)
+        clock.advance(6)
+        coordinator.tick()
+        #expect(coordinator.uiState.kind == .handshaking)
+
+        for _ in 0..<5 {
+            clock.advance(1)
+            client.sendStats("test-device", sampleStats)
+            coordinator.tick()
+            #expect(coordinator.uiState.kind == .handshaking)
+        }
+        client.sendNAL("test-device", Data([0, 0, 0, 1, 0x65]), 5, false, 0)
+        #expect(coordinator.uiState == .live)
+    }
+
+    @Test("a lone parameter set resets the silence clock but does not claim live video")
+    func parameterSetIsActivityButNotLive() {
+        let (client, coordinator, clock) = makeCoordinator()
+        client.sendConnectionState(.connected)
+        client.sendHelperState("test-device", GogglesXPC.GogglesState.live.rawValue, nil)
+        clock.advance(6)
+        coordinator.tick()
+        #expect(coordinator.uiState.kind == .handshaking)
+        client.sendNAL("test-device", Data([0, 0, 0, 1, 0x67]), 7, true, 0)
+        #expect(coordinator.uiState.kind == .handshaking)
+    }
+
+    @Test("helper reporting live restarts the silence clock")
+    func helperLiveResetsSilenceClock() {
+        let (client, coordinator, clock) = makeCoordinator()
+        client.sendConnectionState(.connected)
+        client.sendHelperState("test-device", GogglesXPC.GogglesState.handshaking.rawValue, nil)
+        clock.advance(30)
+        client.sendHelperState("test-device", GogglesXPC.GogglesState.live.rawValue, nil)
         coordinator.tick()
         #expect(coordinator.uiState == .live)
+    }
+
+    @Test("decoder waiting for a keyframe shows the waiting card while the helper says live")
+    func decoderWaitingOverridesLiveDisplay() {
+        let (client, coordinator, clock) = makeCoordinator()
+        client.sendConnectionState(.connected)
+        client.sendHelperState("test-device", GogglesXPC.GogglesState.live.rawValue, nil)
+        #expect(coordinator.displayState == .live)
+        coordinator.setDecoderWaitingForKeyframe(true)
+        #expect(coordinator.displayState == .waitingForKeyframe)
+        #expect(coordinator.uiState == .live)
+        #expect(coordinator.waitingForKeyframeEnteredAt == clock.now())
+        coordinator.setDecoderWaitingForKeyframe(false)
+        #expect(coordinator.displayState == .live)
+    }
+
+    @Test("stuck decoder: asks for a keyframe, then reconnects after 3s")
+    func stuckDecoderRequestsThenReconnects() {
+        let (client, coordinator, clock) = makeCoordinator()
+        var actions: [KeyframeRecoveryPolicy.Action] = []
+        coordinator.onRecoveryAction = { actions.append($0) }
+        client.sendConnectionState(.connected)
+        client.sendHelperState("test-device", GogglesXPC.GogglesState.live.rawValue, nil)
+        coordinator.setDecoderWaitingForKeyframe(true)
+        coordinator.tick()
+        #expect(actions == [.requestKeyframe])
+        for _ in 0..<12 {
+            clock.advance(0.25)
+            client.sendNAL("test-device", Data([0, 0, 0, 1, 0x41]), 1, false, 0)
+            coordinator.tick()
+        }
+        #expect(actions.contains(.reconnect))
+    }
+
+    @Test("a waiting decoder does not trigger recovery while the helper is not live")
+    func noRecoveryWithoutLive() {
+        let (client, coordinator, clock) = makeCoordinator()
+        var actions: [KeyframeRecoveryPolicy.Action] = []
+        coordinator.onRecoveryAction = { actions.append($0) }
+        client.sendConnectionState(.connected)
+        client.sendHelperState("test-device", GogglesXPC.GogglesState.noDevice.rawValue, nil)
+        coordinator.setDecoderWaitingForKeyframe(true)
+        for _ in 0..<40 { clock.advance(0.25); coordinator.tick() }
+        #expect(actions.isEmpty)
     }
 
     @Test("forceState reaches every one of the 9 kinds directly, for manual/--force-state visual verification")

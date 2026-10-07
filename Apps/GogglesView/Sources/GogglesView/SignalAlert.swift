@@ -26,6 +26,7 @@ enum SignalAlertPrefs {
     static let defaultSoundName = "Sosumi"
     static let repeatInterval: TimeInterval = 5
     static let restoredSoundName = "Glass"
+    static let restoreStability: TimeInterval = 2
     /// Standard macOS sounds offered in Settings.
     static let soundChoices = ["Sosumi", "Basso", "Funk", "Hero", "Ping", "Submarine"]
 
@@ -57,6 +58,9 @@ struct SignalAlertPolicy {
     struct Config: Equatable {
         var threshold: TimeInterval = TimeInterval(SignalAlertPrefs.defaultThreshold)
         var repeatInterval: TimeInterval = SignalAlertPrefs.repeatInterval
+        /// How long the signal must stay back before "restored" is announced, so a flapping
+        /// stream does not produce a notice every couple of seconds.
+        var restoreStability: TimeInterval = SignalAlertPrefs.restoreStability
     }
 
     enum Output: Equatable { case lost, restored, repeatReminder }
@@ -65,26 +69,51 @@ struct SignalAlertPolicy {
     /// Time of the last picture; nil until the first one (no alert before it).
     private(set) var lastFrameAt: Date?
     private(set) var isLost = false
+    var hasPendingRestore: Bool { restoreCandidateSince != nil }
     private var lastAlertAt: Date?
     private var acknowledged = false
     private var disconnected = false
+    /// When the picture came back while an alert was active; `.restored` fires once it held.
+    private var restoreCandidateSince: Date?
 
     init(config: Config = Config()) { self.config = config }
 
-    /// A picture arrived. Returns `.restored` if an alert was active.
+    /// A picture arrived. While an alert is active this starts the stability window; it returns
+    /// `.restored` at once only when `restoreStability` is zero, otherwise `tick` announces it.
     mutating func frameArrived(at time: Date) -> Output? {
         disconnected = false
         lastFrameAt = time
         guard isLost else { return nil }
+        if restoreCandidateSince == nil { restoreCandidateSince = time }
+        return restoreIfStable(now: time)
+    }
+
+    /// The signal went away again (state left live). `lastPicture` is when the last picture was
+    /// really seen (the controller backdates it by the watchdog's silence). Cancels a pending restore.
+    mutating func signalDropped(lastPicture: Date) {
+        disconnected = false
+        lastFrameAt = lastPicture
+        restoreCandidateSince = nil
+    }
+
+    private mutating func restoreIfStable(now: Date) -> Output? {
+        guard isLost, let since = restoreCandidateSince,
+              now.timeIntervalSince(since) >= config.restoreStability else { return nil }
         isLost = false
         acknowledged = false
         lastAlertAt = nil
+        restoreCandidateSince = nil
+        lastFrameAt = now
         return .restored
     }
 
     /// Periodic clock evaluation.
     mutating func tick(now: Date) -> Output? {
         guard !disconnected, let last = lastFrameAt else { return nil }
+        if isLost, restoreCandidateSince != nil {
+            // Back for a while but not yet long enough: stay quiet (no reminders either).
+            return restoreIfStable(now: now)
+        }
         if !isLost {
             guard now.timeIntervalSince(last) >= config.threshold else { return nil }
             isLost = true
@@ -102,6 +131,7 @@ struct SignalAlertPolicy {
     mutating func userDisconnected() {
         disconnected = true
         isLost = false
+        restoreCandidateSince = nil
         lastFrameAt = nil
         lastAlertAt = nil
         acknowledged = false
@@ -158,9 +188,14 @@ final class SignalAlertController {
         policy.config = SignalAlertPrefs.policyConfig()
         let t = now()
         if kind == .live {
-            if lastKind != .live { handle(policy.frameArrived(at: t)) }
+            if lastKind != .live {
+                handle(policy.frameArrived(at: t))
+                // Keep polling so a pending "restored" can fire once the signal held.
+                startTimer()
+            }
         } else if lastKind == .live {
-            handle(policy.frameArrived(at: t.addingTimeInterval(-Self.watchdogSilence)))
+            // The last picture was about `watchdogSilence` before the state left live.
+            policy.signalDropped(lastPicture: t.addingTimeInterval(-Self.watchdogSilence))
             startTimer()
             evaluate()
         }
@@ -178,7 +213,7 @@ final class SignalAlertController {
         policy.config = SignalAlertPrefs.policyConfig()
         handle(policy.tick(now: now()))
         // Back to live and nothing pending: no need to keep polling.
-        if lastKind == .live, !policy.isLost {
+        if lastKind == .live, !policy.isLost, !policy.hasPendingRestore {
             timer?.invalidate(); timer = nil
         }
     }

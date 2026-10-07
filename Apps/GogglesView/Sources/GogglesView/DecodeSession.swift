@@ -79,6 +79,54 @@ final class DecodeSession: ObservableObject {
     private var latestDecoded: CVPixelBuffer?
     private let stabilizer = Stabilizer()
     private(set) var teardownCount = 0
+    private var lastPictureAt: UInt64 = 0
+
+    /// True while the decoder has no keyframe to start from: before the first picture, after a
+    /// decoder reset, a teardown or dropped input. The helper may still report `.live` then, so
+    /// the UI uses this to show the "waiting for the first picture" card and the connection
+    /// coordinator uses it to ask for a keyframe (see `KeyframeRecoveryPolicy`).
+    @Published private(set) var isWaitingForKeyframe = true
+
+    private func setWaitingForKeyframe(_ waiting: Bool) {
+        if Thread.isMainThread {
+            if isWaitingForKeyframe != waiting { isWaitingForKeyframe = waiting }
+        } else {
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.isWaitingForKeyframe != waiting else { return }
+                self.isWaitingForKeyframe = waiting
+            }
+        }
+    }
+
+    /// True when a picture was decoded within the last `seconds` (genuine live video).
+    func hasRecentPicture(within seconds: TimeInterval = 1) -> Bool {
+        frameLock.lock(); let last = lastPictureAt; frameLock.unlock()
+        guard last > 0 else { return false }
+        let now = DispatchTime.now().uptimeNanoseconds
+        return now >= last && Double(now - last) / 1_000_000_000 <= seconds
+    }
+
+    /// Runs `action` (main queue) once a picture has been decoded in the last second, polling
+    /// until `timeout`. Used to start automatic recording only for real video.
+    func whenPictureFlowing(timeout: TimeInterval = 5, _ action: @escaping () -> Void) {
+        let deadline = DispatchTime.now() + timeout
+        func poll() {
+            if hasRecentPicture() { action(); return }
+            guard DispatchTime.now() < deadline else { return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { poll() }
+        }
+        DispatchQueue.main.async { poll() }
+    }
+
+    /// Input was dropped upstream (backlog): the decoder must restart at the next IDR.
+    func noteInputDropped() {
+        decoderReady = false
+        stabilizer.reset()
+        setWaitingForKeyframe(true)
+    }
+
+    /// The stabilizer's own state (cost, bypass), for the Settings caption and tests.
+    var stabilizerBypassed: Bool { stabilizer.isBypassed }
 
     /// Fired (on whatever queue `handle`/`recordExternalFailure` is called
     /// on) whenever a sample is dropped -- parameter-set parse failure,
@@ -104,7 +152,7 @@ final class DecodeSession: ObservableObject {
 
     init() {}
 
-    deinit { invalidateDecoder() }
+    deinit { releaseDecoder() }
 
     /// Attaches (or replaces) the render target. Safe to call before any
     /// NAL has been seen, and again later (e.g. `GogglesVideoView` handing
@@ -149,14 +197,20 @@ final class DecodeSession: ObservableObject {
 
     /// Re-encodes the displayed picture with a keyframe every second (see `ReencodeHub`).
     private let outputProcessor = OutputProcessor()
+    private let outputStage = OutputFrameStage()
     lazy var reencodeHub = ReencodeHub(
         source: { [weak self] in self?.outputFrame() },
-        onIdle: { [weak self] in self?.outputProcessor.reset() })
+        onIdle: { [weak self] in self?.outputProcessor.reset(); self?.outputStage.reset() })
 
     /// The picture that leaves the app (recordings, replay, streams): decoded frame with the output crop and look.
+    /// The crop and look render on a background queue, so this returns the previous poll's result.
     private func outputFrame() -> CVPixelBuffer? {
-        guard let frame = latestDecodedFrame() else { return nil }
-        return outputProcessor.process(frame)
+        guard OutputProcessor.isActive else {
+            outputStage.reset()
+            return latestDecodedFrame()
+        }
+        let processor = outputProcessor
+        return outputStage.next(source: { latestDecodedFrame() }, process: { processor.process($0) })
     }
 
     /// For consumers that must be able to start cleanly at any time (replay, network outputs).
@@ -270,6 +324,7 @@ final class DecodeSession: ObservableObject {
             // A decoder joining mid-stream would only produce grey; wait for a real IDR.
             guard Recorder.containsIDR(avcc: avcc) == true else { return }
             decoderReady = true
+            setWaitingForKeyframe(false)
         }
         let status = VTDecompressionSessionDecodeFrame(
             decoder, sampleBuffer: sample,
@@ -316,7 +371,7 @@ final class DecodeSession: ObservableObject {
         }
     }
 
-    private func invalidateDecoder() {
+    private func releaseDecoder() {
         if let d = decoder {
             VTDecompressionSessionWaitForAsynchronousFrames(d)
             VTDecompressionSessionInvalidate(d)
@@ -325,14 +380,24 @@ final class DecodeSession: ObservableObject {
         decoderReady = false
     }
 
+    private func invalidateDecoder() {
+        releaseDecoder()
+        // The next picture is unrelated to the old session's frames.
+        stabilizer.reset()
+        setWaitingForKeyframe(true)
+    }
+
     /// Decoder output (VideoToolbox thread): remember the picture and hand it to every display layer.
     private func decoded(status: OSStatus, image decodedImage: CVImageBuffer?, pts: CMTime) {
         guard status == noErr, var image = decodedImage else {
             if status != noErr { recordFailure(DecodeSessionError.decoderFailed(status)) }
             return
         }
-        if CFGetTypeID(image) == CVPixelBufferGetTypeID() { image = stabilizer.process(image as! CVPixelBuffer) }
-        frameLock.lock(); latestDecoded = image; frameLock.unlock()
+        if CFGetTypeID(image) == CVPixelBufferGetTypeID() {
+            stabilizer.noteTimestamp(pts.value)
+            image = stabilizer.process(image as! CVPixelBuffer)
+        }
+        frameLock.lock(); latestDecoded = image; lastPictureAt = DispatchTime.now().uptimeNanoseconds; frameLock.unlock()
         var fd: CMVideoFormatDescription?
         guard CMVideoFormatDescriptionCreateForImageBuffer(allocator: nil, imageBuffer: image, formatDescriptionOut: &fd) == noErr,
               let fd else { return }
@@ -353,6 +418,7 @@ final class DecodeSession: ObservableObject {
 
     /// Dev aid for documentation screenshots (`--doc-shot`): shows `image` as if the decoder had produced it.
     func injectDecodedFrame(_ image: CVPixelBuffer) {
+        setWaitingForKeyframe(false)
         decoded(status: noErr, image: image, pts: CMClockGetTime(CMClockGetHostTimeClock()))
     }
 
