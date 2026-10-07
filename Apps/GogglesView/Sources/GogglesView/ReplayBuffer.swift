@@ -12,6 +12,20 @@ enum ReplayPrefs {
         guard UserDefaults.standard.object(forKey: secondsKey) != nil else { return 30 }
         return min(max(UserDefaults.standard.integer(forKey: secondsKey), secondsRange.lowerBound), secondsRange.upperBound)
     }
+
+    /// Replay needs a keyframe every second, which only the re-encoded stream has: the raw goggles stream
+    /// has a single keyframe at the start, so a buffer cut from it would never be playable.
+    static var isAvailable: Bool { isAvailable(reencode: ReencodePrefs.enabled, outputActive: OutputProcessor.isActive) }
+    static func isAvailable(reencode: Bool, outputActive: Bool) -> Bool { reencode || outputActive }
+
+    static let unavailableMessage = "Instant replay needs the keyframe encoder. Turn it on in Settings > Streaming."
+
+    /// The window the memory cap really allows at a given bitrate (the buffer holds at most `byteCap` bytes).
+    static func achievableSeconds(requested: Int, bitrateMbps: Int, byteCap: Int = ReplayBuffer.byteCap) -> Int {
+        guard bitrateMbps > 0 else { return requested }
+        let limit = Int(Double(byteCap) * 8 / (Double(bitrateMbps) * 1_000_000))
+        return min(requested, limit)
+    }
 }
 
 /// Pure rolling-window logic, generic so it can be tested without real sample buffers.
@@ -40,10 +54,12 @@ struct ReplayWindow<Item> {
         guard let last = entries.last else { return }
         // Drop the oldest group while the next keyframe still leaves >= maxSeconds.
         while let next = nextKeyIndex(), entries[next].pts <= last.pts - maxSeconds { drop(next) }
-        // Byte cap: drop oldest groups; a lone oversized group is dropped entirely.
-        while totalBytes > maxBytes && !entries.isEmpty {
-            if let next = nextKeyIndex() { drop(next) } else { removeAll() }
-        }
+        // Byte cap: drop whole oldest groups while a later keyframe exists. The only group left is never
+        // discarded (that would empty the buffer for good); it may overshoot the cap until the next
+        // keyframe lets the older part go. Past twice the cap, with no keyframe in sight, start over
+        // at the next keyframe instead of growing without bound.
+        while totalBytes > maxBytes, let next = nextKeyIndex() { drop(next) }
+        if maxBytes <= Int.max / 2, totalBytes > maxBytes * 2 { removeAll() }
     }
 
     private func nextKeyIndex() -> Int? { entries.indices.dropFirst().first { entries[$0].isKey } }

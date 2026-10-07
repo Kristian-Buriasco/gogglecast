@@ -7,13 +7,22 @@ struct ReplayControl: View {
     @StateObject private var buffer = ReplayBuffer()
     @AppStorage(ReplayPrefs.enabledKey) private var enabled = false
     @AppStorage(ReplayPrefs.secondsKey) private var seconds = 30
+    // Observed only so the control updates when the encoder setting changes.
+    @AppStorage(ReencodePrefs.enabledKey) private var reencode = true
     @State private var toast: String?
 
     init(session: DecodeSession) { self.session = session }
 
     var body: some View {
         Group {
-            if enabled {
+            if enabled && !available {
+                Image(systemName: "gobackward")
+                    .foregroundStyle(Color.secondary.opacity(0.5))
+                    .help(ReplayPrefs.unavailableMessage)
+                    .accessibilityLabel("Instant replay unavailable")
+                    .accessibilityValue(ReplayPrefs.unavailableMessage)
+                    .accessibilityIdentifier("replayButton")
+            } else if enabled {
                 HStack(spacing: 6) {
                     Button { save() } label: { Image(systemName: "gobackward") }
                         .keyboardShortcut("p", modifiers: [.command, .shift])
@@ -29,17 +38,20 @@ struct ReplayControl: View {
         .onAppear { sync() }
         .onDisappear { session.removeConsumer(buffer); buffer.clear() }
         .onChange(of: enabled) { _, _ in sync() }
+        .onChange(of: reencode) { _, _ in sync() }
         .onChange(of: seconds) { _, _ in buffer.setSeconds(clamped) }
         .onReceive(NotificationCenter.default.publisher(for: .gogglesSaveReplay)) { n in
             guard GlobalHotkeyRouting.shouldHandle(n, session: session) else { return }
-            if enabled && buffer.bufferedSeconds >= 1 { save() }
+            if enabled && available && buffer.bufferedSeconds >= 1 { save() }
         }
     }
 
     private var clamped: Int { min(max(seconds, ReplayPrefs.secondsRange.lowerBound), ReplayPrefs.secondsRange.upperBound) }
 
+    private var available: Bool { _ = reencode; return ReplayPrefs.isAvailable }
+
     private func sync() {
-        if enabled {
+        if enabled && available {
             buffer.setSeconds(clamped)
             session.addKeyframeSafeConsumer(buffer)
         } else {
@@ -67,6 +79,16 @@ struct ReplayControl: View {
 struct ReplaySettingsSection: View {
     @AppStorage(ReplayPrefs.enabledKey) private var enabled = false
     @AppStorage(ReplayPrefs.secondsKey) private var seconds = 30
+    @AppStorage(ReencodePrefs.enabledKey) private var reencode = true
+    @AppStorage(ReencodePrefs.bitrateKey) private var bitrate = ReencodePrefs.defaultBitrate
+
+    private var caption: String {
+        if !(reencode || OutputProcessor.isActive) { return ReplayPrefs.unavailableMessage }
+        let real = ReplayPrefs.achievableSeconds(requested: seconds, bitrateMbps: bitrate)
+        let cap = ReplayBuffer.byteCap / (1024 * 1024)
+        let window = real < seconds ? "At \(bitrate) Mbps the buffer holds about \(real) s, not \(seconds) s. " : ""
+        return window + "The buffer lives in memory and uses up to \(cap) MB while replay is on."
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -74,6 +96,7 @@ struct ReplaySettingsSection: View {
             Toggle("Keep a replay buffer (⇧⌘P saves it)", isOn: $enabled)
             Stepper("Window: \(seconds) s", value: $seconds, in: ReplayPrefs.secondsRange, step: 5)
                 .disabled(!enabled)
+            Text(caption).font(.caption).foregroundStyle(.secondary)
         }
     }
 }
