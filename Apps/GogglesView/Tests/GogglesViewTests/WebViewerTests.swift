@@ -119,7 +119,7 @@ struct WebViewerTests {
         server.stop()
         let lan = WebViewerServer()
         lan.start(port: 18092, allowLAN: true, token: "")
-        try await Task.sleep(nanoseconds: 300_000_000)
+        for _ in 0..<50 where lan.lastError == nil { try await Task.sleep(nanoseconds: 100_000_000) }
         #expect(!lan.isRunning)
         #expect(lan.lastError != nil)
     }

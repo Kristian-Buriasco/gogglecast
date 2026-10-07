@@ -79,6 +79,10 @@ extension AutomationCommand {
         case .startStream: return "Start network stream"
         case .stopStream: return "Stop network stream"
         case .showWindow: return "Show window"
+        case .copyFrame: return "Copy frame"
+        case .raceOn: return "Race mode on"
+        case .raceOff: return "Race mode off"
+        case .raceToggle: return "Toggle race mode"
         }
     }
 }
