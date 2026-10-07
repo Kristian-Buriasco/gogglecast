@@ -321,6 +321,15 @@
           <p class="note">Questa immagine è ridisegnata a partire dalle voci del menu, non è una cattura dello schermo.</p>
         </div>
       </div>
+      <div class="steps more">
+        <div>
+          <h3>L'overlay fa parte dell'immagine</h3>
+          <p>I goggles disegnano il proprio overlay (dati di volo, batteria, qualità del link, avvisi di memoria) nel video che inviano. Con un drone collegato, l'immagine della camera stava al centro del quadro a circa il 70% di larghezza e altezza, con l'overlay nei margini.</p>
+          <p>Quell'overlay compare in OBS e nelle registrazioni. Per avere un'immagine pulita spegnilo sui goggles oppure ritaglialo. Con la scala del display dei goggles a circa 70%, un ritaglio centrato di circa 1,4x (zoom di Output framing, o il tuo editor) cade sull'immagine, e l'originale non ritagliato conserva i dati.</p>
+          <p class="note">Il frame rate dipende da ciò che inviano i goggles: circa 35 fotogrammi al secondo nel nostro test con un drone collegato, 60 in uno precedente.</p>
+        </div>
+        <div class="screen"><img src="../images/overlay-crop.png" alt="Un fotogramma dai goggles con l'immagine al centro, i dati dell'overlay intorno e un riquadro tratteggiato che indica un ritaglio centrato di circa 1,4x" width="1600" height="900" loading="lazy"></div>
+      </div>
     </section>
 
     <section id="setup" aria-labelledby="setup-h">

@@ -47,6 +47,16 @@ The clip gallery picture uses generated sample clips, and the menu picture is re
 - Session log, benchmark/latency report, diagnostics, onboarding and self-test.
 - Secrets (stream key, tokens, webhooks) kept in the Keychain.
 
+## The goggles' overlay
+
+The goggles draw their own overlay (flight data, battery, link strength, storage warnings) into the video they send, so it also appears in OBS, recordings and streams. With a drone linked, the camera picture sat in the middle of the frame at about 70% of its width and height, with the overlay in the margins.
+
+![A goggles frame with the picture in the middle, the overlay around it and a dashed box marking a centred crop of about 1.4x](docs/images/overlay-crop.png)
+
+To get a clean picture, turn the overlay off on the goggles or crop it out. With the goggles' display scale at about 70%, a centred crop of about 1.4x (Settings > Display > Output framing zoom, or your editor) lands on the picture, and the uncropped original keeps the data. The app tells you once when you first start a stream or the capture window.
+
+Frame rate follows what the goggles send: about 35 frames per second in our test with a drone linked, 60 in an earlier one.
+
 ## Requirements
 
 - Apple Silicon Mac, macOS 14 (Sonoma) or later (`Package.swift` platform `.macOS(.v14)`; the bundled libusb is universal, but only arm64 has been tested).

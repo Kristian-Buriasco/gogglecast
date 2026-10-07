@@ -321,6 +321,15 @@
           <p class="note">This image is redrawn from the menu's own items, not a screen capture.</p>
         </div>
       </div>
+      <div class="steps more">
+        <div>
+          <h3>The overlay is part of the picture</h3>
+          <p>The goggles draw their own overlay (flight data, battery, link strength, storage warnings) into the video they send. With a drone linked, the camera picture sat in the middle of that frame at about 70% of its width and height, with the overlay in the margins.</p>
+          <p>That overlay shows up in OBS and in recordings. To get a clean picture, turn it off on the goggles or crop it out. With the goggles' display scale at about 70%, a centred crop of about 1.4x (Output framing zoom, or your editor) lands on the picture, and the uncropped original keeps the data.</p>
+          <p class="note">Frame rate follows what the goggles send: about 35 frames per second in our test with a drone linked, 60 in an earlier one.</p>
+        </div>
+        <div class="screen"><img src="images/overlay-crop.png" alt="A frame from the goggles with the picture in the middle, the overlay data around it and a dashed box marking a centred crop of about 1.4x" width="1600" height="900" loading="lazy"></div>
+      </div>
     </section>
 
     <section id="setup" aria-labelledby="setup-h">
@@ -353,7 +362,7 @@
           <dt>The goggles' overlay is in the picture</dt>
           <dd>The goggles draw their own on-screen display (flight data, battery, storage warnings) into the video they send, so it shows in OBS and recordings too. Turn it off on the goggles, or crop it out with Output framing. The app tells you once when you start a stream. To crop later but keep the overlay's data in the original, set the goggles' display scale to about 70% so the picture sits inside the frame, then crop about 1.4x from the centre.</dd>
           <dt>Only Goggles 3 has been tried</dt>
-          <dd>Other DJI goggles may or may not work. Nobody has checked.</dd>
+          <dd>Tested with Goggles 3 and a linked drone on Apple Silicon. Other DJI goggles may or may not work. Nobody has checked.</dd>
           <dt>Apple Silicon only</dt>
           <dd>The bundled USB library is universal, but nothing has run on an Intel Mac.</dd>
           <dt>Not notarized</dt>

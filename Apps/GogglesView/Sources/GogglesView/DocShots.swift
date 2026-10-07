@@ -169,7 +169,15 @@ enum DocShots {
             exit(ok ? 0 : 1)
         }
         let session = DecodeSession()
-        let frame = pixelBuffer(scene(width: 1920, height: 1080), width: 1920, height: 1080)
+        // GOGGLESVIEW_DOC_PICTURE=/path/to/1920x1080.png uses a real frame instead of the generated scene.
+        let picture: CIImage = {
+            if let path = ProcessInfo.processInfo.environment["GOGGLESVIEW_DOC_PICTURE"], let img = CIImage(contentsOf: URL(fileURLWithPath: path)) {
+                let sx = 1920 / img.extent.width, sy = 1080 / img.extent.height
+                return img.transformed(by: CGAffineTransform(scaleX: sx, y: sy))
+            }
+            return scene(width: 1920, height: 1080)
+        }()
+        let frame = pixelBuffer(picture, width: 1920, height: 1080)
         var window: NSWindow?
         var delay = 2.0
 
