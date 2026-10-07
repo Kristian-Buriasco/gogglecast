@@ -16,6 +16,9 @@ final class Recorder: ObservableObject, SampleBufferRendering {
 
     init() { RecordingExtras.runLaunchCleanupOnce() }
 
+    /// Supplies goggles/resolution info for the clip's `.gvmeta.json` sidecar; set by the host view.
+    var metadataProvider: (() -> ClipRecordInfo?)?
+
     private let lock = NSLock()
     private var url: URL?
     private var writer: AVAssetWriter?
@@ -158,6 +161,7 @@ final class Recorder: ObservableObject, SampleBufferRendering {
         Logging.recorder.info("armed, waiting for a start frame: \(url.lastPathComponent, privacy: .public)")
         startTime = nil; lastPTS = nil
         lock.unlock()
+        ClipMetadataStore.writeRecordInfo(metadataProvider?(), for: url)
         if let (hub, relay) = relayToSubscribe { DispatchQueue.main.async { hub.subscribe(relay) } }
         DispatchQueue.main.async { self.lastError = nil; self.elapsed = 0; self.markers = []; self.isRecording = true }
     }

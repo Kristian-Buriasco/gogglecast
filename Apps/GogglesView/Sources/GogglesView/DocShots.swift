@@ -166,6 +166,15 @@ enum DocShots {
                 do { try makeClip(at: u, seconds: s.1, shift: s.2) } catch { finish(false) }
                 let date = now.addingTimeInterval(-Double(i) * 86_400 * 1.3 - 3600)
                 try? FileManager.default.setAttributes([.creationDate: date, .modificationDate: date], ofItemAtPath: u.path)
+                // Placeholder tags, notes and goggles only.
+                let tagSets = [["freestyle", "coast"], ["coast", "cruise"], ["freestyle"], ["coast"], ["cruise", "forest"], []]
+                var meta = ClipMetadata()
+                meta.tags = tagSets[i]
+                meta.favourite = i == 0 || i == 2
+                meta.note = i == 0 ? "Calm air, first pack of the day" : ""
+                meta.gogglesName = i % 2 == 0 ? "Goggles A" : "Goggles B"
+                meta.gogglesSerial = i % 2 == 0 ? "SN-A-0001" : "SN-B-0002"
+                ClipMetadataStore.write(meta, for: u)
             }
             d.set(dir.path, forKey: RecordingPrefs.folderKey)
             ClipGalleryWindowController.shared.show()
