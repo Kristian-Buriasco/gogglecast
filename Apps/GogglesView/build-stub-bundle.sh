@@ -156,6 +156,7 @@ cp "$SCRIPT_DIR/BundleResources/com.kburiasco.gogglesview.autoopen.plist" \
 # AppleScript dictionary (Info.plist OSAScriptingDefinition -> Resources/).
 mkdir -p "$APP_BUNDLE/Contents/Resources"
 cp "$SCRIPT_DIR/BundleResources/GogglesView.sdef" "$APP_BUNDLE/Contents/Resources/GogglesView.sdef"
+cp "$SCRIPT_DIR/BundleResources/AppIcon.icns" "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
 
 if [[ -n "$INTENTS_META" ]]; then
     cp -R "$INTENTS_META" "$APP_BUNDLE/Contents/Resources/Metadata.appintents"

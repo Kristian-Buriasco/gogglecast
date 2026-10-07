@@ -7,6 +7,7 @@ All notable changes to this project are documented here. Format based on [Keep a
 ## [0.6.2] - 2026-10-07
 
 ### Added
+- An app icon. The app and its DMG had none, so the Dock and Finder showed the generic icon. The artwork is in `docs/images/app-icon.png`.
 - Back up settings (Settings > General): export your preferences to one JSON file and import them on another Mac. Secrets and identifiers (stream keys, passphrases, tokens, webhook and script paths, goggles profiles, folder paths, window positions) are never exported, and switches that open the app to the network (web viewer, URL commands, automatic installs) are not imported.
 - Troubleshooting card at the top of Settings > General with a one-line health state and buttons for the setup assistant, Reconnect, Connection health and diagnostics. Benchmark, self test and session log moved under "Developer tools" in Settings > Advanced.
 
