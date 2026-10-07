@@ -134,4 +134,16 @@ struct RecorderTests {
         let pAfterSEI: [UInt8] = [0, 0, 0, 2, 0x06, 9, 0, 0, 0, 3, 0x41, 1, 2]
         #expect(Recorder.containsIDR(avcc: pAfterSEI) == false)
     }
+
+    @Test func seiOrAccessUnitDelimiterOnlySamplesAreNotKeyframes() {
+        let sei: [UInt8] = [0, 0, 0, 2, 0x06, 9]
+        let aud: [UInt8] = [0, 0, 0, 2, 0x09, 0xF0]
+        let seiAndAud: [UInt8] = [0, 0, 0, 2, 0x09, 0xF0, 0, 0, 0, 2, 0x06, 9]
+        let withSlice: [UInt8] = [0, 0, 0, 2, 0x06, 9, 0, 0, 0, 3, 0x41, 1, 2]
+        #expect(Recorder.containsOnlyNonPictureNALs(avcc: sei))
+        #expect(Recorder.containsOnlyNonPictureNALs(avcc: aud))
+        #expect(Recorder.containsOnlyNonPictureNALs(avcc: seiAndAud))
+        #expect(!Recorder.containsOnlyNonPictureNALs(avcc: withSlice))
+        #expect(!Recorder.containsOnlyNonPictureNALs(avcc: [UInt8]()))
+    }
 }

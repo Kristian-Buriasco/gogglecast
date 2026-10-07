@@ -152,9 +152,27 @@ final class Recorder: ObservableObject, SampleBufferRendering {
                let ptr {
                 let bytes = UnsafeBufferPointer(start: UnsafeRawPointer(ptr).assumingMemoryBound(to: UInt8.self), count: length)
                 if let idr = containsIDR(avcc: bytes) { return idr }
+                if containsOnlyNonPictureNALs(avcc: bytes) { return false }
             }
         }
         return true
+    }
+
+    /// True when the sample holds NALs but none can start a picture (SEI, access unit delimiter, filler).
+    static func containsOnlyNonPictureNALs<C: Collection>(avcc: C) -> Bool where C.Element == UInt8, C.Index == Int {
+        var i = avcc.startIndex
+        var seen = false
+        while i + 4 < avcc.endIndex {
+            let len = (Int(avcc[i]) << 24) | (Int(avcc[i + 1]) << 16) | (Int(avcc[i + 2]) << 8) | Int(avcc[i + 3])
+            let h = i + 4
+            guard len > 0, h < avcc.endIndex else { return false }
+            switch avcc[h] & 0x1F {
+            case 6, 9, 12: seen = true
+            default: return false
+            }
+            i = h + len
+        }
+        return seen
     }
 
     /// Scans 4-byte-length-prefixed NALs: true if any is an IDR slice (type 5),

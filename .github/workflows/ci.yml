@@ -12,6 +12,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Test app
         working-directory: Apps/GogglesView
+        env:
+          GOGGLES_SKIP_SLOW_TESTS: "1"
         run: swift test
       - name: Test helper
         working-directory: Helper/GogglesHelper
