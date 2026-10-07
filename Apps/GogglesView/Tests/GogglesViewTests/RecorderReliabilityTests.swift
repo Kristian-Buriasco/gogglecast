@@ -2,6 +2,7 @@ import AVFoundation
 import Combine
 import CoreMedia
 import Foundation
+import GogglesH264
 import Testing
 @testable import GogglesView
 

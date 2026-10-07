@@ -163,7 +163,7 @@ final class DecodeSession: ObservableObject {
     /// For consumers that must be able to start cleanly at any time (replay, network outputs).
     /// Gets the re-encoded stream, or the raw one when re-encoding is turned off in Settings.
     func addKeyframeSafeConsumer(_ consumer: SampleBufferRendering) {
-        if ReencodePrefs.enabled || OutputProcessor.isActive {
+        if ReencodePrefs.enabled || OutputProcessor.needsReencodedStream {
             consumerLock.lock()
             extraConsumers.removeAll { $0.value == nil || $0.value === consumer }
             consumerLock.unlock()
