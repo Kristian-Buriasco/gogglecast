@@ -55,6 +55,7 @@ struct SettingsView: View {
                         card { launchAtLoginSection }
                         card { AutoOpenSettingsSection() }
                         card { PresetsSettingsSection() }
+                        card { SettingsBackupSection() }
                         card { ProfileSettingsSection(deviceSerial: profileContext.serial) }
                         card { UpdateSettingsSection() }
                         card { MenuBarItemSettingsToggle() }
