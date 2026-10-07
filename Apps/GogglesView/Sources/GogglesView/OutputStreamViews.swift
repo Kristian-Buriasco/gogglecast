@@ -117,7 +117,7 @@ struct NDISettingsSection: View {
             LibraryPathRow(title: "libndi.dylib path (optional)", path: $libPath)
             TextField("Source name", text: $name)
             Toggle("I accept the unverified NDI ABI (may crash)", isOn: $ack).disabled(found == nil)
-            Text("The NDI struct layouts were written without the SDK headers to check against. Video is decoded to UYVY and sent as-is (CPU cost, small added latency).")
+            Text("Experimental: may not work with every NDI receiver.")
                 .font(.caption).foregroundStyle(.secondary)
         }
     }

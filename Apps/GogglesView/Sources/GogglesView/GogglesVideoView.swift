@@ -70,7 +70,23 @@ final class SampleBufferHostView: NSView {
         onFailedToDecode?(error ?? DecodeSessionError.sampleBufferCreationFailed(-1))
     }
 
-    @objc private func orientationChanged() { needsLayout = true }
+    private var prefsWork: DispatchWorkItem?
+
+    /// Any preference change (rotation, framing, colour, LUT name/intensity/toggles) re-lays out the picture and
+    /// re-applies the colour filters, so the preview follows Settings live. Coalesced on the main queue.
+    @objc private func orientationChanged() {
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.prefsWork?.cancel()
+            let work = DispatchWorkItem { [weak self] in
+                guard let self else { return }
+                self.displayLayer.filters = FramingPrefs.colorFilters()
+                self.needsLayout = true
+            }
+            self.prefsWork = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1, execute: work)
+        }
+    }
 
     // MARK: Framing (crop / zoom / pan / grid / color)
 

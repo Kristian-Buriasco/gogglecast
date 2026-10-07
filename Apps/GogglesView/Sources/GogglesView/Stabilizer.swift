@@ -305,7 +305,7 @@ struct StabilizerSettingsSection: View {
                 Text("Stabilization is paused because this Mac can't keep up with the frame rate. It tries again every few seconds.")
                     .font(.caption).foregroundStyle(.orange)
             }
-            Text("Electronic stabilization: removes shake from the picture without waiting for future frames, so it adds processing time (a few ms) but no frames of delay. It zooms in 4 to 10% to hide the edges, doesn't correct rotation, and applies to recordings and streams made from the live picture. Stronger = smoother but a little more lag on real pans.")
+            Text("Smooths shaky footage. Zooms in slightly (4 to 10%) to hide the edges and adds a tiny delay (a few ms). Applies to the preview, recordings and streams.")
                 .font(.caption).foregroundStyle(.secondary)
         }
     }

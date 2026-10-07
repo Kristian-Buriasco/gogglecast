@@ -166,4 +166,11 @@ enum SetupDiagnosis {
     static func isComplete(_ steps: [Step]) -> Bool {
         !steps.isEmpty && steps.allSatisfy { $0.state == .done }
     }
+
+    /// One line for Settings: all good, or the first step that needs attention.
+    static func healthLine(_ steps: [Step]) -> String {
+        if isComplete(steps) { return "Everything is working." }
+        guard let step = steps.first(where: { $0.state != .done }) else { return "Checking…" }
+        return "\(step.title): \(step.message)"
+    }
 }
