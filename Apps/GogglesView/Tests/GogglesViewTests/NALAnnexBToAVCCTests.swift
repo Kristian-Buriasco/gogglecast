@@ -1,6 +1,7 @@
 import Testing
 import Foundation
 @testable import GogglesView
+import GogglesH264
 
 @Suite("NALAnnexBToAVCC")
 struct NALAnnexBToAVCCTests {

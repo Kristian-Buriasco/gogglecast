@@ -12,7 +12,7 @@ import Foundation
 // leading start code to strip and replace.
 // ─────────────────────────────────────────────────────────────────────────
 
-enum AnnexBConversionError: Error, Equatable {
+public enum AnnexBConversionError: Error, Equatable {
     /// `data` didn't begin with a recognized Annex-B start code (neither
     /// the 3-byte `00 00 01` nor 4-byte `00 00 00 01` form). Per
     /// `Pipeline.swift`'s "00 00 00 01 start code FrameReassembler always
@@ -25,7 +25,7 @@ enum AnnexBConversionError: Error, Equatable {
     case emptyPayload
 }
 
-enum NALAnnexBToAVCC {
+public enum NALAnnexBToAVCC {
     /// Converts one Annex-B start-code-prefixed NAL into AVCC form: the
     /// leading start code stripped and replaced with a 4-byte big-endian
     /// length prefix (matching the `nalUnitHeaderLength: 4` used to build
@@ -37,7 +37,7 @@ enum NALAnnexBToAVCC {
     /// (design.md §5.3 point 1's "don't assume either form"), even though
     /// the one confirmed real-world producer (`FrameReassembler`) always
     /// uses the 4-byte form.
-    static func convert(_ data: Data) throws -> Data {
+    public static func convert(_ data: Data) throws -> Data {
         let bytes = [UInt8](data)
         guard let startCodeLength = startCodeLength(in: bytes) else {
             throw AnnexBConversionError.noStartCode

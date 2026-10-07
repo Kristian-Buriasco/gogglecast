@@ -2,6 +2,7 @@ import Testing
 import CoreMedia
 import Foundation
 @testable import GogglesView
+import GogglesH264
 
 // ─────────────────────────────────────────────────────────────────────────
 // Task 3.2, design.md §9.1 item 4 (verbatim): "Parameter-set split test on

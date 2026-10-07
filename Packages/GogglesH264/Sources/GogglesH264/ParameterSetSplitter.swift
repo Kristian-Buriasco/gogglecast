@@ -20,12 +20,16 @@ import CoreMedia
 /// and `payload` is the raw NAL bytes (header byte included, start code
 /// excluded) -- exactly the form `CMVideoFormatDescriptionCreateFromH264ParameterSets`
 /// wants for a parameter set.
-struct NALUnit: Equatable {
-    let type: UInt8
-    let payload: [UInt8]
+public struct NALUnit: Equatable {
+    public let type: UInt8
+    public let payload: [UInt8]
+    public init(type: UInt8, payload: [UInt8]) {
+        self.type = type
+        self.payload = payload
+    }
 }
 
-enum ParameterSetError: Error, Equatable {
+public enum ParameterSetError: Error, Equatable {
     /// The blob split into NALs but no type-7 (SPS) was among them.
     case missingSPS
     /// The blob split into NALs but no type-8 (PPS) was among them.
@@ -35,7 +39,7 @@ enum ParameterSetError: Error, Equatable {
     case formatDescriptionCreationFailed(OSStatus)
 }
 
-enum ParameterSetSplitter {
+public enum ParameterSetSplitter {
 
     /// Splits an Annex-B byte blob into individual NAL units.
     ///
@@ -50,7 +54,7 @@ enum ParameterSetSplitter {
     /// array rather than throwing -- there is nothing NAL-shaped to report,
     /// and callers (see `ParameterSetFormatDescriptionCache`) already treat
     /// "no SPS found" / "no PPS found" as the actionable error condition.
-    static func split(_ blob: [UInt8]) -> [NALUnit] {
+    public static func split(_ blob: [UInt8]) -> [NALUnit] {
         let ranges = startCodeRanges(in: blob)
         guard !ranges.isEmpty else { return [] }
 
@@ -105,7 +109,7 @@ enum ParameterSetSplitter {
     /// big-endian length prefixes) -- it has no bearing on how the
     /// parameter sets themselves are passed here, which is as bare
     /// pointer+size pairs with no length prefix or start code at all.
-    static func makeFormatDescription(sps: [UInt8], pps: [UInt8]) throws -> CMVideoFormatDescription {
+    public static func makeFormatDescription(sps: [UInt8], pps: [UInt8]) throws -> CMVideoFormatDescription {
         var formatDescription: CMFormatDescription?
         let status = sps.withUnsafeBufferPointer { spsBuffer -> OSStatus in
             pps.withUnsafeBufferPointer { ppsBuffer -> OSStatus in
@@ -134,7 +138,7 @@ enum ParameterSetSplitter {
     /// Convenience combining `split(_:)` + parameter-set extraction +
     /// `makeFormatDescription(sps:pps:)` in one call, for a raw bundled
     /// SPS+PPS blob straight off the wire.
-    static func formatDescription(fromBundledBlob blob: [UInt8]) throws -> CMVideoFormatDescription {
+    public static func formatDescription(fromBundledBlob blob: [UInt8]) throws -> CMVideoFormatDescription {
         let nals = split(blob)
         guard let sps = nals.first(where: { $0.type == 7 })?.payload else {
             throw ParameterSetError.missingSPS
@@ -163,8 +167,8 @@ enum ParameterSetSplitter {
 /// arrives. Not thread-safe by design -- like `NALFPSCounter`/`HelperClient`
 /// state, callers are expected to serialize access on their own queue (the
 /// XPC callback queue, in the eventual Task 3.3 caller).
-final class ParameterSetFormatDescriptionCache {
-    private(set) var formatDescription: CMVideoFormatDescription?
+public final class ParameterSetFormatDescriptionCache {
+    public private(set) var formatDescription: CMVideoFormatDescription?
     private var lastBlob: [UInt8]?
 
     /// Incremented every time `update(withBundledBlob:)` actually rebuilds
@@ -173,9 +177,9 @@ final class ParameterSetFormatDescriptionCache {
     /// purely so the memoization behavior is directly assertable in tests,
     /// independent of `CMFormatDescription`'s CoreFoundation identity
     /// semantics.
-    private(set) var rebuildCount = 0
+    public private(set) var rebuildCount = 0
 
-    init() {}
+    public init() {}
 
     /// Updates the cache with a freshly-received bundled SPS+PPS blob.
     ///
@@ -185,7 +189,7 @@ final class ParameterSetFormatDescriptionCache {
     /// a new format description is built, and it becomes both the return
     /// value and the new cached `formatDescription`.
     @discardableResult
-    func update(withBundledBlob blob: [UInt8]) throws -> CMVideoFormatDescription {
+    public func update(withBundledBlob blob: [UInt8]) throws -> CMVideoFormatDescription {
         if let lastBlob, lastBlob == blob, let formatDescription {
             return formatDescription
         }
@@ -213,7 +217,7 @@ final class ParameterSetFormatDescriptionCache {
     /// no longer exists. Clearing both together is what makes "wait for the
     /// next parameter set" actually resume decoding on the very next
     /// parameter-set NAL, identical bytes or not.
-    func reset() {
+    public func reset() {
         formatDescription = nil
         lastBlob = nil
     }

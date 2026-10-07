@@ -15,19 +15,17 @@
 	<key>CFBundlePackageType</key>
 	<string>SYSX</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.1</string>
+	<string>1.0</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>14.0</string>
-	<!-- The extension point identifier that marks this as a CMIOExtension
-	     camera device to systemextensionsctl / OSSystemExtensionRequest
-	     (CoreMediaIO's CMIOExtensionProvider.h + Apple's CMIOExtension
-	     sample project both use this exact identifier). -->
-	<key>NSExtension</key>
+	<!-- Required for a camera extension: the Mach service CoreMediaIO uses to talk to it. The name
+	     must start with an app group the extension is entitled to (GogglesCamera.entitlements). -->
+	<key>CMIOExtension</key>
 	<dict>
-		<key>NSExtensionPointIdentifier</key>
-		<string>com.apple.cmio.extension</string>
+		<key>CMIOExtensionMachServiceName</key>
+		<string>group.com.kburiasco.gogglesview.camera</string>
 	</dict>
 </dict>
 </plist>

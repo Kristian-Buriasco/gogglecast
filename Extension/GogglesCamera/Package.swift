@@ -1,30 +1,21 @@
 // swift-tools-version:5.10
 import PackageDescription
 
-// ─────────────────────────────────────────────────────────────────────────
-// Task 4.1: THROWAWAY spike package. Not the real Phase-4 camera extension
-// (that's Task 4.2+) -- this builds the minimal `CMIOExtensionProvider`/
-// `Device`/`Stream` skeleton needed to be installable at all, plus one
-// `NSXPCConnection` attempt to the helper's Mach service and one logged
-// `stats` callback. See `Sources/GogglesCameraExtension/main.swift`'s doc
-// comment and the original task notes (not kept in the repo) for the exact
-// scope. Mirrors `Helper/GogglesHelper/Package.swift`'s path-dependency
-// pattern for `GogglesXPC` -- same protocol/value types, no duplication.
-// ─────────────────────────────────────────────────────────────────────────
-
 let package = Package(
     name: "GogglesCameraExtension",
     platforms: [
         .macOS(.v14)
     ],
     dependencies: [
-        .package(path: "../../Packages/GogglesXPC")
+        .package(path: "../../Packages/GogglesXPC"),
+        .package(path: "../../Packages/GogglesH264")
     ],
     targets: [
         .executableTarget(
             name: "GogglesCameraExtension",
             dependencies: [
-                .product(name: "GogglesXPC", package: "GogglesXPC")
+                .product(name: "GogglesXPC", package: "GogglesXPC"),
+                .product(name: "GogglesH264", package: "GogglesH264")
             ]
         )
     ]

@@ -2,6 +2,7 @@ import Testing
 import CoreMedia
 import Foundation
 @testable import GogglesView
+import GogglesH264
 
 // ─────────────────────────────────────────────────────────────────────────
 // Task 3.3: exercises `DecodeSession`'s slice-NAL handling and design.md

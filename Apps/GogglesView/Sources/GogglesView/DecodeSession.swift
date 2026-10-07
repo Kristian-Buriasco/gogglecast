@@ -1,5 +1,6 @@
 import Foundation
 import CoreMedia
+import GogglesH264
 import VideoToolbox
 import AVFoundation
 import Combine

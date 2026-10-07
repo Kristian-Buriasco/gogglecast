@@ -28,18 +28,23 @@ let package = Package(
         .macOS(.v14)
     ],
     dependencies: [
-        .package(path: "../../Packages/GogglesXPC")
+        .package(path: "../../Packages/GogglesXPC"),
+        .package(path: "../../Packages/GogglesH264")
     ],
     targets: [
         .executableTarget(
             name: "GogglesView",
             dependencies: [
-                .product(name: "GogglesXPC", package: "GogglesXPC")
+                .product(name: "GogglesXPC", package: "GogglesXPC"),
+                .product(name: "GogglesH264", package: "GogglesH264")
             ]
         ),
         .testTarget(
             name: "GogglesViewTests",
-            dependencies: ["GogglesView"]
+            dependencies: [
+                "GogglesView",
+                .product(name: "GogglesH264", package: "GogglesH264")
+            ]
         )
     ]
 )

@@ -4,6 +4,7 @@ import CoreMedia
 import Foundation
 import Testing
 @testable import GogglesView
+import GogglesH264
 
 struct BurnInLayoutTests {
     let frame = CGSize(width: 1920, height: 1080)
