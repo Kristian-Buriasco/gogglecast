@@ -357,7 +357,9 @@ final class UpdateInstaller: ObservableObject {
         unregister: () throws -> SMAppService.Status = { try HelperRegistration.unregister() },
         register: () throws -> SMAppService.Status = { try HelperRegistration.register() }
     ) -> HelperUpdateResult {
-        guard let v = d.string(forKey: UpdatePrefs2.helperChangedKey), v == currentVersion else { return .notNeeded }
+        // The marker is written from the release tag ("v0.6.0") while the bundle version has no "v".
+        func bare(_ v: String) -> String { v.hasPrefix("v") ? String(v.dropFirst()) : v }
+        guard let v = d.string(forKey: UpdatePrefs2.helperChangedKey), bare(v) == bare(currentVersion) else { return .notNeeded }
         // Unregistering a service that is not registered can throw; that is not a failure here.
         do { _ = try unregister() } catch {
             Logging.xpc.info("helper unregister before re-register: \(String(describing: error), privacy: .public)")

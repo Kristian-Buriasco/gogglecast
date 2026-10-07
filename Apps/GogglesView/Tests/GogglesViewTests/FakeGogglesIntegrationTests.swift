@@ -274,6 +274,30 @@ struct FakeGogglesIntegrationTests {
         }
     }
 
+    // Real goggles with a 30 to 35 fps feed produced a hub recording of about 60 fps with ~45% duplicate frames.
+    // The re-encoded stream must carry about as many frames as the source delivers.
+    @Test func hubRecordingDoesNotDuplicateFramesOfASlowSource() async throws {
+        var o = FakeGoggles.Options(); o.fps = 30
+        try await withRig(o) { rig in
+            try await startAndWaitForPicture(rig)
+            await sleep(1)
+            let (rec, url) = try rig.makeRecorder(name: "rate")
+            await sleep(6)
+            _ = await rig.finish(rec)
+            let asset = AVURLAsset(url: url)
+            let track = try #require(try await asset.loadTracks(withMediaType: .video).first)
+            let reader = try AVAssetReader(asset: asset)
+            let out = AVAssetReaderTrackOutput(track: track, outputSettings: nil)
+            reader.add(out); reader.startReading()
+            var n = 0
+            while out.copyNextSampleBuffer() != nil { n += 1 }
+            let seconds = try await CMTimeGetSeconds(asset.load(.duration))
+            let rate = Double(n) / max(seconds, 0.001)
+            print("[rate] source 30 fps, recorded \(n) frames in \(seconds) s = \(rate) fps")
+            #expect(rate < 42, "recorded \(rate) fps from a 30 fps source (duplicates)")
+        }
+    }
+
     // (d) Recording armed before the IDR is passthrough.
     @Test func recordingArmedBeforeTheIDRIsPassthroughAndPlayable() async throws {
         try await withRig { rig in

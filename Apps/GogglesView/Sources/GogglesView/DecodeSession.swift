@@ -78,6 +78,7 @@ final class DecodeSession: ObservableObject {
     private var decoderReady = false
     private let frameLock = NSLock()
     private var latestDecoded: CVPixelBuffer?
+    private var decodedCount: UInt64 = 0
     private let stabilizer = Stabilizer()
     private(set) var teardownCount = 0
     private var lastPictureAt: UInt64 = 0
@@ -201,6 +202,7 @@ final class DecodeSession: ObservableObject {
     private let outputStage = OutputFrameStage()
     lazy var reencodeHub = ReencodeHub(
         source: { [weak self] in self?.outputFrame() },
+        sequence: { [weak self] in self?.decodedSequence() ?? 0 },
         onIdle: { [weak self] in self?.outputProcessor.reset(); self?.outputStage.reset() })
 
     /// The picture that leaves the app (recordings, replay, streams): decoded frame with the output crop and look.
@@ -398,7 +400,7 @@ final class DecodeSession: ObservableObject {
             stabilizer.noteTimestamp(pts.value)
             image = stabilizer.process(image as! CVPixelBuffer)
         }
-        frameLock.lock(); latestDecoded = image; lastPictureAt = DispatchTime.now().uptimeNanoseconds; frameLock.unlock()
+        frameLock.lock(); latestDecoded = image; decodedCount &+= 1; lastPictureAt = DispatchTime.now().uptimeNanoseconds; frameLock.unlock()
         var fd: CMVideoFormatDescription?
         guard CMVideoFormatDescriptionCreateForImageBuffer(allocator: nil, imageBuffer: image, formatDescriptionOut: &fd) == noErr,
               let fd else { return }
@@ -421,6 +423,12 @@ final class DecodeSession: ObservableObject {
     func injectDecodedFrame(_ image: CVPixelBuffer) {
         setWaitingForKeyframe(false)
         decoded(status: noErr, image: image, pts: CMClockGetTime(CMClockGetHostTimeClock()))
+    }
+
+    /// Number of pictures decoded so far; changes exactly once per decoded frame.
+    func decodedSequence() -> UInt64 {
+        frameLock.lock(); defer { frameLock.unlock() }
+        return decodedCount
     }
 
     /// The newest decoded picture, independent of whether any window is showing.

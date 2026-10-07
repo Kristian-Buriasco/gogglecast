@@ -38,15 +38,22 @@ final class ReencodeHub {
     private var pool: CVPixelBufferPool?
     private var encoderSize: (w: Int, h: Int)?
     private var lastSurface: (id: UInt32, seed: UInt32)?
+    /// Counts decoded pictures. When present it decides "new picture or not": the IOSurface change counter is
+    /// not reliable for this, because handing the buffer to the encoder bumps it and the hub then re-encodes
+    /// the same picture on every poll (a 35 fps source came out as about 60 fps with duplicate frames).
+    private let sequence: (() -> UInt64)?
+    private var lastSequence: UInt64?
 
     private(set) var framesEncoded = 0
     private(set) var lastError: String?
 
     private struct WeakSub { weak var value: SampleBufferRendering? }
 
-    init(source: @escaping () -> CVPixelBuffer?, bitrateMbps: @escaping () -> Int = { ReencodePrefs.bitrateMbps },
+    init(source: @escaping () -> CVPixelBuffer?, sequence: (() -> UInt64)? = nil,
+         bitrateMbps: @escaping () -> Int = { ReencodePrefs.bitrateMbps },
          onIdle: @escaping () -> Void = {}) {
         self.source = source
+        self.sequence = sequence
         self.onIdle = onIdle
         self.bitrateMbps = bitrateMbps
     }
@@ -90,6 +97,7 @@ final class ReencodeHub {
         timer?.cancel(); timer = nil
         teardownEncoder()
         lastSurface = nil
+        lastSequence = nil
         onIdle()
     }
 
@@ -98,7 +106,11 @@ final class ReencodeHub {
     /// Grabs the displayed picture and encodes it if it changed since the last call.
     func pollOnce() {
         guard let buf = source() else { return }
-        if let surface = CVPixelBufferGetIOSurface(buf)?.takeUnretainedValue() {
+        if let sequence {
+            let n = sequence()
+            if lastSequence == n { return }
+            lastSequence = n
+        } else if let surface = CVPixelBufferGetIOSurface(buf)?.takeUnretainedValue() {
             let key = (id: IOSurfaceGetID(surface), seed: IOSurfaceGetSeed(surface))
             if let last = lastSurface, last == key { return }
             lastSurface = key

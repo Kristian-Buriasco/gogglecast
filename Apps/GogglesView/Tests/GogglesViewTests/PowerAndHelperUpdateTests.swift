@@ -118,6 +118,18 @@ final class HelperUpdateTests: XCTestCase {
         XCTAssertEqual(calls, 0)
     }
 
+    func testMarkerWrittenFromAReleaseTagStillMatchesTheBundleVersion() {
+        // Regression: the marker holds "v2.0" (the tag) and the bundle version is "2.0".
+        let d = defaults(pending: "v2.0")
+        var order: [String] = []
+        let r = UpdateInstaller.finishPendingHelperUpdate(
+            defaults: d, currentVersion: "2.0",
+            unregister: { order.append("unregister"); return .notRegistered },
+            register: { order.append("register"); return .enabled })
+        XCTAssertEqual(r, .reRegistered)
+        XCTAssertEqual(order, ["unregister", "register"])
+    }
+
     func testPendingForAnotherVersionIsIgnored() {
         let r = UpdateInstaller.finishPendingHelperUpdate(
             defaults: defaults(pending: "1.0"), currentVersion: "2.0",
