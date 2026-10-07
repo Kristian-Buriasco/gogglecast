@@ -4,6 +4,26 @@ All notable changes to this project are documented here. Format based on [Keep a
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-10-07
+
+Found during the first run of 0.6 on real goggles with a drone linked.
+
+### Fixed
+- The background service was not restarted after an update. The "service changed" marker was stored with a leading "v" and compared without it, so an updated app kept talking to the old service until you re-registered it by hand. Both forms now match.
+- Recordings, replay and streams made from the re-encoded stream repeated pictures: a source of about 35 frames per second came out as about 60, with roughly 45% duplicate frames (wasted bitrate and CPU). The encoder's own access to a picture made it look new. New pictures are now counted as they are decoded.
+- The recorder treated a sample that held only an SEI or access-unit-delimiter NAL as a keyframe, which would start a file with undecodable data. Such samples are no longer keyframes.
+
+### Added
+- The first-stream and capture-window notice now explains the display-scale tip: with the goggles' display scale at about 70%, the picture sits inside the overlay frame and a centred crop of about 1.4x removes the overlay while the uncropped original keeps the data.
+- README and website explain the goggles' overlay and the 70% picture, with an annotated frame from real goggles. `docs/hardware-testing.md` is a tick-box sheet for a real-goggles pass, including a telemetry capture.
+
+### Developer
+- The doc-shot flags accept `GOGGLESVIEW_DOC_PICTURE=/path/frame.png` to render a window around a real frame. The fake-goggles integration tests run in CI except the slow ones (`GOGGLES_SKIP_SLOW_TESTS=1`).
+
+### Known limits
+- Still not tried on live goggles: unplug and replug, sleep and wake, the signal alert, RTMP and SRT outputs, the setup assistant flow and the Shortcuts actions.
+
+
 ## [0.6.0] - 2026-10-07
 
 ### Added

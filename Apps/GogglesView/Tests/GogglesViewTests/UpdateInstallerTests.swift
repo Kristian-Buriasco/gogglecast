@@ -2,6 +2,7 @@ import Foundation
 import Testing
 @testable import GogglesView
 
+@Suite(.serialized)
 struct UpdateInstallerTests {
     private func release(_ assets: [[String: Any]]) -> Data {
         try! JSONSerialization.data(withJSONObject: ["tag_name": "v9.9", "assets": assets])

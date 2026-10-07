@@ -473,7 +473,11 @@ struct FakeGogglesIntegrationTests {
             await sleep(4.5)
             let bypassed = rig.session.stabilizerBypassed
             _ = await rig.finish(r1)
-            if bypassed { try Test.cancel("stabilizer bypassed itself (machine too slow for 1080p60); reduction not measurable") }
+            if bypassed {
+                // Older Swift Testing releases have no Test.cancel, so skip quietly.
+                print("stabilizer bypassed itself (machine too slow for 1080p60); reduction not measurable")
+                return
+            }
 
             let off = try await meanMotion(offURL)
             let on = try await meanMotion(onURL)
