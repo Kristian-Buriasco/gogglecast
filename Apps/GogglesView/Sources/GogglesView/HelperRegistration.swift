@@ -67,6 +67,34 @@ public enum HelperRegistration {
     /// top-level `describe(_:)` (Task 2.3/2.4), moved here so the Settings
     /// screen's helper-status display and the CLI harness's printed output
     /// use the exact same strings, not two independently-worded copies.
+    /// Plain-language status for the UI (the raw `describe` stays for logs
+    /// and the Diagnostics copy).
+    public static func plainDescription(_ status: SMAppService.Status) -> String {
+        switch status {
+        case .enabled: return "Running and approved"
+        case .requiresApproval: return "Waiting for your approval in System Settings"
+        case .notRegistered: return "Not set up yet"
+        case .notFound: return "Not found. Reinstall GogglesView"
+        @unknown default: return "Unknown"
+        }
+    }
+
+    /// Registers for a user-initiated action and returns a plain error
+    /// sentence on failure (nil on success). Opens Login Items when macOS
+    /// still needs approval. The real error is also logged.
+    @discardableResult
+    public static func registerForUser() -> String? {
+        do {
+            let status = try register()
+            if status == .requiresApproval { SMAppService.openSystemSettingsLoginItems() }
+            return nil
+        } catch {
+            Logging.xpc.error("helper register() failed: \(String(describing: error), privacy: .public)")
+            ConnectionTrace.shared.record("helper register() failed: \(error)")
+            return "Couldn't set up the background service: \(error.localizedDescription)"
+        }
+    }
+
     public static func describe(_ status: SMAppService.Status) -> String {
         switch status {
         case .notRegistered: return "notRegistered"

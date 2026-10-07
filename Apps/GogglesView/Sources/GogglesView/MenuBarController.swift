@@ -33,7 +33,7 @@ import GogglesXPC
 /// window records), and the menu lists each session with its mini-controls
 /// (`MenuBarMiniControls`: record, replay, screenshot, freeze, marker,
 /// show/hide, network stream) plus Reconnect and Disconnect, then
-/// "Open Another Goggles…", Settings… and Quit. Created once at launch and
+/// "Add Goggles…", Settings… and Quit. Created once at launch and
 /// kept alive for the app's lifetime (`NSStatusItem` does not keep itself
 /// alive). Hidden (not removed) while "Show menu bar item" is off.
 final class MenuBarController: NSObject, NSMenuDelegate {
@@ -251,7 +251,11 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             menu.addItem(header)
         }
         menu.addItem(.separator())
-        menu.addItem(item("Open Another Goggles…") { [weak self] in self?.onOpenAnother() })
+        menu.addItem(item("Add Goggles…") { [weak self] in self?.onOpenAnother() })
+        menu.addItem(item("Setup assistant…") {
+            NSApp.activate(ignoringOtherApps: true)
+            OnboardingWindow.show()
+        })
         let raceItem = item("Race Mode") { RaceModeController.shared.toggle() }
         raceItem.state = RaceModePrefs.enabled ? .on : .off
         menu.addItem(raceItem)
@@ -320,25 +324,11 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     ///   entirely rather than showing a stale/zero placeholder.
     static func displayText(for state: GogglesUIState, stats: StreamStats? = nil, resolution: String? = nil) -> String {
         switch state {
-        case .noHelper(let reason):
-            return reason ?? "Helper not installed"
-        case .noDevice:
-            return "No goggles connected"
-        case .claiming:
-            return "Claiming USB interfaces…"
-        case .claimFailed:
-            return "Claim failed"
-        case .resolving:
-            return "Resolving…"
-        case .handshaking(let elapsedSeconds):
-            return "Handshaking… \(elapsedSeconds)s"
-        case .waitingForKeyframe:
-            return "Waiting for video…"
         case .live:
             guard let stats else { return "Live" }
             return ["Live", resolution, "\(stats.fps)fps"].compactMap { $0 }.joined(separator: " · ")
-        case .stalled:
-            return "Signal lost — reconnecting…"
+        default:
+            return ConnectionMessages.shortStatus(for: state)
         }
     }
 

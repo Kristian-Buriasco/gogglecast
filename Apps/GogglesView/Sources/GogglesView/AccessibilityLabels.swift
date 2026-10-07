@@ -35,4 +35,15 @@ enum AccessibilityLabels {
     static func recordState(isRecording: Bool, elapsed: String?) -> String {
         isRecording ? "Recording" + (elapsed.map { " \($0)" } ?? "") : "Not recording"
     }
+
+    /// Setup assistant row: "Step 2 of 4, Goggles on USB, done. Your goggles are connected over USB."
+    static func setupStep(number: Int, of total: Int, title: String, state: SetupDiagnosis.Step.State, message: String) -> String {
+        let status: String
+        switch state {
+        case .done: status = "done"
+        case .attention: status = "needs attention"
+        case .pending: status = "waiting for earlier steps"
+        }
+        return "Step \(number) of \(total), \(title), \(status). \(message)"
+    }
 }

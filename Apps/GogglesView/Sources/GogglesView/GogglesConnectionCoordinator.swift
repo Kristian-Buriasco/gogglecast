@@ -214,6 +214,7 @@ public final class GogglesConnectionCoordinator: ObservableObject {
     }
 
     private func handleConnectionStateChange(_ state: HelperClientConnectionState) {
+        ConnectionTrace.shared.record("[\(deviceId)] connection \(state)")
         // Not one of the 9 device/stream states (see GogglesUIState.swift's
         // file doc comment) -- folded into `.noHelper` with a reason (or
         // `nil` for a plain not-connected-yet case), since the app
@@ -258,6 +259,10 @@ public final class GogglesConnectionCoordinator: ObservableObject {
 
     private func handleHelperStateChanged(_ raw: Int, detail: String?) {
         let mapped = GogglesUIStateMachine.mapHelperState(raw, detail: detail)
+        // Technical detail stays out of the UI: log it and keep it for the Diagnostics copy.
+        let technical = "[\(deviceId)] helper state \(GogglesXPC.GogglesState(rawValue: raw).map { "\($0)" } ?? "raw \(raw)") -> \(mapped.kind.rawValue)" + (detail.map { " detail: \($0)" } ?? "")
+        Logging.client.info("\(technical, privacy: .public)")
+        ConnectionTrace.shared.record(technical)
         // Only stamp a fresh `waitingForKeyframeEnteredAt` on actual entry
         // into the state, not on every repeated `stateChanged` callback the
         // helper might send while already in it -- otherwise the card's

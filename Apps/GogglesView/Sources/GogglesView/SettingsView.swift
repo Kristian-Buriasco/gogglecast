@@ -168,7 +168,7 @@ struct SettingsView: View {
 
     private var helperStatusSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Helper daemon").font(.headline)
+            Text("Background service").font(.headline)
             HStack(spacing: 8) {
                 Circle()
                     .fill(viewModel.statusColor)

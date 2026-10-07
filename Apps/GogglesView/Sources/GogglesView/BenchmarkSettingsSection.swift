@@ -10,7 +10,7 @@ struct BenchmarkSettingsSection: View {
                 Button("Run benchmark…") { BenchmarkWindow.show() }
                 Spacer()
             }
-            Text("Frame pacing, helper-to-display latency, bitrate and CPU/memory on the live stream.")
+            Text("Frame pacing, latency from the background service to the display, bitrate and CPU/memory on the live stream.")
                 .font(.caption).foregroundStyle(.secondary)
         }
     }
