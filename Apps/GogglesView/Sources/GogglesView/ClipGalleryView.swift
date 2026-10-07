@@ -18,7 +18,7 @@ struct ClipGalleryView: View {
         let tags = ClipIndex.allTags(model.clips)
         return Group {
             if model.clips.isEmpty {
-                Text("No recordings in \(RecordingPrefs.directory.path)").foregroundStyle(.secondary)
+                Text("No recordings yet. Press ⇧⌘R while goggles are live to record. Recordings are saved to \(RecordingPrefs.directory.path).").foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 VStack(spacing: 0) {

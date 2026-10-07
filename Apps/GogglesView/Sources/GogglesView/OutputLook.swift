@@ -381,9 +381,9 @@ struct LookSettingsSection: View {
                 Text("\(Int(intensity * 100))%").monospacedDigit().frame(width: 44, alignment: .trailing)
             }
             Toggle("Apply to the preview", isOn: $preview).disabled(name.isEmpty)
-            Toggle("Apply to recordings, replay and streams", isOn: $output).disabled(name.isEmpty)
+            Toggle("Apply to recordings and streams", isOn: $output).disabled(name.isEmpty)
             if let message { Text(message).font(.caption).foregroundStyle(.orange) }
-            Text("Import a 3D .cube look (Rec.709 in, Rec.709 out), e.g. to lift hazy or flat goggles footage. Applying it to outputs re-encodes the picture, like the keyframe encoder does. The preview change shows after the window is next resized or reopened.")
+            Text("Load a .cube colour look to correct flat or hazy goggles footage. 'Apply to recordings and streams' re-encodes the video, which uses more CPU.")
                 .font(.caption).foregroundStyle(.secondary)
         }
     }
@@ -423,7 +423,7 @@ struct OutputFramingSettingsSection: View {
             row("Zoom", $zoom, 1...4, format: "%.1fx")
             row("Horizontal", $panX, -1...1, format: "%+.2f")
             row("Vertical", $panY, -1...1, format: "%+.2f")
-            Text("Independent of the preview framing above. Aspect is read when encoding starts (stop and restart recording or streams to change it); zoom and position can change live. Output is re-encoded with the keyframe encoder.")
+            Text("Crop recordings and streams separately from the preview, for example 9:16 for shorts. Change the aspect while stopped; it takes effect on the next recording or stream. Zoom and position can change live.")
                 .font(.caption).foregroundStyle(.secondary)
         }
     }

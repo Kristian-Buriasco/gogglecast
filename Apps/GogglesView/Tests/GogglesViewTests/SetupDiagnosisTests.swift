@@ -14,6 +14,14 @@ struct SetupDiagnosisTests {
         #expect(s.allSatisfy { $0.action == nil })
     }
 
+    @Test func healthLineSummarizesFirstProblem() {
+        let ok = D.evaluate(helper: .ready, usbSeen: true, claim: .claimed, video: .live)
+        #expect(D.healthLine(ok) == "Everything is working.")
+        let bad = D.evaluate(helper: .needsApproval, usbSeen: true, claim: .unknown, video: .none)
+        #expect(D.healthLine(bad) == "\(bad[0].title): \(bad[0].message)")
+        #expect(D.healthLine([]) == "Checking…")
+    }
+
     @Test func fourStepsInOrder() {
         let s = D.evaluate(helper: .ready, usbSeen: false, claim: .unknown, video: .none)
         #expect(s.map(\.id) == [.helper, .usb, .otg, .video])

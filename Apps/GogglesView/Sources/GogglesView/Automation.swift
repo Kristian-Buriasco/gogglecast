@@ -220,6 +220,8 @@ enum AutomationResult: Equatable {
     case done
     case disabled
     case noTarget
+    /// The command cannot work right now; the text says what to change.
+    case unavailable(String)
 }
 
 /// Routes requests to goggles windows. Installed once by `main.swift`.
@@ -274,6 +276,7 @@ final class AutomationController: NSObject {
             notify("URL command: \(request.command.noticeText)")
         }
         let result = perform(request)
+        if case .unavailable(let message) = result { notify(message) }
         Self.log.info("\(String(describing: request.command), privacy: .public) -> \(String(describing: result), privacy: .public)")
         return result
     }
@@ -303,6 +306,7 @@ final class AutomationController: NSObject {
             }
             return .noTarget
         }
+        if request.command == .saveReplay, let message = ReplayPrefs.currentBlockedMessage { return .unavailable(message) }
         let target = session.decodeSession
         func post(_ name: Notification.Name, _ info: [AnyHashable: Any]? = nil) {
             NotificationCenter.default.post(name: name, object: target, userInfo: info)

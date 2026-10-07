@@ -80,7 +80,7 @@ struct WebViewerSettingsSection: View {
                     NSPasteboard.general.setString(url, forType: .string)
                 }
             }
-            Text("Security: there is no encryption (plain HTTP). Anyone who can reach this port and knows the token can watch your feed. Requests whose Host header is not this Mac (localhost, its .local name or its IP addresses) are refused, which blocks DNS-rebinding from web pages. Keep it off on untrusted networks. Off by default; listens on localhost unless 'Allow other devices' is on. The token is sent in the URL and is not secret against network sniffing.")
+            Text("Off by default. Anyone on your network can watch while it is on. There is no encryption (plain HTTP) and the token is sent in the URL, so keep it off on untrusted networks. It only listens on this Mac unless 'Allow other devices' is on.")
                 .font(.caption).foregroundStyle(.secondary)
             Text("Safari and iOS play the page directly. Other browsers: open the URL's live.m3u8 in VLC. Expect ~4-8 s latency (2 s segments).")
                 .font(.caption).foregroundStyle(.secondary)

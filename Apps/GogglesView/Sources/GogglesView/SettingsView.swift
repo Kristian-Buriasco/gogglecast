@@ -52,9 +52,12 @@ struct SettingsView: View {
                         .padding(.bottom, 2)
                     switch tab.wrappedValue {
                     case .general:
+                        card { TroubleshootingSection(viewModel: viewModel) }
+                        card { helperStatusSection }
                         card { launchAtLoginSection }
                         card { AutoOpenSettingsSection() }
                         card { PresetsSettingsSection() }
+                        card { SettingsBackupSection() }
                         card { ProfileSettingsSection(deviceSerial: profileContext.serial) }
                         card { UpdateSettingsSection() }
                         card { MenuBarItemSettingsToggle() }
@@ -85,16 +88,8 @@ struct SettingsView: View {
                         card { GlobalHotkeysSettingsSection() }
                         card { EventHooksSettingsSection() }
                         card { AutomationSettingsSection() }
-                        card { SessionLogSettingsSection() }
-                        card { helperStatusSection }
-                        card { connectionSection }
-                        card { DiagnosticsSettingsSection() }
-                        card { OnboardingSettingsSection() }
-                        card { SelfTestSettingsSection() }
-                        card { BenchmarkSettingsSection() }
-                        card { ConnectionHealthSettingsSection() }
                         card { SignalAlertSettingsSection() }
-
+                        card { developerToolsSection }
                     }
                 }
                 .padding(.horizontal, 24)
@@ -256,20 +251,54 @@ struct SettingsView: View {
         }
     }
 
-    private var connectionSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Connection").font(.headline)
-            Button("Reconnect") {
-                viewModel.reconnectHandler?()
+    private var developerToolsSection: some View {
+        DisclosureGroup("Developer tools") {
+            VStack(alignment: .leading, spacing: 16) {
+                BenchmarkSettingsSection()
+                SelfTestSettingsSection()
+                SessionLogSettingsSection()
             }
-            .disabled(viewModel.reconnectHandler == nil)
-            .accessibilityIdentifier("settingsReconnectButton")
-            if viewModel.reconnectHandler == nil {
-                Text("No device selected yet.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+            .padding(.top, 8)
         }
+        .font(.headline)
+        .accessibilityIdentifier("developerToolsGroup")
+    }
+}
+
+/// One-line health state plus the recovery actions, reusing what the setup assistant computes.
+struct TroubleshootingSection: View {
+    @ObservedObject var viewModel: SettingsViewModel
+    @StateObject private var model = SetupAssistantModel(env: OnboardingWindow.environment)
+    private let timer = Timer.publish(every: 2, on: .main, in: .common).autoconnect()
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Troubleshooting").font(.headline)
+            HStack(spacing: 8) {
+                Circle()
+                    .fill(model.isComplete ? Color.green : Color.orange)
+                    .frame(width: 8, height: 8)
+                    .accessibilityHidden(true)
+                Text(SetupDiagnosis.healthLine(model.steps))
+                    .font(.caption)
+                    .accessibilityIdentifier("healthLineText")
+            }
+            HStack {
+                Button("Open setup assistant") { OnboardingWindow.show() }
+                    .accessibilityHint("Opens a guided checklist for the background service, USB connection and video")
+                    .accessibilityIdentifier("openSetupAssistantButton")
+                Button("Reconnect") { viewModel.reconnectHandler?() }
+                    .disabled(viewModel.reconnectHandler == nil)
+                    .accessibilityIdentifier("settingsReconnectButton")
+                Button("Connection health") { HealthWindow.show() }
+            }
+            if viewModel.reconnectHandler == nil {
+                Text("No device selected yet.").font(.caption).foregroundStyle(.secondary)
+            }
+            DiagnosticsSettingsSection()
+        }
+        .onAppear { model.refresh() }
+        .onReceive(timer) { _ in model.refresh() }
     }
 }
 #endif

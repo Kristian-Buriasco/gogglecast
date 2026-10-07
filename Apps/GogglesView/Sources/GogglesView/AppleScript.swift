@@ -21,6 +21,8 @@ class GVScriptCommand: NSScriptCommand {
         case .done: return nil
         case .disabled:
             return fail(Int(errAEEventNotPermitted), "Automation is turned off in GogglesView Settings > Advanced.")
+        case .unavailable(let message):
+            return fail(Int(errAEEventNotPermitted), message)
         case .noTarget:
             return fail(Int(errAENoSuchObject), device == nil ? "No goggles window is open." : "No open goggles match that device.")
         }

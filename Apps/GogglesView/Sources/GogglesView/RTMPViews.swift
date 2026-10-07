@@ -47,7 +47,7 @@ struct RTMPSettingsSection: View {
             Toggle("Start automatically", isOn: $autoStart)
             Text("The stream key is stored in the macOS Keychain and is never logged. Changes apply on next start.")
                 .font(.caption).foregroundStyle(.secondary)
-            Text("The goggles' H.264 stream is passed through untouched: its bitrate (~10-20 Mbps) and keyframe interval cannot be changed. Twitch and YouTube typically want at most ~8 Mbps and a 2 s keyframe interval, so the ingest may reject or degrade it. Untested against a real ingest; use a self-hosted RTMP server for best results.")
+            Text("Twitch and YouTube prefer 8 Mbps or less with a keyframe every 2 s. Goggles video is passed through unchanged, so the stream may be rejected or look worse. Not yet tested against a live service.")
                 .font(.caption).foregroundStyle(.secondary)
         }
     }

@@ -42,7 +42,13 @@ struct ReplayControl: View {
         .onChange(of: seconds) { _, _ in buffer.setSeconds(clamped) }
         .onReceive(NotificationCenter.default.publisher(for: .gogglesSaveReplay)) { n in
             guard GlobalHotkeyRouting.shouldHandle(n, session: session) else { return }
-            if enabled && available && buffer.bufferedSeconds >= 1 { save() }
+            if let blocked = ReplayPrefs.blockedMessage(enabled: enabled, reencode: reencode, outputActive: OutputProcessor.isActive) {
+                ToastHUD.shared.show(blocked)
+            } else if buffer.bufferedSeconds >= 1 {
+                save()
+            } else {
+                ToastHUD.shared.show("The replay buffer is still filling. Try again in a few seconds.")
+            }
         }
     }
 
