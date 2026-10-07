@@ -26,6 +26,8 @@ final class OverlayHintTests: XCTestCase {
         XCTAssertTrue(out.body.contains("Output framing"))
         XCTAssertTrue(cap.body.contains("Window Capture"))
         XCTAssertNotEqual(out.title, cap.title)
+        XCTAssertTrue(out.body.contains("70%") && out.body.contains("1.4x"), "output tip about display scale")
+        XCTAssertTrue(cap.body.contains("70%") && cap.body.contains("1.4x"), "capture tip about display scale")
         XCTAssertFalse((out.title + out.body + cap.title + cap.body).contains("\u{2014}"), "no em dashes")
     }
 }
