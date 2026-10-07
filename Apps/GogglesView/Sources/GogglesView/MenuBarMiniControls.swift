@@ -69,7 +69,7 @@ enum MenuBarMiniControls {
 
     /// Per-device submenu title: "DJI Goggles 3 (…1234) — Live · ● REC 01:23".
     static func headerTitle(_ s: MiniControlsSnapshot) -> String {
-        var title = "\(s.label) — \(s.statusText)"
+        var title = "\(s.label): \(s.statusText)"
         if s.isRecording { title += " · ● REC \(formatElapsed(s.recordingElapsed))" }
         return title
     }

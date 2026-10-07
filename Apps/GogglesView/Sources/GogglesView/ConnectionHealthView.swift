@@ -128,13 +128,13 @@ struct ConnectionHealthView: View {
                         Text("\(s.parameterSets)" + (s.parameterSetIntervalMs.map { String(format: ", every %.1f s", $0 / 1000) } ?? ""))
                     }
                     GridRow {
-                        Text("Helper reports").foregroundStyle(.secondary)
+                        Text("Background service reports").foregroundStyle(.secondary)
                         Text(model.helperStats.map { String(format: "%d fps, %.0f kbps", $0.fps, $0.bitrateKbps) } ?? "n/a")
                     }
                 }
                 .font(.callout.monospacedDigit())
 
-                Text("Covers the last \(Int(s.spanSeconds.rounded())) s (up to \(HealthMonitor.defaultWindowSeconds) s). USB error counts and resets are not reported by the helper, so they are not shown.")
+                Text("Covers the last \(Int(s.spanSeconds.rounded())) s (up to \(HealthMonitor.defaultWindowSeconds) s). USB error counts and resets are not reported by the background service, so they are not shown.")
                     .font(.caption2).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
             .padding(20)

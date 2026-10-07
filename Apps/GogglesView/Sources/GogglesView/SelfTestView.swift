@@ -10,8 +10,8 @@ final class SelfTestModel: ObservableObject {
     struct Row: Identifiable { let id: String; let title: String; var status: SetupChecklist.Status; var detail: String? }
 
     @Published var rows: [Row] = [
-        Row(id: "registered", title: "Helper registered", status: .unknown, detail: nil),
-        Row(id: "xpc", title: "Helper reachable + protocol version", status: .unknown, detail: nil),
+        Row(id: "registered", title: "Background service set up", status: .unknown, detail: nil),
+        Row(id: "xpc", title: "Background service reachable and up to date", status: .unknown, detail: nil),
         Row(id: "usb", title: "Goggles enumerated on USB", status: .unknown, detail: nil),
     ]
     @Published var streamRow = Row(id: "stream", title: "Stream test", status: .unknown, detail: "Not run")
@@ -33,7 +33,7 @@ final class SelfTestModel: ObservableObject {
 
         let reg = HelperRegistration.status
         let ok = reg == .enabled
-        set("registered", ok ? .pass : .fail, ok ? nil : "Status: \(HelperRegistration.describe(reg))")
+        set("registered", ok ? .pass : .fail, ok ? nil : HelperRegistration.plainDescription(reg))
 
         client?.onConnectionStateChange = nil
         client?.disconnect()
@@ -47,7 +47,7 @@ final class SelfTestModel: ObservableObject {
                 self.set("xpc", .pass, "Protocol version matches")
                 self.enumerate(c)
             case .versionMismatch(let reported, let expected):
-                self.set("xpc", .fail, "Helper protocol \(reported), app expects \(expected)")
+                self.set("xpc", .fail, "The background service is from a different version (\(reported), this app needs \(expected)). Set it up again in the setup assistant.")
                 self.set("usb", .unknown, "Skipped")
                 self.running = false
             case .connecting, .disconnected: break
@@ -56,7 +56,7 @@ final class SelfTestModel: ObservableObject {
         c.connect()
         DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
             guard let self, self.running, self.client === c, self.rows[1].status == .unknown else { return }
-            self.set("xpc", .fail, "No response from helper in 5 s")
+            self.set("xpc", .fail, "The background service did not answer in 5 s. Open the setup assistant.")
             self.set("usb", .unknown, "Skipped")
             self.running = false
         }

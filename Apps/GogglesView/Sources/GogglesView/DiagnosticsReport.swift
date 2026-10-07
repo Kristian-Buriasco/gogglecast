@@ -125,17 +125,64 @@ enum DiagnosticsReport {
         app expects protocol version: \(GogglesXPC.currentProtocolVersion)
         connection health: \(HealthDiagnostics.summaryLine)
         """
+        let connection = ConnectionTrace.shared.text
         let defaults = UserDefaults.standard
         let pairs: [(String, Any)] = settingsKeys.compactMap { k in defaults.object(forKey: k).map { (k, $0) } }
         let settings = pairs.isEmpty ? "  (all defaults)" : formatSettings(pairs)
         return assemble(sections: [
-            ("App", app), ("Helper", helper), ("Settings", settings),
+            ("App", app), ("Helper", helper), ("Connection events", connection), ("Settings", settings),
             ("Logs (last 10m, last \(logTailLines) lines)", redactHome(runLogShow())),
         ])
     }
 }
 
 /// Settings UI: copy or save the diagnostics report.
+extension DiagnosticsReport {
+    /// Collects the report off the main thread and copies it to the pasteboard.
+    static func copyToPasteboard(completion: @escaping () -> Void = {}) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            let text = collect()
+            DispatchQueue.main.async {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(text, forType: .string)
+                completion()
+            }
+        }
+    }
+}
+
+/// Retry, Copy diagnostics and Open setup assistant: shown on every failed state.
+struct RecoveryActionsRow: View {
+    var onRetry: (() -> Void)?
+    @State private var collecting = false
+    @State private var copied = false
+
+    var body: some View {
+        HStack(spacing: 10) {
+            if let onRetry {
+                Button("Retry", action: onRetry)
+                    .accessibilityHint("Tries to connect to the goggles again")
+                    .accessibilityIdentifier("recoveryRetryButton")
+            }
+            Button(copied ? "Copied" : (collecting ? "Collecting…" : "Copy diagnostics")) {
+                collecting = true
+                copied = false
+                DiagnosticsReport.copyToPasteboard {
+                    collecting = false
+                    copied = true
+                }
+            }
+            .disabled(collecting)
+            .accessibilityHint("Copies technical details to the clipboard so you can send them to support")
+            .accessibilityIdentifier("recoveryCopyDiagnosticsButton")
+            Button("Open setup assistant") { OnboardingWindow.show() }
+                .accessibilityHint("Opens a guided checklist that finds the problem")
+                .accessibilityIdentifier("recoverySetupAssistantButton")
+        }
+        .controlSize(.small)
+    }
+}
+
 struct DiagnosticsSettingsSection: View {
     @State private var collecting = false
     @State private var copied = false

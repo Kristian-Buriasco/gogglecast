@@ -3,25 +3,12 @@ import GogglesXPC
 #if canImport(SwiftUI)
 import SwiftUI
 
-// ─────────────────────────────────────────────────────────────────────────
-// Task 3.5: the real `.waitingForKeyframe` card (design §8.1). Replaces
-// Task 3.4's single-`ProgressView` placeholder in `GogglesConnectionView`.
-//
-// Copy is VERBATIM from design §8.1 -- do not paraphrase it (task brief,
-// explicit instruction). The goggles-side physical-toggle instruction is
-// the primary, most prominent element on the card; "Try requesting a
-// keyframe" is a secondary, visually de-emphasized button explicitly
-// captioned as unreliable. This ordering/emphasis is a REVIEWER REJECTION
-// CRITERION per the task brief -- design §6/8.1 and the plan's own
-// reviewer note both say `requestIFrame()` does not reliably work and must
-// never be presented as the expected fix. Concretely enforced here by:
-//   - the goggles-toggle instruction rendered first, at `.body`/`.headline`
-//     weight, with no button chrome (it's an instruction, not an action to
-//     tap in this UI -- there's nothing to tap, it's physical);
-//   - the keyframe-request control rendered last, as a `.bordered` (not
-//     `.borderedProminent`) `Button`, in `.secondary` foreground color, at
-//     `.caption` size, with an explicit "unlikely to fix it" caption
-//     directly under it.
+// The waiting-for-first-picture card (design §8.1), reworded in plain
+// language. The goggles-side instruction is still the primary, most prominent
+// element; "Ask the goggles to resend" is a secondary, de-emphasized button
+// captioned as unreliable, because `requestIFrame()` does not reliably work
+// and must never be presented as the expected fix. All wording lives in
+// `ConnectionMessages` so it is unit-tested.
 // ─────────────────────────────────────────────────────────────────────────
 
 /// The design §8.1 waiting-for-keyframe card: verbatim copy, a live
@@ -35,6 +22,8 @@ struct WaitingForKeyframeCard: View {
     /// Forwards to `HelperClient.requestIFrame(reply:)` via
     /// `GogglesConnectionCoordinator.requestKeyframe()`.
     let onRequestKeyframe: () -> Void
+    /// Reconnects to the goggles (the Retry button). nil hides Retry.
+    var onRetry: (() -> Void)?
 
     /// Local, view-only feedback that a tap actually happened (the XPC call
     /// itself is fire-and-forget from this view's perspective -- the helper
@@ -47,14 +36,9 @@ struct WaitingForKeyframeCard: View {
         VStack(alignment: .leading, spacing: 14) {
             // ── Primary guidance: verbatim design §8.1 copy. ──
             VStack(alignment: .leading, spacing: 8) {
-                Text("Waiting for a keyframe from your goggles")
+                Text(ConnectionMessages.waitingTitle)
                     .font(.headline)
-                Text("Video data is arriving, but the goggles only send a new keyframe when liveview sharing is restarted.")
-                Text("On the goggles, open the shortcuts menu (5D button / AR dial) and toggle **Share Liveview to Mobile Device via Wi-Fi** off, then on again.")
-                Text("(Ready in a moment — this is a limitation of the goggles, not of GogglesView.)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .italic()
+                Text(ConnectionMessages.waitingBody)
             }
             .fixedSize(horizontal: false, vertical: true)
 
@@ -70,7 +54,7 @@ struct WaitingForKeyframeCard: View {
 
             // ── Secondary, explicitly-unreliable escape hatch. ──
             VStack(alignment: .leading, spacing: 4) {
-                Button(justRequested ? "Keyframe requested" : "Try requesting a keyframe") {
+                Button(justRequested ? ConnectionMessages.askResendSent : ConnectionMessages.askResend) {
                     justRequested = true
                     onRequestKeyframe()
                     DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
@@ -82,10 +66,12 @@ struct WaitingForKeyframeCard: View {
                 .disabled(justRequested)
                 .accessibilityIdentifier("requestKeyframeButton")
 
-                Text("Unlikely to work — the goggles-side toggle above is the reliable fix.")
+                Text(ConnectionMessages.askResendCaveat)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
+
+            RecoveryActionsRow(onRetry: onRetry)
         }
         .padding(16)
         .frame(maxWidth: 420, alignment: .leading)

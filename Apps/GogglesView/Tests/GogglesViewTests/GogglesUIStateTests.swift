@@ -63,13 +63,14 @@ struct GogglesUIStateMachineMappingTests {
     @Test("the two claimFailed diagnostics are distinct and each contains its design-mandated content")
     func diagnosticStringsAreDistinctAndContainRequiredContent() {
         #expect(GogglesDiagnostics.interfaceClaimFailed != GogglesDiagnostics.arpTimeout)
-        // design §8.3: the en*-interface/replug workaround must be IN the
-        // claimFailed diagnostic text.
-        #expect(GogglesDiagnostics.interfaceClaimFailed.contains("en*"))
+        // design §8.3: the network-adapter/replug workaround must be IN the claimFailed text, in plain words.
         #expect(GogglesDiagnostics.interfaceClaimFailed.contains("System Settings > Network"))
-        #expect(GogglesDiagnostics.interfaceClaimFailed.lowercased().contains("unplug/replug") || GogglesDiagnostics.interfaceClaimFailed.lowercased().contains("replug"))
-        // design §7: verbatim required response text for the ARP-timeout row.
-        #expect(GogglesDiagnostics.arpTimeout == "goggles did not answer on the USB network link — power-cycle the goggles")
+        #expect(GogglesDiagnostics.interfaceClaimFailed.contains("unplug and replug"))
+        #expect(GogglesDiagnostics.interfaceClaimFailed.hasPrefix("Couldn't take control of the goggles."))
+        #expect(GogglesDiagnostics.arpTimeout == "The goggles didn't respond. Turn them off and on, check OTG is enabled, then Retry.")
+        // Technical wording stays available for logs and Diagnostics.
+        #expect(GogglesDiagnostics.interfaceClaimFailedTechnical.contains("en*"))
+        #expect(GogglesDiagnostics.arpTimeoutTechnical.contains("USB network link"))
     }
 }
 
@@ -395,30 +396,23 @@ import AppKit
 @Suite("MenuBarController static helpers (Task 3.6)")
 struct MenuBarControllerTests {
 
-    @Test("displayText is non-empty and state-specific for every kind")
+    @Test("displayText is plain-language and non-empty for every kind")
     func displayTextIsPopulated() {
-        let samples: [GogglesUIState] = [
-            .noHelper(reason: nil), .noDevice, .claiming,
-            .claimFailed(reason: GogglesDiagnostics.interfaceClaimFailed),
-            .resolving, .handshaking(elapsedSeconds: 4),
-            .waitingForKeyframe, .live, .stalled
-        ]
-        var seen = Set<String>()
-        for sample in samples {
-            let text = MenuBarController.displayText(for: sample)
-            #expect(!text.isEmpty)
-            seen.insert(text)
-        }
-        // Every sampled state produces distinct copy (handshaking's elapsed
-        // seconds is baked into its own text, so this also confirms that's
-        // not a static string).
-        #expect(seen.count == samples.count)
+        #expect(MenuBarController.displayText(for: .noHelper(reason: nil)) == "Background service not set up")
+        #expect(MenuBarController.displayText(for: .noDevice) == "No goggles connected")
+        #expect(MenuBarController.displayText(for: .claiming) == "Connecting…")
+        #expect(MenuBarController.displayText(for: .resolving) == "Connecting…")
+        #expect(MenuBarController.displayText(for: .handshaking(elapsedSeconds: 4)) == "Connecting…")
+        #expect(MenuBarController.displayText(for: .claimFailed(reason: "x")) == "Can't connect, open GogglesView")
+        #expect(MenuBarController.displayText(for: .waitingForKeyframe) == "Waiting for video, check goggles live view")
+        #expect(MenuBarController.displayText(for: .live) == "Live")
+        #expect(MenuBarController.displayText(for: .stalled) == "No video, reconnecting…")
     }
 
-    @Test("noHelper with a version-mismatch reason surfaces that reason verbatim, not a generic string")
-    func noHelperReasonSurfaced() {
+    @Test("noHelper with a version-mismatch reason still shows the short plain status")
+    func noHelperReasonNotShownInMenu() {
         let reason = "helper protocol version 2 does not match app's 3 -- reinstall/update the helper or the app"
-        #expect(MenuBarController.displayText(for: .noHelper(reason: reason)) == reason)
+        #expect(MenuBarController.displayText(for: .noHelper(reason: reason)) == "Background service not set up")
     }
 
     @Test("live with stats appends resolution and real fps, not a placeholder")

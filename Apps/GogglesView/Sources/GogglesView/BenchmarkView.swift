@@ -80,7 +80,7 @@ struct BenchmarkView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Benchmark").font(.title2.bold())
-            Text("Measures frame pacing, helper-to-display latency, bitrate and this app's CPU/memory on the live stream. Leave the stream running and avoid other heavy work during the run.")
+            Text("Measures frame pacing, latency from the background service to the display, bitrate and this app's CPU/memory on the live stream. Leave the stream running and avoid other heavy work during the run.")
                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
 
             HStack {

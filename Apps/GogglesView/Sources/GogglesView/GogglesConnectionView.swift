@@ -340,23 +340,23 @@ struct GogglesConnectionView: View {
         HStack(alignment: .center) {
             if let onOpenAnother {
                 Button(action: onOpenAnother) {
-                    Label("Devices", systemImage: "plus.rectangle.on.rectangle")
+                    Label("Add Goggles…", systemImage: "plus.rectangle.on.rectangle")
                         .font(.caption)
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
-                .help("Open another goggles in a new window (this one keeps streaming)")
+                .help("Add more goggles in a new window. This one keeps streaming.")
                 .accessibilityIdentifier("openAnotherButton")
             }
             if let onDisconnect {
                 Button(action: onDisconnect) {
-                    Label("Close", systemImage: "xmark.circle")
+                    Label("Hide", systemImage: "eye.slash")
                         .font(.caption)
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
-                .help("Hide this window. The stream keeps running, so coming back shows video straight away. To stop it, use Goggles > Disconnect or the menu bar item.")
-                .accessibilityHint("Hides this window; the stream keeps running")
+                .help("Hide this window. Video, recording and streaming keep running. To stop, use Goggles > Disconnect.")
+                .accessibilityHint("Hides this window. Video, recording and streaming keep running")
                 .accessibilityIdentifier("disconnectButton")
             }
             Button {
@@ -434,59 +434,46 @@ struct GogglesConnectionView: View {
         }
     }
 
+    @State private var helperSetupError: String?
+
     @ViewBuilder
     private var overlay: some View {
-        switch coordinator.uiState {
-        case .noHelper(let reason):
-            VStack(spacing: 8) {
-                Text(reason ?? "The GogglesView helper isn't installed or registered.")
-                    .multilineTextAlignment(.center)
-                Button("Set up") {
-                    try? coordinator.setUpHelper()
-                }
-            }
-
-        case .noDevice:
-            Label("Connect your Goggles 3 with USB-C", systemImage: "cable.connector")
-
-        case .claiming:
-            ProgressView("Claiming USB interfaces…")
-
-        case .claimFailed(let reason):
-            VStack(spacing: 8) {
-                Text(reason)
-                    .multilineTextAlignment(.center)
-                Button("Retry") { coordinator.retry() }
-            }
-
-        case .resolving:
-            ProgressView("Resolving goggles on the USB network link…")
-
-        case .handshaking(let elapsedSeconds):
-            ProgressView("Handshaking… \(elapsedSeconds)s")
-
-        case .waitingForKeyframe:
-            // Task 3.5: the real design §8.1 card -- verbatim copy, live
-            // elapsed counter, and the secondary/unreliable
-            // requestIFrame() button. `enteredAt` defaults to "now" only as
-            // a display-time fallback (e.g. a race on the very first
-            // render before the coordinator's own timestamp lands); in
-            // practice `waitingForKeyframeEnteredAt` is always set by the
-            // time this case is reachable (`handleHelperStateChanged`/
-            // `forceState` both set it in the same update as `uiState`
-            // itself).
+        let state = coordinator.uiState
+        if case .waitingForKeyframe = state {
             WaitingForKeyframeCard(
                 enteredAt: coordinator.waitingForKeyframeEnteredAt ?? Date(),
-                onRequestKeyframe: { coordinator.requestKeyframe() }
+                onRequestKeyframe: { coordinator.requestKeyframe() },
+                onRetry: { coordinator.retry() }
             )
-
-        case .live:
-            EmptyView()
-
-        case .stalled:
-            Text("Signal lost — reconnecting…")
-                .padding(8)
-                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 8))
+        } else if let message = ConnectionMessages.message(for: state) {
+            VStack(spacing: 10) {
+                if message.showsProgress {
+                    ProgressView(message.headline)
+                } else if case .noDevice = state {
+                    Label(message.headline, systemImage: "cable.connector")
+                } else {
+                    Text(message.headline).multilineTextAlignment(.center)
+                }
+                if let detail = message.detail {
+                    Text(detail).font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                }
+                if case .noHelper = state {
+                    Button("Set up background service") { helperSetupError = HelperRegistration.registerForUser() }
+                    if let helperSetupError {
+                        Text(helperSetupError).font(.caption).foregroundStyle(.red).multilineTextAlignment(.center)
+                    }
+                }
+                if case .stalled = state {
+                    Button("Reconnect now") { coordinator.reconnect() }
+                        .accessibilityIdentifier("reconnectNowButton")
+                }
+                if ConnectionMessages.offersRecoveryActions(state.kind) {
+                    RecoveryActionsRow(onRetry: { coordinator.retry() })
+                }
+            }
+            .frame(maxWidth: 460)
+            .padding(8)
+            .accessibilityIdentifier("overlay-\(state.kind.rawValue)")
         }
     }
 }

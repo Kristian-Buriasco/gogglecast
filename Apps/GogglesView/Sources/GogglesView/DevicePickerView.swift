@@ -20,6 +20,7 @@ struct DevicePickerView: View {
     /// `SettingsWindowController` (mirrors `GogglesConnectionView`'s own
     /// `onOpenSettings?` optionality).
     var onOpenSettings: (() -> Void)?
+    @State private var setupError: String?
 
     var body: some View {
         VStack(spacing: 16) {
@@ -63,18 +64,20 @@ struct DevicePickerView: View {
     private var content: some View {
         switch picker.state {
         case .selected:
-            Label("Connect your Goggles 3 with USB-C", systemImage: "cable.connector")
+            Label(ConnectionMessages.noDevice, systemImage: "cable.connector")
                 .foregroundStyle(.white)
                 .accessibilityIdentifier("picker-discovering")
 
         case .discovering:
             // 0 devices, helper connected: show the diagnostic checklist.
             VStack(alignment: .leading, spacing: 12) {
-                Label("Connect your Goggles 3 with USB-C", systemImage: "cable.connector")
+                Label(ConnectionMessages.noDevice, systemImage: "cable.connector")
                     .font(.title3.bold())
                     .foregroundStyle(.white)
                 SetupChecklistView(items: SetupChecklist.items(
                     registration: .init(HelperRegistration.status), reachability: .connected, devicesFound: 0))
+                RecoveryActionsRow(onRetry: nil)
+                    .padding(.top, 4)
             }
             .frame(maxWidth: 460, alignment: .leading)
             .accessibilityIdentifier("picker-discovering")
@@ -85,7 +88,7 @@ struct DevicePickerView: View {
                 // screen (and its heading) is now the every-time path,
                 // not just the 2+-device case -- the heading adapts
                 // rather than always saying "Multiple Goggles found".
-                Text(candidates.count == 1 ? "Select your Goggles" : "Multiple Goggles found — choose one")
+                Text(candidates.count == 1 ? "Select your goggles" : "Multiple goggles found. Choose one.")
                     .font(.title3.bold())
                     .foregroundStyle(.white)
                 ScrollView {
@@ -107,12 +110,20 @@ struct DevicePickerView: View {
             // not new copy, for the same underlying condition surfaced one
             // step earlier in the flow.
             VStack(spacing: 8) {
-                Text(reason ?? "The GogglesView helper isn't installed or registered.")
+                Text(ConnectionMessages.noHelper)
                     .multilineTextAlignment(.center)
                     .foregroundStyle(.white)
-                Button("Set up") {
-                    try? HelperRegistration.register()
+                Text(reason == nil ? ConnectionMessages.noHelperDetail : ConnectionMessages.noHelperMismatchDetail)
+                    .font(.callout)
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(.secondary)
+                Button("Set up background service") {
+                    setupError = HelperRegistration.registerForUser()
                 }
+                if let setupError {
+                    Text(setupError).font(.caption).foregroundStyle(.red).multilineTextAlignment(.center)
+                }
+                RecoveryActionsRow(onRetry: { picker.resumeIfConnected() })
                 SetupChecklistView(items: SetupChecklist.items(
                     registration: .init(HelperRegistration.status),
                     reachability: reason == nil ? .disconnected : .versionMismatch, devicesFound: nil))

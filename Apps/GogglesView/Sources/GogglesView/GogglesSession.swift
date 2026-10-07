@@ -10,6 +10,8 @@ extension Notification.Name {
     /// Posted (object: the session's `DecodeSession`) right before a goggles
     /// window is torn down, so per-window views can finalize recordings.
     static let gogglesSessionWillClose = Notification.Name("GogglesSessionWillClose")
+    /// Posted (object: deviceId) when the user chose "Stop and disconnect" while closing a window that is recording or streaming.
+    static let gogglesStopAndDisconnect = Notification.Name("GogglesStopAndDisconnect")
 }
 
 /// Pure naming helpers for per-device windows (unit-tested).
@@ -219,6 +221,20 @@ final class GogglesSession: NSObject, RegistrableSession, NSWindowDelegate {
     // MARK: - NSWindowDelegate
 
     func windowShouldClose(_ sender: NSWindow) -> Bool {
+        let board = SessionControlBoard.shared
+        let prompt = ConnectionMessages.closePrompt(
+            recording: board.recorder(for: decodeSession)?.isRecording == true,
+            streaming: board.streamer(for: decodeSession)?.isStreaming == true)
+        if let prompt {
+            let alert = NSAlert()
+            alert.messageText = prompt
+            alert.addButton(withTitle: "Hide window")
+            alert.addButton(withTitle: "Stop and disconnect")
+            if alert.runModal() == .alertSecondButtonReturn {
+                NotificationCenter.default.post(name: .gogglesStopAndDisconnect, object: deviceId)
+                return false
+            }
+        }
         sender.orderOut(nil)
         return false
     }

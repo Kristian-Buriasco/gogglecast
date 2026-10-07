@@ -81,7 +81,7 @@ public final class SettingsViewModel: ObservableObject {
     }
 
     public var statusDescription: String {
-        "SMAppService.daemon: \(HelperRegistration.describe(status))"
+        HelperRegistration.plainDescription(status)
     }
 
     #if canImport(SwiftUI)
@@ -146,7 +146,7 @@ public final class SettingsViewModel: ObservableObject {
                 let newStatus = try HelperRegistration.register()
                 status = newStatus
                 if newStatus == .requiresApproval {
-                    actionMessage = "Requires approval — opening Login Items & Extensions…"
+                    actionMessage = "Waiting for your approval. Opening Login Items & Extensions…"
                     openLoginItemsSettings()
                 } else {
                     actionMessage = nil
@@ -156,7 +156,7 @@ public final class SettingsViewModel: ObservableObject {
                 actionMessage = nil
             }
         } catch {
-            actionMessage = "Failed: \(error.localizedDescription)"
+            actionMessage = "Couldn't change this setting: \(error.localizedDescription)"
             // Re-read the real status rather than trusting the toggle's
             // intended new value -- a failed register()/unregister() call
             // may have left the daemon in whatever state it was already in,
@@ -171,13 +171,13 @@ public final class SettingsViewModel: ObservableObject {
             let newStatus = try HelperRegistration.register()
             status = newStatus
             actionMessage = newStatus == .enabled
-                ? "Re-registered."
-                : "Status: \(HelperRegistration.describe(newStatus))"
+                ? "Background service set up again."
+                : HelperRegistration.plainDescription(newStatus)
             if newStatus == .requiresApproval {
                 openLoginItemsSettings()
             }
         } catch {
-            actionMessage = "Re-register failed: \(error.localizedDescription)"
+            actionMessage = "Couldn't set up the background service: \(error.localizedDescription)"
             status = HelperRegistration.status
         }
     }

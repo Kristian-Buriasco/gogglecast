@@ -24,8 +24,8 @@ struct MenuBarMiniControlsTests {
     }
 
     @Test func headerAndInfoLine() {
-        #expect(MenuBarMiniControls.headerTitle(snap()) == "Goggles 3 (…1234) — Live")
-        #expect(MenuBarMiniControls.headerTitle(snap(recording: true, elapsed: 83)) == "Goggles 3 (…1234) — Live · ● REC 01:23")
+        #expect(MenuBarMiniControls.headerTitle(snap()) == "Goggles 3 (…1234): Live")
+        #expect(MenuBarMiniControls.headerTitle(snap(recording: true, elapsed: 83)) == "Goggles 3 (…1234): Live · ● REC 01:23")
         #expect(MenuBarMiniControls.infoLine(snap()) == "60 fps · Battery 80% · Not recording")
         #expect(MenuBarMiniControls.infoLine(snap(recording: true, elapsed: 5)) == "60 fps · Battery 80% · Recording 00:05")
         #expect(MenuBarMiniControls.infoLine(snap(live: false, battery: nil)) == "— fps · Not recording")

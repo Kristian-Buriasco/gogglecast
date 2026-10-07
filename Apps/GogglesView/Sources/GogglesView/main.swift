@@ -349,8 +349,8 @@ if args.contains("--run") || !args.dropFirst().contains(where: { $0.hasPrefix("-
     //
     // Window behavior:
     //   - The picker is a single reusable window, reachable from Goggles >
-    //     Open Another Goggles… (⌘N), the menu-bar item, and each goggles
-    //     window's "Devices" button. Picking a device opens its window and
+    //     Add Goggles… (⌘N), the menu-bar item, and each goggles
+    //     window's "Add Goggles…" button. Picking a device opens its window and
     //     leaves every other window streaming.
     //   - A goggles window's red close button hides it (streaming continues,
     //     as before multi-window); "Disconnect" (footer button, Goggles menu,
@@ -414,7 +414,7 @@ if args.contains("--run") || !args.dropFirst().contains(where: { $0.hasPrefix("-
     let gogglesMenu = NSMenu(title: "Goggles")
     gogglesMenu.autoenablesItems = false
     let openAnotherMenuTarget = MenuActionTarget { presentPicker() }
-    let openAnotherMenuItem = NSMenuItem(title: "Open Another Goggles…", action: #selector(MenuActionTarget.invoke), keyEquivalent: "n")
+    let openAnotherMenuItem = NSMenuItem(title: "Add Goggles…", action: #selector(MenuActionTarget.invoke), keyEquivalent: "n")
     openAnotherMenuItem.target = openAnotherMenuTarget
     gogglesMenu.addItem(openAnotherMenuItem)
     let copyFrameMenuTarget = MenuActionTarget {
@@ -608,6 +608,42 @@ if args.contains("--run") || !args.dropFirst().contains(where: { $0.hasPrefix("-
     )
     RaceModeController.shared.install(sessions: { registry.all })
     presentPicker()
+
+    // "Stop and disconnect" from the close-window prompt.
+    NotificationCenter.default.addObserver(forName: .gogglesStopAndDisconnect, object: nil, queue: .main) { n in
+        if let id = n.object as? String { disconnectSession(id) }
+    }
+
+    // Setup assistant: live values from the helper connection and open sessions.
+    OnboardingWindow.environment = SetupAssistantEnvironment(
+        reachability: { SetupChecklist.Reachability(client.connectionState) },
+        states: { registry.all.map { $0.coordinator.uiState } },
+        ensureSession: {
+            guard registry.isEmpty else { return }
+            client.enumerateDevices { infos in
+                guard registry.isEmpty, infos.count == 1, let info = infos.first else { return }
+                openSession(deviceId: info.deviceId, info: DevicePickerCandidate(info))
+                dismissPicker()
+                // Keep the assistant in front; Done shows the live window.
+                registry.activeSession?.window.orderOut(nil)
+                OnboardingWindow.show()
+            }
+        },
+        reconnect: { client.connect() },
+        retry: { registry.all.forEach { $0.coordinator.retry() } },
+        finish: {
+            if let session = registry.activeSession ?? registry.all.first { session.focus() } else { presentPicker() }
+        }
+    )
+    let helpMenuItem = NSMenuItem()
+    mainMenu.addItem(helpMenuItem)
+    let helpMenu = NSMenu(title: "Help")
+    let setupAssistantTarget = MenuActionTarget { OnboardingWindow.show() }
+    let setupAssistantItem = NSMenuItem(title: "Setup assistant…", action: #selector(MenuActionTarget.invoke), keyEquivalent: "")
+    setupAssistantItem.target = setupAssistantTarget
+    helpMenu.addItem(setupAssistantItem)
+    helpMenuItem.submenu = helpMenu
+    app.helpMenu = helpMenu
     OnboardingWindow.showIfFirstRun()  // after the picker so it opens on top
 
     client.connect()
@@ -615,7 +651,7 @@ if args.contains("--run") || !args.dropFirst().contains(where: { $0.hasPrefix("-
     // `app.run()` is called exactly once for the whole process; every window
     // after this point is created from main-queue callbacks while it spins.
     withExtendedLifetime((appDelegate, raceMenuTarget, settingsWindowController, settingsMenuTarget, reconnectMenuTarget,
-                         openAnotherMenuTarget, disconnectMenuTarget, healthMenuTarget, menuBarController, registry)) {
+                         openAnotherMenuTarget, disconnectMenuTarget, healthMenuTarget, setupAssistantTarget, menuBarController, registry)) {
         app.run()
     }
     exit(0)

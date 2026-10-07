@@ -168,16 +168,27 @@ public enum GogglesDiagnostics {
     /// claim or RNDIS init failure), i.e. every `claimFailed` cause other
     /// than the ARP-timeout one below.
     public static let interfaceClaimFailed =
+        "Couldn't take control of the goggles. Another app (or a macOS network setting) may be using them. " +
+        "Quit other goggles or capture apps, unplug and replug, then press Retry. " +
+        "If it keeps failing, open System Settings > Network and turn off the new network adapter macOS added for the goggles."
+
+    /// design §7 table row "ARP resolution timeout (3 s)". The design's
+    /// technical wording ("goggles did not answer on the USB network link,
+    /// power-cycle the goggles") now lives in `arpTimeoutTechnical` for logs
+    /// and the Diagnostics copy; the user sees plain language. Shown when
+    /// `RNDISTransport.init` throws `ARPResolver.ARPResolverError`.
+    public static let arpTimeout =
+        "The goggles didn't respond. Turn them off and on, check OTG is enabled, then Retry."
+
+    /// Technical counterpart of `interfaceClaimFailed`, for logs and Diagnostics only.
+    public static let interfaceClaimFailedTechnical =
         "Could not claim the Goggles 3 USB interfaces (root claim or RNDIS init failed). " +
         "Workaround: disable the \"en*\" network interface macOS created for the goggles in " +
         "System Settings > Network, or unplug/replug the goggles."
 
-    /// design §7 table row "ARP resolution timeout (3 s)", verbatim
-    /// required response text. Shown when `RNDISTransport.init` throws
-    /// `ARPResolver.ARPResolverError` (primary probe + multi-subnet sweep
-    /// fallback both got no reply).
-    public static let arpTimeout =
-        "goggles did not answer on the USB network link — power-cycle the goggles"
+    /// Technical counterpart of `arpTimeout`, for logs and Diagnostics only.
+    public static let arpTimeoutTechnical =
+        "goggles did not answer on the USB network link; power-cycle the goggles"
 }
 
 /// Pure, XPC-free state-derivation logic -- the testable core of this task.
