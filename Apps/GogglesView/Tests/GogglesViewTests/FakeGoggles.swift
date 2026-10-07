@@ -21,6 +21,8 @@ final class FakeGoggles {
         var realTime = true
         /// Synthetic hand-held camera shake: the whole picture jitters.
         var shake = false
+        /// Moving shapes over the texture; off leaves only the textured background (and the shake).
+        var shapes = true
         /// Peak shake displacement in pixels.
         var shakeAmplitude = 22.0
         var parameterSetHz = 5.0
@@ -138,7 +140,7 @@ final class FakeGoggles {
 
     // MARK: Encoder
 
-    private func makeEncoder() throws {
+    func makeEncoder() throws {
         var s: VTCompressionSession?
         let st = VTCompressionSessionCreate(
             allocator: nil, width: Int32(options.width), height: Int32(options.height),
@@ -169,11 +171,11 @@ final class FakeGoggles {
 
     // MARK: Picture
 
-    /// Static texture, larger than the frame so shake never reveals an edge: upscaled colour noise
+    /// Static texture, larger than the frame so shake never reveals an edge: coarse colour noise blocks (12 px, they survive compression, so a motion estimator can lock on)
     /// plus a gradient, so the encoder has real detail to chew on and the stabilizer has something to track.
-    private func makeBackground() {
+    func makeBackground() {
         let w = options.width + 2 * Self.pad, h = options.height + 2 * Self.pad
-        let small = CGRect(x: 0, y: 0, width: w / 6 + 2, height: h / 6 + 2)
+        let small = CGRect(x: 0, y: 0, width: w / 12 + 2, height: h / 12 + 2)
         let noise = CIFilter(name: "CIRandomGenerator")!.outputImage!.cropped(to: small)
         let toned = noise.applyingFilter("CIColorMatrix", parameters: [
             "inputRVector": CIVector(x: 0.30, y: 0, z: 0, w: 0),
@@ -187,9 +189,16 @@ final class FakeGoggles {
             "inputColor0": CIColor(red: 0.10, green: 0.25, blue: 0.55),
             "inputColor1": CIColor(red: 0.75, green: 0.55, blue: 0.20),
         ])!.outputImage!.cropped(to: CGRect(x: 0, y: 0, width: w, height: h))
-        let scaled = toned.samplingNearest().transformed(by: CGAffineTransform(scaleX: 6, y: 6))
+        let scaled = toned.samplingNearest().transformed(by: CGAffineTransform(scaleX: 12, y: 12))
             .cropped(to: CGRect(x: 0, y: 0, width: w, height: h))
-        let mixed = scaled.applyingFilter("CIAdditionCompositing", parameters: [kCIInputBackgroundImageKey: gradient])
+        // Static high-contrast landmarks (fixed in the world, so they move only with the camera).
+        var world = scaled.applyingFilter("CIAdditionCompositing", parameters: [kCIInputBackgroundImageKey: gradient])
+        for i in 0..<28 {
+            let x = Double((i * 397) % (w - 220)) + 20, y = Double((i * 211) % (h - 160)) + 20
+            let c = i % 2 == 0 ? CIColor(red: 0.97, green: 0.97, blue: 0.97) : CIColor(red: 0.03, green: 0.03, blue: 0.06)
+            world = CIImage(color: c).cropped(to: CGRect(x: x, y: y, width: 40 + Double(i % 5) * 28, height: 30 + Double(i % 4) * 30)).composited(over: world)
+        }
+        let mixed = world
         // Bake once so every frame only translates a bitmap.
         if let cg = ci.createCGImage(mixed, from: CGRect(x: 0, y: 0, width: w, height: h)) {
             background = CIImage(cgImage: cg)
@@ -206,7 +215,7 @@ final class FakeGoggles {
         return CGPoint(x: x, y: y)
     }
 
-    private func renderFrame(_ n: Int, shake: Bool) -> CVPixelBuffer? {
+    func renderFrame(_ n: Int, shake: Bool) -> CVPixelBuffer? {
         guard let pool, let background else { return nil }
         var pb: CVPixelBuffer?
         guard CVPixelBufferPoolCreatePixelBuffer(nil, pool, &pb) == kCVReturnSuccess, let pb else { return nil }
@@ -231,10 +240,8 @@ final class FakeGoggles {
             rect(w * 0.7, h * (0.2 + 0.5 * (0.5 + 0.5 * sin(t * 1.3 + 1))), 180, 280, CIColor(red: 0.1, green: 0.85, blue: 0.3)),
             disc(w * (0.5 + 0.3 * cos(t * 1.1)), h * (0.5 + 0.3 * sin(t * 1.7)), 120, CIColor(red: 1, green: 1, blue: 0.1)),
             disc(w * (0.3 + 0.25 * sin(t * 0.6 + 2)), h * (0.7 + 0.2 * cos(t * 2.1)), 70, CIColor(red: 0.95, green: 0.95, blue: 0.95)),
-            // A black bar that sweeps across: strong edge, large uniform area.
-            rect(w * ((t * 0.25).truncatingRemainder(dividingBy: 1.2) - 0.1), 0, 90, h, CIColor(red: 0.02, green: 0.02, blue: 0.05)),
         ]
-        for s in shapes { image = s.composited(over: image) }
+        if options.shapes { for s in shapes { image = s.composited(over: image) } }
 
         // The visible window slides over the padded scene by the camera offset.
         let window = CGRect(x: pad + off.x, y: pad + off.y, width: w, height: h)

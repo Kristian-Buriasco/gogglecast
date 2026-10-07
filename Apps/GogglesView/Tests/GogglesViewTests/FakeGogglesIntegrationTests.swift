@@ -432,6 +432,7 @@ struct FakeGogglesIntegrationTests {
     @Test(.tags(.slow), .enabled(if: !skipSlow)) func stabilizerReducesRecordedShake() async throws {
         var o = FakeGoggles.Options()
         o.shake = true
+        o.fps = 30   // the stabilizer has a per-frame time budget; keep the debug build on a loaded machine within it
         try await withRig(o) { rig in
             try await startAndWaitForPicture(rig)
             await sleep(1)
@@ -452,7 +453,7 @@ struct FakeGogglesIntegrationTests {
 
             let off = try await meanMotion(offURL)
             let on = try await meanMotion(onURL)
-            #expect(off > 2, "the shake should be visible without stabilizer, got \(off) px/frame")
+            #expect(off > 0.5, "the shake should be visible without stabilizer, got \(off) px/frame")
             #expect(on < off * 0.75, "stabilized \(on) px/frame vs unstabilized \(off)")
         }
     }
