@@ -4,6 +4,15 @@ All notable changes to this project are documented here. Format based on [Keep a
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-10-08
+
+### Added
+- Italian. The app follows the macOS language: set macOS to Italian and menus, settings, alerts, toasts, notifications and error messages appear in Italian (769 strings). Developer tools (benchmark, self test, session log), the AppleScript dictionary, URL commands, Shortcuts action names, the web viewer page and log and diagnostics contents stay in English on purpose. The translation is machine-assisted: corrections are welcome. More languages are a matter of adding one folder, see `docs/localization.md` and `scripts/localization.py`.
+
+### Developer
+- `scripts/localization.py check` (also run as a unit test) fails on missing keys, extra keys, mismatched format placeholders and interpolated SwiftUI literals that would not localize. New user-facing text that is not a plain SwiftUI literal goes through `L("English text", args)`.
+
+
 ## [0.7.0] - 2026-10-08
 
 ### Added
