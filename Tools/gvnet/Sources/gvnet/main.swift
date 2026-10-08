@@ -1,6 +1,8 @@
 import Foundation
 import GVNetCore
-#if canImport(Glibc)
+#if os(Windows)
+import WinSDK
+#elseif canImport(Glibc)
 import Glibc
 #elseif canImport(Musl)
 import Musl
@@ -69,7 +71,9 @@ if options.out == "-" {
     fileHandle = h
 }
 
+#if !os(Windows)
 signal(SIGPIPE, SIG_IGN)
+#endif
 let socket: UDPSocket
 do {
     socket = try UDPSocket(bind: options.bind, localPort: options.localPort, peer: options.host, peerPort: options.port)

@@ -36,3 +36,25 @@ jobs:
           .build/debug/gvnet --host 127.0.0.1 --bind 127.0.0.1 --seconds 3 --out /tmp/gv.h264 --stats
           wait
           test "$(head -c 5 /tmp/gv.h264 | od -An -tx1 | tr -d ' \n')" = "0000000167"
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: compnerd/gha-setup-swift@main
+        with:
+          branch: swift-6.0-release
+          tag: 6.0-RELEASE
+      - name: Build and test gvnet (Windows)
+        working-directory: Tools/gvnet
+        run: swift test
+      - name: Loopback run against the fake goggles
+        working-directory: Tools/gvnet
+        shell: pwsh
+        run: |
+          swift build
+          $fake = Start-Process python -ArgumentList "scripts/fake_goggles.py" -PassThru -NoNewWindow
+          Start-Sleep -Seconds 2
+          .build/debug/gvnet.exe --host 127.0.0.1 --bind 127.0.0.1 --seconds 3 --out gv.h264 --stats
+          $fake.WaitForExit(10000) | Out-Null
+          $head = [System.IO.File]::ReadAllBytes("gv.h264")[0..4] -join ","
+          if ($head -ne "0,0,0,1,103") { throw "unexpected output start: $head" }
