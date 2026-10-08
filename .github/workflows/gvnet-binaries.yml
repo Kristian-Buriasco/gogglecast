@@ -1,0 +1,90 @@
+name: gvnet binaries
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to attach the binaries to (leave empty to only keep them as workflow artifacts)"
+        required: false
+permissions:
+  contents: write
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x86_64
+            os: ubuntu-latest
+            container: swift:6.0
+          - name: linux-arm64
+            os: ubuntu-24.04-arm
+            container: swift:6.0
+          - name: windows-x86_64
+            os: windows-latest
+    runs-on: ${{ matrix.os }}
+    container: ${{ matrix.container }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: compnerd/gha-setup-swift@main
+        if: runner.os == 'Windows'
+        with:
+          branch: swift-6.3-release
+          tag: 6.3-RELEASE
+      - name: Build (Linux, static Swift runtime)
+        if: runner.os == 'Linux'
+        working-directory: Tools/gvnet
+        run: swift build -c release --static-swift-stdlib
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
+        working-directory: Tools/gvnet
+        run: swift build -c release --static-swift-stdlib
+      - name: Package (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p out
+          cp Tools/gvnet/.build/release/gvnet out/gvnet
+          cp Tools/gvnet/scripts/fake_goggles.py out/
+          tar -C out -czf gvnet-${{ matrix.name }}.tar.gz .
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory out | Out-Null
+          Copy-Item Tools/gvnet/.build/release/gvnet.exe out/
+          Copy-Item Tools/gvnet/scripts/fake_goggles.py out/
+          Compress-Archive -Path out/* -DestinationPath gvnet-${{ matrix.name }}.zip
+      - name: Smoke test the packaged binary
+        if: runner.os == 'Linux'
+        run: |
+          out/gvnet --bogus 2>&1 | head -3 || true
+          ldd out/gvnet | head -20
+      - name: Smoke test the packaged binary (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./out/gvnet.exe --bogus 2>&1 | Select-Object -First 3
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gvnet-${{ matrix.name }}
+          path: |
+            gvnet-${{ matrix.name }}.tar.gz
+            gvnet-${{ matrix.name }}.zip
+          if-no-files-found: ignore
+  attach:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release' || inputs.tag != ''
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Checksums and upload
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: |
+          cd dist
+          sha256sum gvnet-* > gvnet-SHA256SUMS.txt
+          gh release upload "$TAG" gvnet-* --repo "$GITHUB_REPOSITORY" --clobber
