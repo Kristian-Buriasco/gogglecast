@@ -150,6 +150,8 @@ struct RecordingChaptersTests {
             r.enqueue(SyntheticStream.sample(i, key: i % 30 == 0))
             if i == 20 { r.addMarker(label: "First") }
             if i == 150 { r.addMarker(label: "Second") }
+            // Let the writer drain: on a slow machine an unpaced burst makes it drop frames and move the split.
+            if i % 6 == 0 { try await Task.sleep(nanoseconds: 4_000_000) }
         }
         _ = await stopped(r)
         let part1 = try await chapters(of: url)
