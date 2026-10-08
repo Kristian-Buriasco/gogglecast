@@ -2,7 +2,7 @@
 
 GogglesView itself is a macOS app. For other systems there is `gvnet`, a small command-line client in `Tools/gvnet`. It speaks the goggles' liveview protocol (UDP port 9003) over a normal network interface and writes raw H.264 to a file, stdout or a UDP port. There is no window, no recording UI, no stabilizer: pipe it into a player or OBS.
 
-**Status: experimental.** It builds and its tests pass on macOS and Linux, and it has been run end to end against a fake goggles (`Tools/gvnet/scripts/fake_goggles.py`) on loopback. It has **not** been run against real goggles on Linux or Windows yet. If you try it, please report what happened (issue or discussion), with the output of `ip addr` / `lsusb` on Linux.
+**Status: experimental.** It builds and its tests pass on macOS, Linux and Windows, and it is run end to end against a fake goggles (`Tools/gvnet/scripts/fake_goggles.py`) on loopback on all three in CI. It has **not** been run against real goggles on Linux or Windows yet. If you try it, please report what happened (issue or discussion), with the output of `ip addr` / `lsusb` on Linux, or the adapter name from Device Manager on Windows.
 
 ## Why this can work without USB code
 
@@ -21,7 +21,12 @@ If no interface appears, run `dmesg | tail` after plugging in. If the kernel doe
 
 ## Windows
 
-Not tested. The same approach applies if Windows binds the goggles as a "Remote NDIS Compatible Device" and gives it a network adapter: set that adapter to `192.168.60.1/24` and run `gvnet.exe`. `gvnet` currently uses POSIX sockets, so it needs a small WinSock layer (`UDPSocket.swift`) and a Swift for Windows toolchain before it builds there. Windows 11 has removed the in-box RNDIS driver in some versions; then a driver such as the Linux-style `usb_rndis` or a WinUSB based client would be needed.
+`gvnet` builds and runs on Windows (Swift 6.3 from swift.org, Visual Studio build tools): CI builds it, runs its tests and does the same loopback run against the fake goggles as on Linux. It has **not** been tried with real goggles on Windows.
+
+1. Build: `cd Tools\gvnet && swift build -c release` (`.build\release\gvnet.exe`).
+2. Goggles on, Share Liveview on, OTG enabled, USB connected. The goggles must show up as a network adapter ("Remote NDIS Compatible Device" in Device Manager, under Network adapters). Windows 11 has removed the in-box RNDIS driver in some versions; if the goggles show up as an unknown device instead, an RNDIS driver is needed first. That is the part most likely to need work, and it is untested.
+3. Give that adapter a fixed address: Settings > Network > the adapter > IP assignment > Manual, `192.168.60.1`, mask `255.255.255.0`.
+4. Run it, for example: `gvnet.exe --host 192.168.60.2 --bind 192.168.60.1 --stats | ffplay -f h264 -fflags nobuffer -` (in `cmd`, not PowerShell: PowerShell mangles binary pipes; or use `--out flight.h264`).
 
 ## What it does
 

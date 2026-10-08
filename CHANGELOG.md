@@ -5,10 +5,10 @@ All notable changes to this project are documented here. Format based on [Keep a
 ## [Unreleased]
 
 ### Added
-- `gvnet` (Tools/gvnet): an experimental command-line client for Linux (and macOS) that reads the goggles' liveview over a network interface and writes raw H.264 to a file, stdout or UDP. Tested against a fake goggles on loopback, not yet on real goggles outside macOS. See `docs/linux-and-windows.md`.
+- `gvnet` (Tools/gvnet): an experimental command-line client for Linux and Windows (and macOS) that reads the goggles' liveview over a network interface and writes raw H.264 to a file, stdout or UDP. Tested against a fake goggles on loopback, CI builds, tests and loopback-runs it on Linux and Windows. Not yet tried on real goggles outside macOS. See `docs/linux-and-windows.md`.
 
 ### Developer
-- CI builds and tests `gvnet` on Linux. `GogglesProtocol` builds on Linux; four of its tests need the `clean-start.gvcap` capture that is not in the repository and fail without it (also on macOS).
+- CI builds and tests `gvnet` on Linux and Windows. `GogglesProtocol` builds on Linux; four of its tests need the `clean-start.gvcap` capture that is not in the repository and fail without it (also on macOS).
 
 ## [0.8.0] - 2026-10-08
 
