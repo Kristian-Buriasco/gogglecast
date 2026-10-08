@@ -4,6 +4,9 @@ All notable changes to this project are documented here. Format based on [Keep a
 
 ## [Unreleased]
 
+### Added
+- French. The app follows the macOS language: set macOS to French and the interface appears in French (769 strings, same scope as Italian). The translation is machine-assisted: corrections are welcome, see `docs/localization.md`.
+
 ## [0.7.1] - 2026-10-08
 
 ### Added

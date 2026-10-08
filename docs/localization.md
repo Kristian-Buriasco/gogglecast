@@ -1,11 +1,11 @@
 # Localization
 
-GogglesView is available in English and Italian. The app follows the macOS language
+GogglesView is available in English, Italian and French. The app follows the macOS language
 (System Settings > General > Language & Region). Adding another language means adding one
 folder of text; no code changes.
 
-The Italian translation is machine-assisted. Corrections are welcome: open an issue or a
-pull request that edits `it.lproj/Localizable.strings`.
+The Italian and French translations are machine-assisted. Corrections are welcome: open an
+issue or a pull request that edits `it.lproj/Localizable.strings` or `fr.lproj/Localizable.strings`.
 
 ## How it works
 
@@ -16,6 +16,7 @@ The English text in the source code is the key. Translations are classic
 Apps/GogglesView/BundleResources/Localization/
   en.lproj/Localizable.strings    generated, every key maps to itself
   it.lproj/Localizable.strings    Italian
+  fr.lproj/Localizable.strings    French
 ```
 
 `Apps/GogglesView/build-stub-bundle.sh` copies every `*.lproj` folder into
@@ -122,3 +123,17 @@ English; use the assembled bundle.
   file names, the `gogglesview://` URL scheme and its commands, the AppleScript dictionary
   (`GogglesView.sdef`), command line flags, Shortcuts action names, the web viewer page, and
   the developer tools (benchmark, self-test, session logs).
+
+## Translation notes (French)
+
+* Natural, concise UI French in the style of macOS: infinitive or imperative for buttons and
+  menu items (Démarrer l'enregistrement, Ouvrir, Annuler), "vous" only where a sentence needs it.
+* Kept in English: GogglesView, DJI, Goggles 3, OBS, NDI, SRT, RTMP, UDP, HLS, LUT, bitrate,
+  codec, Mbps, fps, and the names of the goggles' own menu entries ("Share Liveview",
+  "OTG Wired Connection to Computer").
+* "Goggles" is "lunettes", "recording" is "enregistrement", "marker" is "marqueur", "clip
+  gallery" is "galerie de clips", "race mode" is "mode course", "Trash" is "corbeille",
+  "Keychain" is "trousseau", "System Settings" is "Réglages Système".
+* Not translated: the same categories as for Italian (log messages, diagnostics and health
+  report text, file names, URL scheme, AppleScript dictionary, Shortcuts action names, web
+  viewer page, developer tools).
