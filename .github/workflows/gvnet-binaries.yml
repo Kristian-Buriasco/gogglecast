@@ -63,7 +63,11 @@ jobs:
       - name: Smoke test the packaged binary (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
-        run: ./out/gvnet.exe --bogus 2>&1 | Select-Object -First 3
+        run: |
+          # Clean PATH: the packaged exe must not depend on the Swift toolchain's DLLs.
+          $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot"
+          $text = (& "$PWD/out/gvnet.exe" --bogus 2>&1 | Out-String)
+          if ($LASTEXITCODE -ne 2 -or $text -notmatch "usage: gvnet") { throw "packaged gvnet.exe did not start (exit $LASTEXITCODE): $text" }
       - uses: actions/upload-artifact@v4
         with:
           name: gvnet-${{ matrix.name }}

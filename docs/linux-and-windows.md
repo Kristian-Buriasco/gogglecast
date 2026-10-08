@@ -8,6 +8,10 @@ GogglesView itself is a macOS app. For other systems there is `gvnet`, a small c
 
 On macOS the system's RNDIS driver does not bring the goggles' USB link up, so the app speaks RNDIS itself over libusb. Linux ships an RNDIS driver (`rndis_host`) and Windows has a built-in RNDIS driver (some Windows 11 builds removed it; see below). If the goggles show up as a network interface, the protocol is just UDP to `192.168.60.2:9003`. The goggles' own Wi-Fi access point works the same way, with the goggles' Wi-Fi address.
 
+## Download
+
+Each release from 0.9 on carries prebuilt `gvnet-linux-x86_64.tar.gz`, `gvnet-linux-arm64.tar.gz` and `gvnet-windows-x86_64.zip` (with `gvnet-SHA256SUMS.txt`), built by CI from the tagged source. The Linux builds only need glibc and libstdc++; the Windows build needs nothing installed. Unpack and run `gvnet --help`-style usage below. They are unsigned: Windows SmartScreen may warn.
+
 ## Linux
 
 1. Build: `cd Tools/gvnet && swift build -c release` (Swift 5.10 or newer, from swift.org).
