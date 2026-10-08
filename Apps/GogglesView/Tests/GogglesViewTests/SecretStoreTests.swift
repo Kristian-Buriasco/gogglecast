@@ -73,6 +73,7 @@ struct SecretStoreTests {
         for k in [RTMPPrefs.streamKeyKey, SRTPrefs.passphraseKey, WebViewerPrefs.tokenKey, UpdatePrefs.tokenKey] {
             #expect(keys.contains(k))
         }
-        #expect(keys.count == 4 + AppEvent.allCases.count)
+        #expect(keys.contains(OBSPrefs.passwordKey))
+        #expect(keys.count == 5 + AppEvent.allCases.count)
     }
 }

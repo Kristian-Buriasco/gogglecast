@@ -280,10 +280,12 @@ enum EventHookInstaller {
 
     static func uninstall(deviceId: String) {
         perDevice[deviceId] = nil
+        Task { @MainActor in OBSIntegration.shared.deviceGone(deviceId) }
     }
 
     static func install(coordinator: GogglesConnectionCoordinator) {
         let deviceId = coordinator.deviceId
+        Task { @MainActor in OBSIntegration.shared.startIfEnabled() }
         var bag = Set<AnyCancellable>()
         // Debounced: a flapping signal must not fire streamLost/streamLive hooks on every flip.
         let debouncer = StreamDebouncerBox()
@@ -291,7 +293,10 @@ enum EventHookInstaller {
             debouncer.value.observe(state.kind, at: Date())
         }.store(in: &bag)
         Timer.publish(every: 0.5, on: .main, in: .common).autoconnect().sink { _ in
-            if let e = debouncer.value.tick(at: Date()) { EventBus.shared.post(e, payload: ["deviceId": deviceId]) }
+            if let e = debouncer.value.tick(at: Date()) {
+                EventBus.shared.post(e, payload: ["deviceId": deviceId])
+                Task { @MainActor in OBSIntegration.shared.streamEvent(e, deviceId: deviceId) }
+            }
         }.store(in: &bag)
 
         var lastBattery: Int?

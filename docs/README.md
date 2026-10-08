@@ -1,6 +1,7 @@
 # Documentation
 
 - [automation.md](automation.md): `gogglesview://` URL scheme and AppleScript suite.
+- [obs.md](obs.md): connect to OBS Studio, use GogglesView as a source, and the optional record and scene rules.
 - [latency.md](latency.md): benchmark / latency mode and how to read the numbers.
 - [dev-setup.md](dev-setup.md): helper registration, signing and the dev iteration loop.
 - [design.md](design.md): architecture and design decisions.

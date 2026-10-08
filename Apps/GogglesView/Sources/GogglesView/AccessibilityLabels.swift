@@ -46,4 +46,16 @@ enum AccessibilityLabels {
         }
         return "Step \(number) of \(total), \(title), \(status). \(message)"
     }
+
+    /// OBS status line: "OBS Studio: Connected to OBS 30.2.3" or the error text.
+    static func obsStatus(enabled: Bool, status: String, error: String?) -> String {
+        guard enabled else { return "OBS Studio integration is off" }
+        if let error, !error.isEmpty { return "\(status). \(error)" }
+        return status
+    }
+
+    /// Scene picker: "Scene when live, Gameplay" / "Scene when lost, left unchanged".
+    static func obsScene(role: String, scene: String) -> String {
+        "Scene when \(role), " + (scene.isEmpty ? "left unchanged" : scene)
+    }
 }

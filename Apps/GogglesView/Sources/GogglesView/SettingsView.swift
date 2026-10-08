@@ -84,6 +84,7 @@ struct SettingsView: View {
                         card { WebViewerSettingsSection() }
                         card { SRTSettingsSection() }
                         card { NDISettingsSection() }
+                        card { OBSSettingsSection() }
                     case .advanced:
                         card { GlobalHotkeysSettingsSection() }
                         card { EventHooksSettingsSection() }
