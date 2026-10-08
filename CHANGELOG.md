@@ -4,6 +4,8 @@ All notable changes to this project are documented here. Format based on [Keep a
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-08
+
 ### Added
 - Zebra stripes and focus peaking (Settings > Display > Exposure and focus aids, and the Goggles menu). Stripes mark areas above a chosen brightness (50 to 100%, 100 means clipping); peaking colours sharp edges in red, green, yellow or white at low, medium or high sensitivity. Preview only: recordings, replays and streams are never changed. Analysed on a small copy of the frame about 15 times a second, so the cost does not grow with resolution. Race mode turns them off.
 - French. The app follows the macOS language: set macOS to French and the interface appears in French (785 strings, same scope as Italian). The translation is machine-assisted: corrections are welcome, see `docs/localization.md`.
