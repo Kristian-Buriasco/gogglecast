@@ -52,9 +52,9 @@ jobs:
         shell: pwsh
         run: |
           swift build
-          $fake = Start-Process python -ArgumentList "scripts/fake_goggles.py" -PassThru -NoNewWindow
-          Start-Sleep -Seconds 2
-          .build/debug/gvnet.exe --host 127.0.0.1 --bind 127.0.0.1 --seconds 3 --out gv.h264 --stats
+          $fake = Start-Process python -ArgumentList "-u","scripts/fake_goggles.py" -PassThru -NoNewWindow -RedirectStandardOutput fake.log
+          for ($i = 0; $i -lt 30 -and -not ((Test-Path fake.log) -and (Select-String -Path fake.log -Pattern "waiting for handshake" -Quiet)); $i++) { Start-Sleep -Seconds 1 }
+          .build/debug/gvnet.exe --host 127.0.0.1 --bind 127.0.0.1 --seconds 5 --out gv.h264 --stats
           $fake.WaitForExit(10000) | Out-Null
           $head = [System.IO.File]::ReadAllBytes("gv.h264")[0..4] -join ","
           if ($head -ne "0,0,0,1,103") { throw "unexpected output start: $head" }
