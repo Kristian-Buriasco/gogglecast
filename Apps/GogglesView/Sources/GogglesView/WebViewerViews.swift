@@ -52,9 +52,21 @@ struct WebViewerSettingsSection: View {
     @AppStorage(WebViewerPrefs.lanKey) private var lan = false
     @KeychainSecret(WebViewerPrefs.tokenKey) private var token
 
+    private var effectivePort: Int { (1...65535).contains(port) ? port : 8080 }
+
     private var url: String {
-        WebViewerPrefs.viewerURL(host: lan ? WebViewerPrefs.localHostname : "localhost",
-                                 port: (1...65535).contains(port) ? port : 8080, token: token)
+        WebViewerPrefs.viewerURL(host: lan ? WebViewerPrefs.localHostname : "localhost", port: effectivePort, token: token)
+    }
+
+    private func urlRow(_ value: String, label: String) -> some View {
+        HStack {
+            Text(value).font(.system(.caption, design: .monospaced)).textSelection(.enabled)
+            Button("Copy URL") {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(value, forType: .string)
+            }
+            .accessibilityLabel("Copy \(label) URL")
+        }
     }
 
     var body: some View {
@@ -73,16 +85,31 @@ struct WebViewerSettingsSection: View {
             }
             Text(lan ? "A token is required while other devices are allowed." : "With the token empty only this Mac can connect, and only through localhost.")
                 .font(.caption).foregroundStyle(.secondary)
-            HStack {
-                Text(url).font(.system(.caption, design: .monospaced)).textSelection(.enabled)
-                Button("Copy") {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(url, forType: .string)
+            urlRow(url, label: lan ? "This Mac (.local)" : "This Mac")
+            if lan {
+                if let ip = WebViewerAddress.preferredIPv4(from: WebHostPolicy.localAddresses()) {
+                    let ipURL = WebViewerPrefs.viewerURL(host: ip, port: effectivePort, token: token)
+                    urlRow(ipURL, label: "IP address")
+                    HStack(alignment: .top, spacing: 12) {
+                        if let qr = WebViewerQR.image(for: ipURL) {
+                            Image(decorative: qr, scale: 1).interpolation(.none).resizable()
+                                .frame(width: 140, height: 140)
+                                .accessibilityLabel("QR code of the viewer address")
+                        }
+                        Text("Scan with the iPad or phone camera to open the viewer. Safari there can use Share > Add to Home Screen for a full-screen app. The device must be on the same network. The QR code contains the access token, so do not share a screenshot of it.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                } else {
+                    Text("No local network address found. Connect this Mac to Wi-Fi or Ethernet.")
+                        .font(.caption).foregroundStyle(.secondary)
                 }
+            } else {
+                Text("To watch on an iPad or phone, turn on 'Allow other devices on the network'. A QR code appears here.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
             Text("Off by default. Anyone on your network can watch while it is on. There is no encryption (plain HTTP) and the token is sent in the URL, so keep it off on untrusted networks. It only listens on this Mac unless 'Allow other devices' is on.")
                 .font(.caption).foregroundStyle(.secondary)
-            Text("Safari and iOS play the page directly. Other browsers: open the URL's live.m3u8 in VLC. Expect ~4-8 s latency (2 s segments).")
+            Text("Safari on iPad, iPhone and Mac plays the page directly. Other browsers: open the URL's live.m3u8 in VLC. Latency comes from 1 s segments and Safari's start-up buffer; expect a few seconds behind live, not real time (not yet measured on hardware). The page shows its own estimate.")
                 .font(.caption).foregroundStyle(.secondary)
         }
     }

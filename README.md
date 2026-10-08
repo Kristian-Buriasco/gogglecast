@@ -41,6 +41,7 @@ The clip gallery picture uses generated sample clips, and the menu picture is re
 - Stats overlay (resolution, framerate, bitrate, dropped frames), each field toggled in Settings.
 - Instant replay buffer, loop recorder, auto-split, markers, clip gallery with passthrough trim and share, optional burn-in logo/text recording.
 - Streaming out: UDP MPEG-TS, RTMP (Twitch/YouTube), SRT, local web viewer (HLS), NDI (experimental).
+- Watch on an iPad or phone with no extra app: turn on the web viewer and "Allow other devices" in Settings, scan the QR code, optionally Add to Home Screen. See [docs/web-viewer.md](docs/web-viewer.md).
 - Framing (zoom/pan/crop/grid/color), freeze, mini window, rotate/flip, per-goggles profiles and presets.
 - Several goggles at once, each in its own window.
 - Menu bar controls, global hotkeys, event hooks, `gogglesview://` URL scheme and AppleScript.

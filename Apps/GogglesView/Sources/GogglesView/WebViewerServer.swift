@@ -61,8 +61,8 @@ struct HLSSegment: Equatable {
 /// Sliding window of finished segments. The playlist lists the newest `windowSize`;
 /// a few extra are retained so a client mid-download of the oldest entry still succeeds.
 struct HLSWindow {
-    static let windowSize = 6
-    static let retained = 9
+    static let windowSize = 8
+    static let retained = 12
     private(set) var segments: [HLSSegment] = []
     private(set) var nextSeq = 0
 
@@ -74,14 +74,20 @@ struct HLSWindow {
 
     var listed: [HLSSegment] { Array(segments.suffix(Self.windowSize)) }
 
+    /// Where players should begin, in seconds from the end of the playlist (negative).
+    static let startOffset = -3.0
+
     func data(forSequence seq: Int) -> Data? { segments.first { $0.seq == seq }?.data }
 
     /// nil until the first segment exists (live playlists must not be empty).
     func playlist(token: String) -> String? {
         let l = listed
         guard let first = l.first else { return nil }
-        let target = Int(ceil(l.map(\.duration).max() ?? 2))
+        // RFC 8216: every EXTINF, rounded to the nearest integer, must not exceed TARGETDURATION. Rounding
+        // (not ceil) keeps 1.03 s segments at a target of 1, which is what sets Safari's start-up hold-back.
+        let target = max(1, Int((l.map(\.duration).max() ?? 1).rounded()))
         var s = "#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:\(target)\n#EXT-X-MEDIA-SEQUENCE:\(first.seq)\n"
+        s += "#EXT-X-START:TIME-OFFSET=\(Int(Self.startOffset)),PRECISE=NO\n"
         let q = WebViewerPrefs.tokenSuffix(token, joiner: "?") // players don't inherit the playlist's query
         for seg in l { s += String(format: "#EXTINF:%.3f,\n", seg.duration) + "seg\(seg.seq).ts\(q)\n" }
         return s
@@ -95,8 +101,12 @@ struct HLSSegmenter {
     /// If keyframes stop arriving the open segment would grow forever; past this size it is dropped
     /// and the segmenter waits for the next keyframe.
     static let defaultMaxSegmentBytes = 8_000_000
+    /// The encoder emits a keyframe every second, so segments are cut on every keyframe.
+    static let defaultTargetDuration = 1.0
+    /// Timestamps jitter by a frame or so; without slack a 0.99 s gap would skip a keyframe and make 2 s segments.
+    static let cutSlack = 0.05
 
-    var targetDuration = 2.0
+    var targetDuration = HLSSegmenter.defaultTargetDuration
     var maxSegmentBytes = HLSSegmenter.defaultMaxSegmentBytes
     private(set) var window = HLSWindow()
     private var muxer = MPEGTSMuxer()
@@ -106,14 +116,14 @@ struct HLSSegmenter {
     /// Bytes buffered in the open (unpublished) segment.
     var pendingBytes: Int { current.count }
 
-    init(targetDuration: Double = 2.0, maxSegmentBytes: Int = HLSSegmenter.defaultMaxSegmentBytes) {
+    init(targetDuration: Double = HLSSegmenter.defaultTargetDuration, maxSegmentBytes: Int = HLSSegmenter.defaultMaxSegmentBytes) {
         self.targetDuration = targetDuration
         self.maxSegmentBytes = maxSegmentBytes
     }
 
     mutating func push(avcc: Data, isKeyframe: Bool, parameterSets: [Data], pts: Double) {
         if let s = start {
-            if isKeyframe, pts - s >= targetDuration {
+            if isKeyframe, pts - s >= targetDuration - Self.cutSlack {
                 window.add(duration: pts - s, data: current)
                 current = Data()
                 start = pts
@@ -133,7 +143,7 @@ struct HLSSegmenter {
 // MARK: - HTTP parsing / routing (pure)
 
 enum WebRoute: Equatable {
-    case page, playlist, segment(Int)
+    case page, playlist, segment(Int), manifest, icon(Int)
     case notFound, unauthorized, methodNotAllowed, badRequest
 }
 
@@ -168,6 +178,9 @@ struct WebRequest: Equatable {
         switch r.path {
         case "/", "/index.html": return .page
         case "/live.m3u8": return .playlist
+        case "/manifest.webmanifest": return .manifest
+        case "/icon-180.png": return .icon(180)
+        case "/icon-512.png": return .icon(512)
         default:
             if r.path.hasPrefix("/seg"), r.path.hasSuffix(".ts") {
                 let n = r.path.dropFirst(4).dropLast(3)
@@ -244,27 +257,6 @@ enum WebHostPolicy {
     }
 }
 
-enum WebViewerPage {
-    static func html(token: String) -> String {
-        let q = WebViewerPrefs.tokenSuffix(token, joiner: "?")
-        return """
-        <!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-        <title>GogglesView</title>
-        <style>html,body{margin:0;background:#000;color:#ccc;font:14px -apple-system,sans-serif}video{width:100%;max-height:90vh;background:#000}p{padding:0 12px}</style>
-        </head><body>
-        <video id="v" controls autoplay muted playsinline></video>
-        <p id="m">Waiting for stream...</p>
-        <p>Safari / iOS play this natively. Other browsers: open <code>live.m3u8\(q)</code> in VLC (Media &gt; Open Network).</p>
-        <script>
-        var v=document.getElementById('v'),m=document.getElementById('m'),u='live.m3u8\(q)';
-        function go(){fetch(u).then(function(r){if(!r.ok)throw 0;v.src=u;m.textContent='';v.play().catch(function(){})}).catch(function(){setTimeout(go,1000)})}
-        if(v.canPlayType('application/vnd.apple.mpegurl'))go();else m.textContent='This browser has no native HLS support.';
-        v.addEventListener('error',function(){m.textContent='Stream interrupted, retrying...';setTimeout(go,2000)});
-        </script></body></html>
-        """
-    }
-}
-
 // MARK: - Server
 
 /// Opt-in HLS live server. Runs entirely on one private queue; `enqueue` only hops to it.
@@ -314,6 +306,8 @@ final class WebViewerServer: ObservableObject, SampleBufferRendering {
                         }
                     }
                 }
+                // Advertised only while other devices are allowed; cancelling the listener withdraws it.
+                if allowLAN { l.service = WebViewerBonjour.service() }
                 listener = l
                 l.start(queue: queue)
             } catch {
@@ -379,6 +373,11 @@ final class WebViewerServer: ObservableObject, SampleBufferRendering {
         case .segment(let n):
             if let d = segmenter.window.data(forSequence: n) { reply(c, 200, "OK", "video/mp2t", d) }
             else { reply(c, 404, "Not Found", "text/plain", Data("Gone".utf8)) }
+        case .manifest:
+            reply(c, 200, "OK", "application/manifest+json", Data(WebViewerPage.manifest(token: token).utf8))
+        case .icon(let size):
+            if let png = WebViewerIcon.png(size: size) { reply(c, 200, "OK", "image/png", png) }
+            else { reply(c, 404, "Not Found", "text/plain", Data("Not found".utf8)) }
         case .notFound: reply(c, 404, "Not Found", "text/plain", Data("Not found".utf8))
         case .unauthorized: reply(c, 401, "Unauthorized", "text/plain", Data("Missing or wrong token".utf8))
         case .methodNotAllowed: reply(c, 405, "Method Not Allowed", "text/plain", Data("GET only".utf8))
