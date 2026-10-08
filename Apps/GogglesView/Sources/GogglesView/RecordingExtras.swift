@@ -137,6 +137,8 @@ enum RecordingExtras {
 struct RecordingMarker: Codable, Equatable {
     var t: Double
     var label: String
+    /// True for markers the app added by itself; nil (omitted from the file) for manual ones.
+    var auto: Bool? = nil
 }
 
 enum RecordingMarkers {

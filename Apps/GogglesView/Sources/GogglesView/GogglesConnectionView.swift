@@ -73,7 +73,7 @@ struct GogglesConnectionView: View {
         do {
             let url = try Screenshot.save(frame)
             showNote("Saved \(url.lastPathComponent)", revealing: url)
-            NotificationCenter.default.post(name: .gogglesScreenshotSaved, object: nil, userInfo: ["path": url.path])
+            NotificationCenter.default.post(name: .gogglesScreenshotSaved, object: session, userInfo: ["path": url.path])
         } catch {
             showNote("Screenshot failed")
         }

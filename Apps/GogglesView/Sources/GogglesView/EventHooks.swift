@@ -291,7 +291,11 @@ enum EventHookInstaller {
             debouncer.value.observe(state.kind, at: Date())
         }.store(in: &bag)
         Timer.publish(every: 0.5, on: .main, in: .common).autoconnect().sink { _ in
-            if let e = debouncer.value.tick(at: Date()) { EventBus.shared.post(e, payload: ["deviceId": deviceId]) }
+            if let e = debouncer.value.tick(at: Date()) {
+                EventBus.shared.post(e, payload: ["deviceId": deviceId])
+                NotificationCenter.default.post(name: .gogglesHookEventFired, object: nil,
+                                                userInfo: ["event": e, "deviceId": deviceId])
+            }
         }.store(in: &bag)
 
         var lastBattery: Int?
@@ -299,6 +303,8 @@ enum EventHookInstaller {
             let threshold = EventHookConfig.batteryThreshold
             if EventHookLogic.batteryCrossedBelow(previous: lastBattery, current: pct, threshold: threshold), let pct {
                 EventBus.shared.post(.batteryLow, payload: ["percent": pct, "threshold": threshold, "deviceId": deviceId])
+                NotificationCenter.default.post(name: .gogglesHookEventFired, object: nil,
+                                                userInfo: ["event": AppEvent.batteryLow, "deviceId": deviceId, "percent": pct])
             }
             if pct != nil { lastBattery = pct }
         }.store(in: &bag)

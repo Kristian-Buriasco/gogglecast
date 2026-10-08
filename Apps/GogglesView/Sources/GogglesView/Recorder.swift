@@ -41,6 +41,8 @@ final class Recorder: ObservableObject, SampleBufferRendering {
     private var sessionElapsed: TimeInterval = 0
     private var finished: [(url: URL, duration: TimeInterval)] = []
     private var pendingMarkers: [RecordingMarker] = []
+    /// Markers of the segment being written as (seconds into that file, title); they become its chapters when it is finished.
+    private var segmentChapters: [(start: TimeInterval, title: String)] = []
 
     // Reliability state (guarded by `lock`).
     /// Free-space source for a folder; nil means unknown. Replaced in tests.
@@ -213,6 +215,7 @@ final class Recorder: ObservableObject, SampleBufferRendering {
         self.url = url
         baseURL = url; part = 1; limits = limitsProvider()
         sessionStart = nil; segmentBytes = 0; sessionElapsed = 0; finished = []; pendingMarkers = []
+        segmentChapters = []
         armed = true
         usingHub = false
         pendingHubSwitch = false; splitDueSince = nil
@@ -248,11 +251,13 @@ final class Recorder: ObservableObject, SampleBufferRendering {
         var markers: [RecordingMarker]
         var relay: HubRelay?
         var wasArmed: Bool
+        var chapters: [(start: TimeInterval, title: String)]
     }
 
     private func teardownLocked() -> Teardown {
         let t = Teardown(writer: writer, input: input, url: url, base: baseURL, markers: pendingMarkers,
-                         relay: hubRelay, wasArmed: armed)
+                         relay: hubRelay, wasArmed: armed, chapters: segmentChapters)
+        segmentChapters = []
         writer = nil; input = nil; url = nil; baseURL = nil; armed = false; startTime = nil; lastPTS = nil
         sessionStart = nil; pendingMarkers = []
         hubRelay = nil; usingHub = false; pendingHubSwitch = false; splitDueSince = nil
@@ -299,7 +304,20 @@ final class Recorder: ObservableObject, SampleBufferRendering {
                 completion?(nil)
                 return
             }
+            // Chapters are added once the file is complete (see RecordingChapters.swift); the sidecar already has the markers.
+            if let u = t.url { Recorder.addChapters(t.chapters, to: u) }
             completion?(t.url)
+        }
+    }
+
+    /// Never fails the recording: on any problem the finished file is left untouched.
+    private static func addChapters(_ chapters: [(start: TimeInterval, title: String)], to url: URL) {
+        guard !chapters.isEmpty else { return }
+        let outcome = ChapterRewriter.addChapters(chapters, to: url)
+        switch outcome {
+        case .added(let n): Logging.recorder.info("added \(n) chapters to \(url.lastPathComponent, privacy: .public)")
+        case .skipped(let why): Logging.recorder.info("no chapters for \(url.lastPathComponent, privacy: .public): \(why, privacy: .public)")
+        case .failed(let why): Logging.recorder.error("chapters not added to \(url.lastPathComponent, privacy: .public): \(why, privacy: .public)")
         }
     }
 
@@ -496,6 +514,8 @@ final class Recorder: ObservableObject, SampleBufferRendering {
     /// keyframe then opens the new file in `enqueue`. Caller holds `lock`.
     private func rotate(finishing w: AVAssetWriter) {
         let done = url, duration = lastPTS.map { CMTimeGetSeconds($0) } ?? 0
+        let chapters = segmentChapters
+        segmentChapters = []
         input?.markAsFinished()
         writer = nil; input = nil; startTime = nil; lastPTS = nil; splitDueSince = nil
         if let done { finished.append((done, duration)) }
@@ -506,7 +526,7 @@ final class Recorder: ObservableObject, SampleBufferRendering {
             let ok = w.status == .completed
             if !ok {
                 DispatchQueue.main.async { self.lastError = w.error?.localizedDescription }
-            }
+            } else if let done { Recorder.addChapters(chapters, to: done) }
             // Loop mode: only ever delete once the segment that just rotated was finalised, so a failed
             // write never costs the user older footage. Only files this session created are in `finished`.
             self.lock.lock()
@@ -524,11 +544,14 @@ final class Recorder: ObservableObject, SampleBufferRendering {
     // MARK: - Markers
 
     /// Adds a marker at the current recording time (no-op when not recording).
-    func addMarker(label: String) {
+    /// `auto` marks events the app noticed by itself (signal lost, low battery, ...); they get a different tick in the trim view.
+    func addMarker(label: String, auto: Bool = false) {
         let text = label.trimmingCharacters(in: .whitespacesAndNewlines)
         lock.lock()
         guard armed, let base = baseURL, !text.isEmpty else { lock.unlock(); return }
-        pendingMarkers.append(RecordingMarker(t: (sessionElapsed * 1000).rounded() / 1000, label: text))
+        pendingMarkers.append(RecordingMarker(t: (sessionElapsed * 1000).rounded() / 1000, label: text, auto: auto ? true : nil))
+        // Position inside the file being written (a marker before the first frame starts at 0).
+        segmentChapters.append((lastPTS.map { CMTimeGetSeconds($0) } ?? 0, text))
         let all = pendingMarkers
         lock.unlock()
         Recorder.writeMarkers(all, for: base)

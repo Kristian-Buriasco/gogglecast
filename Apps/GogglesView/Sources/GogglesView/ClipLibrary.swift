@@ -4,6 +4,9 @@ import AppKit
 struct ClipMarker: Codable, Equatable {
     var t: Double
     var label: String
+    /// True for markers the app added by itself; nil for manual ones and files from older versions.
+    var auto: Bool? = nil
+    var isAuto: Bool { auto == true }
 }
 
 struct Clip: Identifiable, Equatable {
@@ -45,6 +48,28 @@ enum ClipLibrary {
     static func decodeMarkers(_ data: Data?) -> [ClipMarker] {
         guard let data, let m = try? JSONDecoder().decode([ClipMarker].self, from: data) else { return [] }
         return m.filter { $0.t.isFinite && $0.t >= 0 }.sorted { $0.t < $1.t }
+    }
+
+    /// Markers that fall inside a trim `[start, end]`, moved so `start` becomes 0. A marker exactly at `end` is kept.
+    static func trimmedMarkers(_ markers: [ClipMarker], start: Double, end: Double) -> [ClipMarker] {
+        markers
+            .filter { $0.t.isFinite && $0.t >= start && $0.t <= end }
+            .map { m in
+                var shifted = m
+                shifted.t = ((m.t - start) * 1000).rounded() / 1000
+                return shifted
+            }
+            .sorted { $0.t < $1.t }
+    }
+
+    /// Writes the markers sidecar for a clip (nothing when there are none).
+    @discardableResult
+    static func writeMarkers(_ markers: [ClipMarker], for clip: URL) -> Bool {
+        guard !markers.isEmpty else { return false }
+        let enc = JSONEncoder()
+        enc.outputFormatting = [.prettyPrinted, .sortedKeys]
+        guard let data = try? enc.encode(markers) else { return false }
+        return (try? data.write(to: sidecarURL(for: clip), options: .atomic)) != nil
     }
 
     static func sidecarURL(for clip: URL) -> URL {
