@@ -35,6 +35,9 @@ final class SampleBufferHostView: NSView {
         wantsLayer = true
         layer = CALayer()
         clipLayer.addSublayer(displayLayer)
+        exposureLayer.magnificationFilter = .nearest
+        exposureLayer.isHidden = true
+        clipLayer.addSublayer(exposureLayer)
         layer?.addSublayer(clipLayer)
         gridLayer.strokeColor = NSColor.white.withAlphaComponent(0.6).cgColor
         gridLayer.fillColor = nil
@@ -93,6 +96,8 @@ final class SampleBufferHostView: NSView {
     /// Clips the picture to the crop window (aspect modes); `displayLayer` lives inside it.
     private let clipLayer = CALayer()
     private let gridLayer = CAShapeLayer()
+    /// Zebra and focus-peaking overlay; mirrors the picture's geometry so it follows rotation, zoom and pan.
+    private let exposureLayer = CALayer()
 
     override func layout() {
         super.layout()
@@ -112,10 +117,15 @@ final class SampleBufferHostView: NSView {
         // Orientation first, then zoom about the center, then pan (in view axes).
         let dx = FramingGeometry.offset(pan: FramingPrefs.panX, zoom: zoom, extent: w)
         let dy = FramingGeometry.offset(pan: FramingPrefs.panY, zoom: zoom, extent: h)
-        displayLayer.setAffineTransform(
-            OrientationPrefs.transform(rotation: r, flipH: OrientationPrefs.flipH, flipV: OrientationPrefs.flipV)
-                .concatenating(CGAffineTransform(scaleX: zoom, y: zoom))
-                .concatenating(CGAffineTransform(translationX: dx, y: dy)))
+        let pictureTransform = OrientationPrefs.transform(rotation: r, flipH: OrientationPrefs.flipH, flipV: OrientationPrefs.flipV)
+            .concatenating(CGAffineTransform(scaleX: zoom, y: zoom))
+            .concatenating(CGAffineTransform(translationX: dx, y: dy))
+        displayLayer.setAffineTransform(pictureTransform)
+        exposureLayer.setAffineTransform(.identity)
+        exposureLayer.bounds = displayLayer.bounds
+        exposureLayer.position = displayLayer.position
+        exposureLayer.contentsGravity = aspect == .fit ? .resizeAspect : .resizeAspectFill
+        exposureLayer.setAffineTransform(pictureTransform)
         // Layer filters on an AVSampleBufferDisplayLayer are untested with live video.
         displayLayer.filters = FramingPrefs.colorFilters()
 
@@ -125,6 +135,15 @@ final class SampleBufferHostView: NSView {
         }
         gridLayer.frame = bounds
         gridLayer.path = path
+        CATransaction.commit()
+    }
+
+    /// Shows (or clears) the exposure overlay from the analyzer.
+    func setExposureOverlay(_ image: CGImage?) {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        exposureLayer.contents = image
+        exposureLayer.isHidden = image == nil
         CATransaction.commit()
     }
 
@@ -181,6 +200,7 @@ struct GogglesVideoView: NSViewRepresentable {
         } else {
             session.attach(renderer: view.displayLayer)
         }
+        session.addExposureSink(owner: view) { [weak view] image in view?.setExposureOverlay(image) }
         view.onFailedToDecode = { [weak session] error in
             session?.recordExternalFailure(error)
         }

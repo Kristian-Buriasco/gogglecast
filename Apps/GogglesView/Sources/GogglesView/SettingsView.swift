@@ -76,6 +76,7 @@ struct SettingsView: View {
                         card { FramingSettingsSection() }
                         card { OutputFramingSettingsSection() }
                         card { LookSettingsSection() }
+                        card { ExposureSettingsSection() }
                         card { OrientationSettingsSection() }
                         card { captureWindowSection }
                         card { MiniWindowSettingsSection() }

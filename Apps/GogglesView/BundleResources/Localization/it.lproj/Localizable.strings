@@ -840,3 +840,20 @@
 "Enter Full Screen" = "Attiva schermo intero";
 "Bring All to Front" = "Porta tutto in primo piano";
 "Help" = "Aiuto";
+
+"Exposure and focus aids" = "Aiuti per esposizione e messa a fuoco";
+"Zebra stripes" = "Zebra";
+"Stripes from" = "Strisce da";
+"Focus peaking" = "Focus peaking";
+"Sensitivity" = "Sensibilità";
+"Low" = "Bassa";
+"Medium" = "Media";
+"High" = "Alta";
+"Colour" = "Colore";
+"Red" = "Rosso";
+"Green" = "Verde";
+"Yellow" = "Giallo";
+"White" = "Bianco";
+"Stripes mark areas that are close to white, so you can see where highlights clip. Peaking colours sharp edges. Both only appear in the preview; recordings and streams are not changed. Race mode turns them off." = "Le strisce segnano le aree vicine al bianco, così vedi dove le alte luci si bruciano. Il peaking colora i bordi nitidi. Compaiono solo nell'anteprima; registrazioni e streaming non cambiano. La modalità gara li disattiva.";
+"Zebra Stripes" = "Zebra";
+"Focus Peaking" = "Focus peaking";

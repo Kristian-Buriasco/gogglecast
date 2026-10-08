@@ -284,6 +284,21 @@
 "exit %lld" = "exit %lld";
 "failed" = "failed";
 "Choose an executable to run on %@" = "Choose an executable to run on %@";
+/* ExposureAssist.swift */
+"Exposure and focus aids" = "Exposure and focus aids";
+"Zebra stripes" = "Zebra stripes";
+"Stripes from" = "Stripes from";
+"Focus peaking" = "Focus peaking";
+"Sensitivity" = "Sensitivity";
+"Low" = "Low";
+"Medium" = "Medium";
+"High" = "High";
+"Colour" = "Colour";
+"Red" = "Red";
+"Green" = "Green";
+"Yellow" = "Yellow";
+"White" = "White";
+"Stripes mark areas that are close to white, so you can see where highlights clip. Peaking colours sharp edges. Both only appear in the preview; recordings and streams are not changed. Race mode turns them off." = "Stripes mark areas that are close to white, so you can see where highlights clip. Peaking colours sharp edges. Both only appear in the preview; recordings and streams are not changed. Race mode turns them off.";
 /* GlobalHotkeys.swift */
 "Start/stop recording" = "Start/stop recording";
 "Save instant replay" = "Save instant replay";
@@ -834,6 +849,8 @@
 /* main.swift */
 "About GogglesView" = "About GogglesView";
 "File" = "File";
+"Zebra Stripes" = "Zebra Stripes";
+"Focus Peaking" = "Focus Peaking";
 "Connection Health…" = "Connection Health…";
 "Window" = "Window";
 "Minimize" = "Minimize";

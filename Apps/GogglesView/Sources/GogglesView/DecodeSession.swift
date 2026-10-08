@@ -401,6 +401,7 @@ final class DecodeSession: ObservableObject {
             image = stabilizer.process(image as! CVPixelBuffer)
         }
         frameLock.lock(); latestDecoded = image; decodedCount &+= 1; lastPictureAt = DispatchTime.now().uptimeNanoseconds; frameLock.unlock()
+        updateExposureAids(image)
         var fd: CMVideoFormatDescription?
         guard CMVideoFormatDescriptionCreateForImageBuffer(allocator: nil, imageBuffer: image, formatDescriptionOut: &fd) == noErr,
               let fd else { return }
@@ -417,6 +418,31 @@ final class DecodeSession: ObservableObject {
         let layers = extraConsumers.compactMap { $0.value as? AVSampleBufferDisplayLayer }
         consumerLock.unlock()
         for layer in layers where layer !== renderer { layer.enqueue(sample) }
+    }
+
+    // MARK: - Exposure aids (zebra, focus peaking)
+
+    private let exposureAnalyzer = ExposureAnalyzer()
+    private struct ExposureSink { weak var owner: AnyObject?; let handler: (CGImage?) -> Void }
+    private var exposureSinks: [ExposureSink] = []
+
+    /// A preview view registers to receive the zebra/peaking overlay image (main queue; nil clears it).
+    func addExposureSink(owner: AnyObject, _ handler: @escaping (CGImage?) -> Void) {
+        consumerLock.lock()
+        exposureSinks.removeAll { $0.owner == nil || $0.owner === owner }
+        exposureSinks.append(ExposureSink(owner: owner, handler: handler))
+        consumerLock.unlock()
+    }
+
+    private func updateExposureAids(_ image: CVImageBuffer) {
+        guard CFGetTypeID(image) == CVPixelBufferGetTypeID(), !freezeState.frozenNow else { return }
+        exposureAnalyzer.submit(image as! CVPixelBuffer, settings: ExposurePrefs.current()) { [weak self] overlay in
+            guard let self else { return }
+            self.consumerLock.lock()
+            let sinks = self.exposureSinks.filter { $0.owner != nil }
+            self.consumerLock.unlock()
+            for sink in sinks { sink.handler(overlay) }
+        }
     }
 
     /// Dev aid for documentation screenshots (`--doc-shot`): shows `image` as if the decoder had produced it.

@@ -440,6 +440,20 @@ if args.contains("--run") || !args.dropFirst().contains(where: { $0.hasPrefix("-
     NotificationCenter.default.addObserver(forName: .gogglesRaceModeChanged, object: nil, queue: .main) { _ in
         raceMenuItem.state = RaceModePrefs.enabled ? .on : .off
     }
+    let zebraMenuTarget = MenuActionTarget { UserDefaults.standard.set(!ExposurePrefs.zebra(), forKey: ExposurePrefs.zebraKey) }
+    let zebraMenuItem = NSMenuItem(title: L("Zebra Stripes"), action: #selector(MenuActionTarget.invoke), keyEquivalent: "")
+    zebraMenuItem.target = zebraMenuTarget
+    gogglesMenu.addItem(zebraMenuItem)
+    let peakingMenuTarget = MenuActionTarget { UserDefaults.standard.set(!ExposurePrefs.peaking(), forKey: ExposurePrefs.peakingKey) }
+    let peakingMenuItem = NSMenuItem(title: L("Focus Peaking"), action: #selector(MenuActionTarget.invoke), keyEquivalent: "")
+    peakingMenuItem.target = peakingMenuTarget
+    gogglesMenu.addItem(peakingMenuItem)
+    let syncExposureMenu = {
+        zebraMenuItem.state = ExposurePrefs.zebra() ? .on : .off
+        peakingMenuItem.state = ExposurePrefs.peaking() ? .on : .off
+    }
+    syncExposureMenu()
+    NotificationCenter.default.addObserver(forName: UserDefaults.didChangeNotification, object: nil, queue: .main) { _ in syncExposureMenu() }
     let healthMenuTarget = MenuActionTarget { HealthWindow.show() }
     let healthMenuItem = NSMenuItem(title: L("Connection Health…"), action: #selector(MenuActionTarget.invoke), keyEquivalent: "")
     healthMenuItem.target = healthMenuTarget

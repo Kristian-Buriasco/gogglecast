@@ -161,6 +161,7 @@ Avoidable, now removed by race mode (all live, no decoder re-creation):
 | Preview LUT, brightness/contrast/saturation | `CALayer.filters` evaluated by the compositor every frame | filters removed |
 | Grid overlay | extra shape layer | emptied |
 | Stats overlay (OSD) | SwiftUI re-render on the main thread, which also feeds the decoder | hidden |
+| Zebra and focus peaking | a frame copy and a CPU pass about 15 times a second, plus one overlay layer | off |
 | Mini window | a second display layer enqueued from the decode callback, plus a window to composite | hidden (preference kept, restored when race mode ends) |
 | Decoder power hints | `MaximizePowerEfficiency` may let the hardware decoder favour efficiency | set to false on the running session; original value restored when race mode ends |
 
