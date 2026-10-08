@@ -18,7 +18,7 @@ struct EventHooksSettingsSection: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(event.rawValue).font(.subheadline.bold())
                     HStack {
-                        Text(scripts[event].flatMap { $0.isEmpty ? nil : $0 } ?? "No program")
+                        Text(scripts[event].flatMap { $0.isEmpty ? nil : $0 } ?? L("No program"))
                             .font(.caption.monospaced()).lineLimit(1).truncationMode(.middle)
                             .foregroundStyle(.secondary)
                         Spacer()
@@ -36,7 +36,7 @@ struct EventHooksSettingsSection: View {
                         .controlSize(.small)
                 }
             }
-            Stepper("batteryLow threshold: \(battery)%", value: $battery, in: 1...99)
+            Stepper(L("batteryLow threshold: %lld%%", battery), value: $battery, in: 1...99)
             HStack {
                 Text("Recent runs").font(.subheadline.bold())
                 Spacer()
@@ -47,7 +47,7 @@ struct EventHooksSettingsSection: View {
             }
             ForEach(log.runs) { run in
                 VStack(alignment: .leading, spacing: 1) {
-                    Text("\(run.date.formatted(date: .omitted, time: .standard)) \(run.event.rawValue) → \(run.exitCode.map { "exit \($0)" } ?? "failed")")
+                    Text(verbatim: "\(run.date.formatted(date: .omitted, time: .standard)) \(run.event.rawValue) → \(run.exitCode.map { L("exit %lld", Int($0)) } ?? L("failed"))")
                         .font(.caption.bold())
                     Text(run.target).font(.caption2.monospaced()).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
                     if !run.output.isEmpty { Text(run.output).font(.caption2.monospaced()).lineLimit(3) }
@@ -69,7 +69,7 @@ struct EventHooksSettingsSection: View {
         panel.canChooseFiles = true
         panel.canChooseDirectories = false
         panel.allowsMultipleSelection = false
-        panel.message = "Choose an executable to run on \(event.rawValue)"
+        panel.message = L("Choose an executable to run on %@", event.rawValue)
         if panel.runModal() == .OK, let url = panel.url { set(script: url.path, for: event) }
     }
 }

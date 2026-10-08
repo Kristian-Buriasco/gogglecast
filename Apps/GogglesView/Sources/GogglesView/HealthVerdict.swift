@@ -11,7 +11,19 @@ import Foundation
 // ─────────────────────────────────────────────────────────────────────────
 
 struct HealthVerdict: Equatable {
-    enum Level: String, Equatable { case noData = "No data", healthy = "Healthy", unstable = "Unstable", poor = "Poor" }
+    enum Level: String, Equatable {
+        case noData = "No data", healthy = "Healthy", unstable = "Unstable", poor = "Poor"
+
+        /// Localized name for the window; the raw value stays English for reports.
+        var title: String {
+            switch self {
+            case .noData: return L("No data")
+            case .healthy: return L("Healthy")
+            case .unstable: return L("Unstable")
+            case .poor: return L("Poor")
+            }
+        }
+    }
 
     struct Thresholds {
         /// Unstable when p95 gap exceeds max(p50 * factor, floor).
@@ -35,39 +47,39 @@ struct HealthVerdict: Equatable {
     var reasons: [String]
     var suggestions: [String]
 
-    static let cableTip = "Try another USB cable that carries data; many cables are charge-only, and long or thin ones struggle with USB 3."
-    static let directPortTip = "Plug into a port on the Mac directly rather than through a hub or dock."
-    static let interferenceTip = "Move other USB 3 devices, hubs and drives away from the goggles and its cable; USB 3 noise disturbs 2.4 GHz radio links."
-    static let otgTip = "Check the goggles' OTG / USB setting so the goggles act as a device, then reconnect."
+    static var cableTip: String { L("Try another USB cable that carries data; many cables are charge-only, and long or thin ones struggle with USB 3.") }
+    static var directPortTip: String { L("Plug into a port on the Mac directly rather than through a hub or dock.") }
+    static var interferenceTip: String { L("Move other USB 3 devices, hubs and drives away from the goggles and its cable; USB 3 noise disturbs 2.4 GHz radio links.") }
+    static var otgTip: String { L("Check the goggles' OTG / USB setting so the goggles act as a device, then reconnect.") }
 
     static func evaluate(_ s: HealthSnapshot, thresholds t: Thresholds = Thresholds()) -> HealthVerdict {
         let silent = (s.secondsSinceLastFrame ?? 0) >= t.silentSeconds
         if s.frames < t.minimumFrames && !silent {
-            return HealthVerdict(level: .noData, reasons: ["Not enough frames yet to judge the connection."], suggestions: [])
+            return HealthVerdict(level: .noData, reasons: [L("Not enough frames yet to judge the connection.")], suggestions: [])
         }
 
         var poor: [String] = [], unstable: [String] = []
         var gapProblem = false, lossProblem = false
 
         if silent, let since = s.secondsSinceLastFrame {
-            poor.append("No video for \(Int(since)) s.")
+            poor.append(L("No video for %lld s.", Int(since)))
         }
         if s.lossPercent >= t.poorLossPercent {
-            poor.append(String(format: "%.1f%% of frames were lost or failed to decode.", s.lossPercent)); lossProblem = true
+            poor.append(L("%.1f%% of frames were lost or failed to decode.", s.lossPercent)); lossProblem = true
         } else if s.lossPercent >= t.unstableLossPercent {
-            unstable.append(String(format: "%.1f%% of frames were lost or failed to decode.", s.lossPercent)); lossProblem = true
+            unstable.append(L("%.1f%% of frames were lost or failed to decode.", s.lossPercent)); lossProblem = true
         }
         if let p95 = s.gapP95Ms, let p50 = s.gapP50Ms {
             if p95 > max(p50 * t.poorGapFactor, t.poorGapFloorMs) {
-                poor.append(String(format: "Frames arrive very unevenly (95%% of gaps under %.0f ms).", p95)); gapProblem = true
+                poor.append(L("Frames arrive very unevenly (95%% of gaps under %.0f ms).", p95)); gapProblem = true
             } else if p95 > max(p50 * t.unstableGapFactor, t.unstableGapFloorMs) {
-                unstable.append(String(format: "Frames arrive unevenly (95%% of gaps under %.0f ms).", p95)); gapProblem = true
+                unstable.append(L("Frames arrive unevenly (95%% of gaps under %.0f ms).", p95)); gapProblem = true
             }
         }
         if s.stalls500 >= t.poorStalls500 {
-            poor.append("\(s.stalls500) pauses of half a second or more."); gapProblem = true
+            poor.append(L("%lld pauses of half a second or more.", s.stalls500)); gapProblem = true
         } else if s.stalls250 >= t.unstableStalls250 {
-            unstable.append("\(s.stalls250) pauses of a quarter second or more."); gapProblem = true
+            unstable.append(L("%lld pauses of a quarter second or more.", s.stalls250)); gapProblem = true
         }
 
         if !poor.isEmpty {

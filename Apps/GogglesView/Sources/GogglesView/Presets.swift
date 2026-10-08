@@ -5,12 +5,19 @@ import SwiftUI
 enum SettingsPreset: String, CaseIterable, Identifiable {
     case streaming = "Streaming", recording = "Recording", minimal = "Minimal"
     var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .streaming: return L("Streaming")
+        case .recording: return L("Recording")
+        case .minimal: return L("Minimal")
+        }
+    }
 
     var summary: String {
         switch self {
-        case .streaming: return "Stats overlay on, network stream auto-starts, no recording/replay."
-        case .recording: return "Auto-record on connect, instant replay (60 s), clean video."
-        case .minimal: return "Everything optional off; framing reset."
+        case .streaming: return L("Stats overlay on, network stream auto-starts, no recording/replay.")
+        case .recording: return L("Auto-record on connect, instant replay (60 s), clean video.")
+        case .minimal: return L("Everything optional off; framing reset.")
         }
     }
 
@@ -71,13 +78,13 @@ struct PresetsSettingsSection: View {
             Text("Presets").font(.headline)
             HStack {
                 Picker("", selection: $selection) {
-                    ForEach(SettingsPreset.allCases) { Text($0.rawValue).tag($0) }
+                    ForEach(SettingsPreset.allCases) { Text($0.title).tag($0) }
                 }
                 .labelsHidden()
                 .accessibilityLabel("Preset")
                 .frame(width: 140)
-                Button("Apply") { selection.apply(); message = "Applied \(selection.rawValue)." }
-                Button("Reset all to defaults") { SettingsPreset.resetAll(); message = "Reset to defaults." }
+                Button("Apply") { selection.apply(); message = L("Applied %@.", selection.title) }
+                Button("Reset all to defaults") { SettingsPreset.resetAll(); message = L("Reset to defaults.") }
             }
             Text(selection.summary).font(.caption).foregroundStyle(.secondary)
             if let message { Text(message).font(.caption).foregroundStyle(.secondary) }

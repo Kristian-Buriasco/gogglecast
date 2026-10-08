@@ -43,7 +43,7 @@ final class TrimModel: ObservableObject {
     /// Passthrough: no re-encode, so cut points snap to the nearest preceding keyframe.
     func export(done: @escaping (URL) -> Void) {
         guard let s = AVAssetExportSession(asset: AVURLAsset(url: clip.url), presetName: AVAssetExportPresetPassthrough) else {
-            error = "Export not available for this file"; return
+            error = L("Export not available for this file"); return
         }
         let out = ClipLibrary.trimOutputURL(for: clip.url)
         s.outputURL = out
@@ -62,7 +62,7 @@ final class TrimModel: ObservableObject {
                     ClipMetadataStore.carryOver(from: self.clip.url, to: out)
                     ClipLibrary.writeMarkers(ClipLibrary.trimmedMarkers(self.clip.markers, start: self.start, end: self.end), for: out)
                     done(out)
-                } else { self.error = s.error?.localizedDescription ?? "Export failed" }
+                } else { self.error = s.error?.localizedDescription ?? L("Export failed") }
             }
         }
     }
@@ -81,14 +81,14 @@ struct TrimView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Trim \(model.clip.name)").font(.headline).lineLimit(1)
+            Text(L("Trim %@", model.clip.name)).font(.headline).lineLimit(1)
             VideoPlayer(player: model.player).frame(minHeight: 260)
             if model.duration > 0 {
-                HandleRow(label: "Start", value: model.start, range: 0...model.duration, markers: model.clip.markers,
+                HandleRow(label: L("Start"), value: model.start, range: 0...model.duration, markers: model.clip.markers,
                           set: model.setStart)
-                HandleRow(label: "End", value: model.end, range: 0...model.duration, markers: model.clip.markers,
+                HandleRow(label: L("End"), value: model.end, range: 0...model.duration, markers: model.clip.markers,
                           set: model.setEnd)
-                Text("Length \(ClipLibrary.formatDuration(model.end - model.start)) · passthrough, cuts snap to keyframes")
+                Text(L("Length %@ · passthrough, cuts snap to keyframes", ClipLibrary.formatDuration(model.end - model.start)))
                     .font(.caption).foregroundStyle(.secondary)
             }
             if let e = model.error { Text(e).font(.caption).foregroundStyle(.red) }
@@ -118,20 +118,20 @@ private struct HandleRow: View {
             Text(label).frame(width: 40, alignment: .leading)
             VStack(spacing: 0) {
                 Slider(value: Binding(get: { value }, set: set), in: range)
-                    .accessibilityLabel("\(label) time")
-                    .accessibilityValue("\(Int(value.rounded())) seconds")
+                    .accessibilityLabel(L("%@ time", label))
+                    .accessibilityValue(L("%lld seconds", Int(value.rounded())))
                 if !markers.isEmpty {
                     GeometryReader { g in
                         ForEach(Array(markers.enumerated()), id: \.offset) { _, m in
                             Rectangle().fill(m.isAuto ? Color.cyan : Color.orange).frame(width: 2, height: 8)
                                 .accessibilityElement()
-                                .accessibilityLabel(m.isAuto ? "Automatic marker \(m.label)" : "Marker \(m.label)")
+                                .accessibilityLabel(m.isAuto ? L("Automatic marker %@", m.label) : L("Marker %@", m.label))
                                 .accessibilityAddTraits(.isButton)
-                                .accessibilityHint("Moves the \(label.lowercased()) handle to this marker")
+                                .accessibilityHint(L("Moves the %@ handle to this marker", label.lowercased()))
                                 .accessibilityAction { set(m.t) }
                                 .position(x: 8 + (g.size.width - 16) * CGFloat(m.t / max(range.upperBound, 0.001)), y: 4)
                                 .onTapGesture { set(m.t) }
-                                .help(m.isAuto ? "\(m.label) (automatic)" : m.label)
+                                .help(m.isAuto ? L("%@ (automatic)", m.label) : m.label)
                         }
                     }.frame(height: 10)
                 }

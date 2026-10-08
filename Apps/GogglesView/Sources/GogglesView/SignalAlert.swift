@@ -231,13 +231,13 @@ final class SignalAlertController {
         guard let output else { return }
         switch output {
         case .lost:
-            SignalAlertNotifier.post(title: "Signal lost", body: "\(deviceLabel()) stopped sending video.", id: "lost")
+            SignalAlertNotifier.post(title: L("Signal lost"), body: L("%@ stopped sending video.", deviceLabel()), id: "lost")
             playAlertSound()
         case .repeatReminder:
             playAlertSound()
         case .restored:
             stopSound()
-            SignalAlertNotifier.post(title: "Signal restored", body: "\(deviceLabel()) is sending video again.", id: "restored")
+            SignalAlertNotifier.post(title: L("Signal restored"), body: L("%@ is sending video again.", deviceLabel()), id: "restored")
             if SignalAlertPrefs.soundEnabled() { SignalAlertSound.play(SignalAlertPrefs.restoredSoundName) }
         }
     }
@@ -303,7 +303,7 @@ struct SignalAlertSettingsSection: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Signal-lost alert").font(.headline)
             Toggle("Alert when the video signal is lost", isOn: $enabled)
-            Stepper("After \(threshold) s without video", value: $threshold, in: SignalAlertPrefs.thresholdRange)
+            Stepper(L("After %lld s without video", threshold), value: $threshold, in: SignalAlertPrefs.thresholdRange)
                 .disabled(!enabled)
             Toggle("Repeat a sound until the signal returns", isOn: $soundOn).disabled(!enabled)
             HStack {

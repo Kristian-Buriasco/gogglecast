@@ -9,8 +9,8 @@ enum FramingAspect: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var title: String {
         switch self {
-        case .fit: return "Fit"
-        case .fill: return "Fill"
+        case .fit: return L("Fit")
+        case .fill: return L("Fill")
         case .r16x9: return "16:9"
         case .r4x3: return "4:3"
         case .r1x1: return "1:1"
@@ -32,7 +32,7 @@ enum FramingAspect: String, CaseIterable, Identifiable {
 enum FramingGrid: String, CaseIterable, Identifiable {
     case off, thirds, cross
     var id: String { rawValue }
-    var title: String { self == .off ? "Off" : self == .thirds ? "Thirds" : "Center cross" }
+    var title: String { self == .off ? L("Off") : self == .thirds ? L("Thirds") : L("Center cross") }
 }
 
 /// Pure geometry, kept free of AppKit state so it is unit-testable.
@@ -197,8 +197,8 @@ struct FreezeControl: View {
         }
         .buttonStyle(.plain)
         .keyboardShortcut("f", modifiers: [.shift, .command])
-        .help(state.isFrozen ? "Resume video (⇧⌘F)" : "Freeze video (⇧⌘F); recording and streaming continue")
-        .accessibilityLabel(state.isFrozen ? "Resume video" : "Freeze video")
+        .help(state.isFrozen ? L("Resume video (⇧⌘F)") : L("Freeze video (⇧⌘F); recording and streaming continue"))
+        .accessibilityLabel(state.isFrozen ? L("Resume video") : L("Freeze video"))
         .accessibilityHint("Recording and streaming continue while frozen")
         .accessibilityIdentifier("freezeButton")
     }
@@ -219,14 +219,14 @@ struct FramingSettingsSection: View {
                 ForEach(FramingAspect.allCases) { Text($0.title).tag($0.rawValue) }
             }
             .pickerStyle(.segmented)
-            slider("Zoom", $zoom, 1...4, format: "%.1fx")
+            slider(L("Zoom"), $zoom, 1...4, format: "%.1fx")
             Picker("Grid", selection: $grid) {
                 ForEach(FramingGrid.allCases) { Text($0.title).tag($0.rawValue) }
             }
             .pickerStyle(.segmented)
-            slider("Brightness", $brightness, -0.5...0.5, format: "%+.2f")
-            slider("Contrast", $contrast, 0.5...2, format: "%.2f")
-            slider("Saturation", $saturation, 0...2, format: "%.2f")
+            slider(L("Brightness"), $brightness, -0.5...0.5, format: "%+.2f")
+            slider(L("Contrast"), $contrast, 0.5...2, format: "%.2f")
+            slider(L("Saturation"), $saturation, 0...2, format: "%.2f")
             Button("Reset") { FramingPrefs.resetAll() }
             Text("Scroll or pinch to zoom, drag to pan, double-click to reset. Affects the main and capture windows only; recordings and streams use Output framing below.")
                 .font(.caption2).foregroundStyle(.secondary)

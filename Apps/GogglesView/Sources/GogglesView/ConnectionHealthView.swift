@@ -60,12 +60,14 @@ final class ConnectionHealthModel: ObservableObject {
         verdict = v
         helperStats = stats
         live = target.isLive()
-        HealthDiagnostics.publish(HealthReport.summaryLine(s, v))
+        HealthDiagnostics.publish(Localization.english { HealthReport.summaryLine(s, HealthVerdict.evaluate(s)) })
     }
 
     var reportText: String {
-        HealthReport.text(label: label, snapshot: snapshot, verdict: verdict,
-                          helperFps: helperStats?.fps, helperBitrateKbps: helperStats?.bitrateKbps)
+        Localization.english {
+            HealthReport.text(label: label, snapshot: snapshot, verdict: HealthVerdict.evaluate(snapshot),
+                              helperFps: helperStats?.fps, helperBitrateKbps: helperStats?.bitrateKbps)
+        }
     }
 }
 
@@ -106,16 +108,16 @@ struct ConnectionHealthView: View {
                 }
 
                 HStack(spacing: 10) {
-                    tile("Frames per second", String(format: "%.0f", s.fps))
-                    tile("Bitrate", String(format: "%.1f Mbps", s.bitrateMbps))
-                    tile("Last frame", s.secondsSinceLastFrame.map { String(format: "%.1f s ago", $0) } ?? "none")
-                    tile("Dropped / failed", "\(s.drops) / \(s.decodeFailures)")
+                    tile(L("Frames per second"), String(format: "%.0f", s.fps))
+                    tile(L("Bitrate"), String(format: "%.1f Mbps", s.bitrateMbps))
+                    tile(L("Last frame"), s.secondsSinceLastFrame.map { L("%.1f s ago", $0) } ?? L("none"))
+                    tile(L("Dropped / failed"), "\(s.drops) / \(s.decodeFailures)")
                 }
 
-                chartCard("Frames per second", unit: "fps", color: .green, points: points { Double($0.frames) })
-                chartCard("Video bitrate", unit: "Mbps", color: .cyan, points: points { $0.megabitsPerSecond })
-                chartCard("Longest frame gap each second", unit: "ms", color: .orange, points: points { $0.maxGapMs })
-                chartCard("Decode latency", unit: "ms", color: .purple, points: s.series.compactMap { b in b.latencyMs.map { (b.secondsAgo, $0) } })
+                chartCard(L("Frames per second"), unit: "fps", color: .green, points: points { Double($0.frames) })
+                chartCard(L("Video bitrate"), unit: "Mbps", color: .cyan, points: points { $0.megabitsPerSecond })
+                chartCard(L("Longest frame gap each second"), unit: "ms", color: .orange, points: points { $0.maxGapMs })
+                chartCard(L("Decode latency"), unit: "ms", color: .purple, points: s.series.compactMap { b in b.latencyMs.map { (b.secondsAgo, $0) } })
                 problemsCard
                 histogramCard
 
@@ -125,16 +127,16 @@ struct ConnectionHealthView: View {
                     GridRow { Text("Decode latency avg / p95").foregroundStyle(.secondary); Text("\(ms(s.latencyMs)) / \(ms(s.latencyP95Ms))") }
                     GridRow {
                         Text("Parameter sets").foregroundStyle(.secondary)
-                        Text("\(s.parameterSets)" + (s.parameterSetIntervalMs.map { String(format: ", every %.1f s", $0 / 1000) } ?? ""))
+                        Text("\(s.parameterSets)" + (s.parameterSetIntervalMs.map { L(", every %.1f s", $0 / 1000) } ?? ""))
                     }
                     GridRow {
                         Text("Background service reports").foregroundStyle(.secondary)
-                        Text(model.helperStats.map { String(format: "%d fps, %.0f kbps", $0.fps, $0.bitrateKbps) } ?? "n/a")
+                        Text(model.helperStats.map { String(format: "%d fps, %.0f kbps", $0.fps, $0.bitrateKbps) } ?? L("n/a"))
                     }
                 }
                 .font(.callout.monospacedDigit())
 
-                Text("Covers the last \(Int(s.spanSeconds.rounded())) s (up to \(HealthMonitor.defaultWindowSeconds) s). USB error counts and resets are not reported by the background service, so they are not shown.")
+                Text(L("Covers the last %lld s (up to %lld s). USB error counts and resets are not reported by the background service, so they are not shown.", Int(s.spanSeconds.rounded()), HealthMonitor.defaultWindowSeconds))
                     .font(.caption2).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
             .padding(20)
@@ -145,7 +147,7 @@ struct ConnectionHealthView: View {
         .foregroundStyle(.white)
     }
 
-    private func ms(_ v: Double?) -> String { v.map { String(format: "%.1f ms", $0) } ?? "n/a" }
+    private func ms(_ v: Double?) -> String { v.map { String(format: "%.1f ms", $0) } ?? L("n/a") }
 
     private func points(_ value: @escaping (HealthBucket) -> Double) -> [(Int, Double)] {
         model.snapshot.series.map { ($0.secondsAgo, value($0)) }
@@ -156,13 +158,13 @@ struct ConnectionHealthView: View {
         return VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
                 Circle().fill(verdictColor).frame(width: 12, height: 12).accessibilityHidden(true)
-                Text(v.level.rawValue).font(.headline)
+                Text(v.level.title).font(.headline)
             }
             ForEach(v.reasons, id: \.self) { Text($0).font(.callout) }
             if !v.suggestions.isEmpty {
                 Text("What to try").font(.subheadline.bold()).padding(.top, 2)
                 ForEach(Array(v.suggestions.enumerated()), id: \.offset) { i, tip in
-                    Text("\(i + 1). \(tip)").font(.callout).fixedSize(horizontal: false, vertical: true)
+                    Text(verbatim: "\(i + 1). \(tip)").font(.callout).fixedSize(horizontal: false, vertical: true)
                 }
             }
         }

@@ -112,12 +112,12 @@ struct UpdateSettingsSection: View {
         if case .failed(let m) = installer.state { return m }
         if case .manual(let m) = installer.state { return m }
         if let b = installer.blockedReason, case .staged = installer.state { return b }
-        if case .downloading = installer.state { return "Downloading and verifying the update…" }
+        if case .downloading = installer.state { return L("Downloading and verifying the update…") }
         switch checker.result {
-        case nil: return "Version \(UpdateChecker.currentVersion)"
-        case .upToDate: return "You're up to date (version \(UpdateChecker.currentVersion))."
-        case .available(let t, _): return "\(t) is available. You have \(UpdateChecker.currentVersion)."
-        case .failed: return "Couldn't check for updates."
+        case nil: return L("Version %@", UpdateChecker.currentVersion)
+        case .upToDate: return L("You're up to date (version %@).", UpdateChecker.currentVersion)
+        case .available(let t, _): return L("%@ is available. You have %@.", t, UpdateChecker.currentVersion)
+        case .failed: return L("Couldn't check for updates.")
         }
     }
 
@@ -141,13 +141,13 @@ struct UpdateSettingsSection: View {
     @ViewBuilder private var primaryButton: some View {
         switch installer.state {
         case .staged(let v):
-            Button("Install \(v) & Restart") { installer.installAndRestart() }
+            Button(L("Install %@ & Restart", v)) { installer.installAndRestart() }
                 .buttonStyle(.borderedProminent)
         case .downloading:
             ProgressView().controlSize(.small)
         default:
             if case .available(let tag, _) = checker.result, let asset = checker.latestAsset {
-                Button("Download \(tag)") { installer.stage(asset: asset, version: tag) }
+                Button(L("Download %@", tag)) { installer.stage(asset: asset, version: tag) }
                     .buttonStyle(.borderedProminent)
             } else {
                 Button("Check Now") { checker.check() }.disabled(checker.checking)

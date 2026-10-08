@@ -22,10 +22,10 @@ enum BurnInCorner: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var label: String {
         switch self {
-        case .topLeft: return "Top left"
-        case .topRight: return "Top right"
-        case .bottomLeft: return "Bottom left"
-        case .bottomRight: return "Bottom right"
+        case .topLeft: return L("Top left")
+        case .topRight: return L("Top right")
+        case .bottomLeft: return L("Bottom left")
+        case .bottomRight: return L("Bottom right")
         }
     }
     var isTop: Bool { self == .topLeft || self == .topRight }

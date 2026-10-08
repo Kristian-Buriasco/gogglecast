@@ -167,18 +167,18 @@ public enum GogglesDiagnostics {
     /// when `RNDISTransport.init` throws `RNDISTransportError` (interface
     /// claim or RNDIS init failure), i.e. every `claimFailed` cause other
     /// than the ARP-timeout one below.
-    public static let interfaceClaimFailed =
-        "Couldn't take control of the goggles. Another app (or a macOS network setting) may be using them. " +
-        "Quit other goggles or capture apps, unplug and replug, then press Retry. " +
-        "If it keeps failing, open System Settings > Network and turn off the new network adapter macOS added for the goggles."
+    public static var interfaceClaimFailed: String {
+        L("Couldn't take control of the goggles. Another app (or a macOS network setting) may be using them. Quit other goggles or capture apps, unplug and replug, then press Retry. If it keeps failing, open System Settings > Network and turn off the new network adapter macOS added for the goggles.")
+    }
 
     /// design §7 table row "ARP resolution timeout (3 s)". The design's
     /// technical wording ("goggles did not answer on the USB network link,
     /// power-cycle the goggles") now lives in `arpTimeoutTechnical` for logs
     /// and the Diagnostics copy; the user sees plain language. Shown when
     /// `RNDISTransport.init` throws `ARPResolver.ARPResolverError`.
-    public static let arpTimeout =
-        "The goggles didn't respond. Turn them off and on, check OTG is enabled, then Retry."
+    public static var arpTimeout: String {
+        L("The goggles didn't respond. Turn them off and on, check OTG is enabled, then Retry.")
+    }
 
     /// Technical counterpart of `interfaceClaimFailed`, for logs and Diagnostics only.
     public static let interfaceClaimFailedTechnical =

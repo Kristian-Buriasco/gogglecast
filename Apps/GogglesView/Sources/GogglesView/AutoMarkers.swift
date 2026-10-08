@@ -67,12 +67,12 @@ struct AutoMarkerPolicy {
 
     static func label(for event: Event) -> String {
         switch event {
-        case .signalLost: return "Signal lost"
-        case .signalRestored: return "Signal restored"
-        case .batteryLow(let p): return "Goggles battery low (\(p)%)"
-        case .replaySaved: return "Replay saved"
-        case .screenshotTaken: return "Screenshot taken"
-        case .raceMode(let on): return on ? "Race mode on" : "Race mode off"
+        case .signalLost: return L("Signal lost")
+        case .signalRestored: return L("Signal restored")
+        case .batteryLow(let p): return L("Goggles battery low (%lld%%)", p)
+        case .replaySaved: return L("Replay saved")
+        case .screenshotTaken: return L("Screenshot taken")
+        case .raceMode(let on): return on ? L("Race mode on") : L("Race mode off")
         }
     }
 

@@ -173,22 +173,22 @@ final class UpdateInstaller: ObservableObject {
         guard state != .downloading else { return }
         let pin = pinProvider()
         if case .none = pin {
-            state = .manual("This build isn't signed with a developer identity, so it can't verify an update's authenticity. Opened the releases page; download and install it manually.")
+            state = .manual(L("This build isn't signed with a developer identity, so it can't verify an update's authenticity. Opened the releases page; download and install it manually."))
             openURL(UpdatePrefs.releasesPage)
             return
         }
         guard let want = asset.sha256, !want.isEmpty else {
-            state = .failed("The release publishes no checksum, so the update can't be verified. Download it manually from the releases page."); return
+            state = .failed(L("The release publishes no checksum, so the update can't be verified. Download it manually from the releases page.")); return
         }
         guard FileManager.default.isWritableFile(atPath: bundleURL.deletingLastPathComponent().path) else {
-            state = .failed("GogglesView's folder isn't writable. Download the release manually."); return
+            state = .failed(L("GogglesView's folder isn't writable. Download the release manually.")); return
         }
         state = .downloading
         Task.detached { [self] in
             do {
                 let (tmp, resp) = try await URLSession.shared.download(from: asset.url)
                 defer { try? FileManager.default.removeItem(at: tmp) }
-                guard (resp as? HTTPURLResponse)?.statusCode == 200 else { throw UpdateError("Download failed") }
+                guard (resp as? HTTPURLResponse)?.statusCode == 200 else { throw UpdateError(L("Download failed")) }
                 let app = try Self.extractApp(dmg: tmp, expectedVersion: version, pin: pin, expectedSHA256: want)
                 await MainActor.run { self.markStaged(app: app, version: version, arm: true) }
             } catch {
@@ -207,7 +207,7 @@ final class UpdateInstaller: ObservableObject {
     func installAndRestart() {
         guard case .staged = state else { return }
         if isRecordingNow() {
-            blockedReason = "Not installing while recording or streaming. Stop it first."
+            blockedReason = L("Not installing while recording or streaming. Stop it first.")
             return
         }
         blockedReason = nil
@@ -245,7 +245,7 @@ final class UpdateInstaller: ObservableObject {
         } catch {
             scriptSpawned = false
             try? FileManager.default.removeItem(at: path)
-            state = .failed("Couldn't start the installer: \(error.localizedDescription)")
+            state = .failed(L("Couldn't start the installer: %@", error.localizedDescription))
         }
     }
 
@@ -292,16 +292,16 @@ final class UpdateInstaller: ObservableObject {
         try fm.copyItem(at: dmg, to: dmgCopy)
         // Hash exactly what will be mounted, not the download's temp file.
         guard try sha256Hex(of: dmgCopy) == expectedSHA256.lowercased() else {
-            throw UpdateError("Checksum mismatch; update discarded")
+            throw UpdateError(L("Checksum mismatch; update discarded"))
         }
         guard try run("/usr/bin/hdiutil", ["attach", "-nobrowse", "-readonly", "-noverify", "-mountpoint", mount.path, dmgCopy.path]) == 0 else {
-            throw UpdateError("Couldn't open the update disk image")
+            throw UpdateError(L("Couldn't open the update disk image"))
         }
         mounted = true
         let src = mount.appendingPathComponent("GogglesView.app")
-        guard fm.fileExists(atPath: src.path) else { throw UpdateError("Update does not contain GogglesView.app") }
+        guard fm.fileExists(atPath: src.path) else { throw UpdateError(L("Update does not contain GogglesView.app")) }
         let dst = out.appendingPathComponent("GogglesView.app")
-        guard try run("/usr/bin/ditto", [src.path, dst.path]) == 0 else { throw UpdateError("Couldn't copy the update") }
+        guard try run("/usr/bin/ditto", [src.path, dst.path]) == 0 else { throw UpdateError(L("Couldn't copy the update")) }
         try verify(staged: dst, current: current, pin: pin, expectedVersion: expectedVersion)
         succeeded = true
         return dst
@@ -312,24 +312,24 @@ final class UpdateInstaller: ObservableObject {
     static func verify(staged: URL, current: URL?, pin: SignaturePin, expectedVersion: String) throws {
         switch pin {
         case .none:
-            throw UpdateError("This build can't verify update authenticity")
+            throw UpdateError(L("This build can't verify update authenticity"))
         case .requirement(let r):
             guard UpdateSignature.satisfies(staged, requirement: r) else {
-                throw UpdateError("Update isn't signed by the same identity as this app")
+                throw UpdateError(L("Update isn't signed by the same identity as this app"))
             }
         case .integrityOnlyForTests:
             guard UpdateSignature.satisfies(staged, requirement: nil) else {
-                throw UpdateError("Update's code signature is invalid")
+                throw UpdateError(L("Update's code signature is invalid"))
             }
         }
         if let current, let cid = UpdateSignature.identifier(current), UpdateSignature.identifier(staged) != cid {
-            throw UpdateError("Update has a different app identity")
+            throw UpdateError(L("Update has a different app identity"))
         }
         let plist = NSDictionary(contentsOf: staged.appendingPathComponent("Contents/Info.plist"))
         let v = plist?["CFBundleShortVersionString"] as? String ?? ""
         guard VersionComparator.isNewer(remote: v, than: UpdateChecker.currentVersion),
               VersionComparator.components(v) == VersionComparator.components(expectedVersion) else {
-            throw UpdateError("Update version doesn't match the release")
+            throw UpdateError(L("Update version doesn't match the release"))
         }
     }
 
@@ -371,7 +371,7 @@ final class UpdateInstaller: ObservableObject {
                 d.removeObject(forKey: UpdatePrefs2.helperChangedKey)
                 return .reRegistered
             case .requiresApproval:
-                return .failed("macOS is waiting for your approval. In System Settings > General > Login Items & Extensions, switch on GogglesView.")
+                return .failed(L("macOS is waiting for your approval. In System Settings > General > Login Items & Extensions, switch on GogglesView."))
             default:
                 return .failed(HelperRegistration.plainDescription(status))
             }
@@ -389,7 +389,7 @@ final class UpdateInstaller: ObservableObject {
     /// setup assistant.
     func runPendingHelperUpdate() {
         if case .failed(let reason) = Self.finishPendingHelperUpdate() {
-            helperUpdateError = "The update installed, but the background service didn't restart: \(reason.hasSuffix(".") ? reason : reason + ".") Try Re-register under Background service in Settings."
+            helperUpdateError = L("The update installed, but the background service didn't restart: %@ Try Re-register under Background service in Settings.", reason.hasSuffix(".") ? reason : reason + ".")
         } else {
             helperUpdateError = nil
         }

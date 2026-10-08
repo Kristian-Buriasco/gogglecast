@@ -80,7 +80,7 @@ struct ClipMetadata: Codable, Equatable {
     /// Metadata for a clip trimmed out of this one: same tags, favourite and goggles, a "Trimmed from" note.
     func carriedOver(fromClipNamed name: String) -> ClipMetadata {
         var m = self
-        m.note = note.isEmpty ? "Trimmed from \(name)" : "\(note)\nTrimmed from \(name)"
+        m.note = note.isEmpty ? L("Trimmed from %@", name) : "\(note)\n" + L("Trimmed from %@", name)
         return m
     }
 }
@@ -171,10 +171,10 @@ extension AccessibilityLabels {
     /// "Name, Oct 5, 0:34, 12 MB, tags fpv, coast, favourite".
     static func clipCard(name: String, date: String, duration: String, size: String, tags: [String], favourite: Bool) -> String {
         var parts = [name, date, duration, size]
-        if !tags.isEmpty { parts.append("tags " + tags.joined(separator: ", ")) }
-        if favourite { parts.append("favourite") }
+        if !tags.isEmpty { parts.append(L("tags %@", tags.joined(separator: ", "))) }
+        if favourite { parts.append(L("favourite")) }
         return parts.joined(separator: ", ")
     }
 
-    static func favouriteToggle(isOn: Bool) -> String { isOn ? "Remove from favourites" : "Add to favourites" }
+    static func favouriteToggle(isOn: Bool) -> String { isOn ? L("Remove from favourites") : L("Add to favourites") }
 }

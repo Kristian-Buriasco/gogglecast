@@ -200,7 +200,7 @@ struct ReencodeSettingsSection: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Keyframes for replay and streams").font(.headline)
             Toggle("Re-encode with regular keyframes", isOn: $enabled)
-            Stepper("Bitrate: \(bitrate) Mbps", value: $bitrate, in: ReencodePrefs.bitrateRange)
+            Stepper(L("Bitrate: %lld Mbps", bitrate), value: $bitrate, in: ReencodePrefs.bitrateRange)
                 .disabled(!enabled)
             Text("The goggles send one keyframe when Share Liveview starts and none after, so instant replay, UDP, RTMP, SRT and the web viewer can't start cleanly later. This re-encodes the picture with a keyframe every second (hardware encoder, runs only while one of those is active). Turn it off to pass the goggles' stream through untouched; clips and late-joining viewers may then show grey until the next keyframe.")
                 .font(.caption).foregroundStyle(.secondary)

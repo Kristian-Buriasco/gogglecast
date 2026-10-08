@@ -28,7 +28,7 @@ struct MarkerControl: View {
         .accessibilityIdentifier("markerButton")
         .alert("Add marker", isPresented: $showCustom) {
             TextField("Label", text: $custom)
-            Button("Add") { recorder.addMarker(label: custom.isEmpty ? "Marker" : custom) }
+            Button("Add") { recorder.addMarker(label: custom.isEmpty ? L("Marker") : custom) }
             Button("Cancel", role: .cancel) {}
         }
     }
@@ -42,14 +42,14 @@ struct RecordingExtrasSettingsSection: View {
 
     var body: some View {
         Section("Recording extras") {
-            field("Split every", $splitMinutes, range: 0...120, step: 5, unit: "min",
-                  caption: "Starts a new -partN file at the next clean cut point; recording continues. Ignored in loop mode.")
-            field("Split at size", $splitMegabytes, range: 0...100_000, step: 500, unit: "MB",
-                  caption: "Also splits when a file reaches this size.")
-            field("Loop recording: keep only the last", $loopKeep, range: 0...100_000, step: 5, unit: "min",
-                  caption: "Older parts are permanently deleted (not moved to the Trash). Recording is split into parts of one sixth of this length, and only parts from the current recording are deleted.")
-            field("Auto-delete after", $autoDeleteDays, range: 0...3650, step: 1, unit: "days",
-                  caption: "At launch, moves recordings (.mov, .mp4 and .json files starting with your prefix) older than this to the Trash. Files from the last 24 hours and instant replay clips are never touched.")
+            field(L("Split every"), $splitMinutes, range: 0...120, step: 5, unit: L("min"),
+                  caption: L("Starts a new -partN file at the next clean cut point; recording continues. Ignored in loop mode."))
+            field(L("Split at size"), $splitMegabytes, range: 0...100_000, step: 500, unit: L("MB"),
+                  caption: L("Also splits when a file reaches this size."))
+            field(L("Loop recording: keep only the last"), $loopKeep, range: 0...100_000, step: 5, unit: L("min"),
+                  caption: L("Older parts are permanently deleted (not moved to the Trash). Recording is split into parts of one sixth of this length, and only parts from the current recording are deleted."))
+            field(L("Auto-delete after"), $autoDeleteDays, range: 0...3650, step: 1, unit: L("days"),
+                  caption: L("At launch, moves recordings (.mov, .mp4 and .json files starting with your prefix) older than this to the Trash. Files from the last 24 hours and instant replay clips are never touched."))
         }
         .onChange(of: autoDeleteDays) { old, new in
             guard old == 0, new > 0 else { return }
@@ -61,10 +61,10 @@ struct RecordingExtrasSettingsSection: View {
     static func confirmAutoDelete(days: Int) -> Bool {
         let alert = NSAlert()
         alert.alertStyle = .warning
-        alert.messageText = "Move old recordings to the Trash?"
+        alert.messageText = L("Move old recordings to the Trash?")
         alert.informativeText = RecordingExtras.autoDeleteConfirmation(days: days, folder: RecordingPrefs.directory)
-        alert.addButton(withTitle: "Continue")
-        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: L("Continue"))
+        alert.addButton(withTitle: L("Cancel"))
         return alert.runModal() == .alertFirstButtonReturn
     }
 

@@ -43,9 +43,9 @@ struct SetupChecklistView: View {
     }
     private static func statusText(_ s: SetupChecklist.Status) -> String {
         switch s {
-        case .pass: return "Passed"
-        case .fail: return "Needs attention"
-        case .unknown: return "Not checked"
+        case .pass: return L("Passed")
+        case .fail: return L("Needs attention")
+        case .unknown: return L("Not checked")
         }
     }
     private static func color(_ s: SetupChecklist.Status) -> Color {
@@ -197,12 +197,12 @@ private struct StepRow: View {
                 .frame(width: 24)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 5) {
-                Text("\(number). \(step.title)").font(.headline)
+                Text(verbatim: "\(number). \(step.title)").font(.headline)
                 Text(step.message).font(.callout).fixedSize(horizontal: false, vertical: true)
                 if !step.instructions.isEmpty {
                     VStack(alignment: .leading, spacing: 3) {
                         ForEach(Array(step.instructions.enumerated()), id: \.offset) { i, text in
-                            Text("\(i + 1). \(text)").font(.callout).fixedSize(horizontal: false, vertical: true)
+                            Text(verbatim: "\(i + 1). \(text)").font(.callout).fixedSize(horizontal: false, vertical: true)
                         }
                     }
                     .padding(.leading, 4)
@@ -270,7 +270,7 @@ enum OnboardingWindow {
             onClose: { finish(openLive: false) }))
         host.sizingOptions = []
         let w = NSWindow(contentViewController: host)
-        w.title = "Setup assistant"
+        w.title = L("Setup assistant")
         w.styleMask = [.titled, .closable]
         w.setContentSize(NSSize(width: 520, height: 640))
         w.isReleasedWhenClosed = false

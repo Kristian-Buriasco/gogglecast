@@ -43,10 +43,10 @@ struct CompactDeviceIdentity: View {
                 .foregroundStyle(.white)
             Text("·")
                 .foregroundStyle(.secondary)
-            Text("S/N \(info?.serial ?? "—")")
+            Text(verbatim: "S/N \(info?.serial ?? "—")")
             Text("·")
                 .foregroundStyle(.secondary)
-            Text("USB \(usbIDText)")
+            Text(verbatim: "USB \(usbIDText)")
         }
         .font(.caption)
         .foregroundStyle(.secondary)

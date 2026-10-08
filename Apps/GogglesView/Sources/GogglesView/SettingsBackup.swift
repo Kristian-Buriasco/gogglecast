@@ -167,8 +167,8 @@ enum SettingsBackup {
 
         var message: String {
             switch self {
-            case .notSettingsFile: return "This is not a GogglesView settings file."
-            case .newerFormat: return "This file was made by a newer version of GogglesView. Update the app and try again."
+            case .notSettingsFile: return L("This is not a GogglesView settings file.")
+            case .newerFormat: return L("This file was made by a newer version of GogglesView. Update the app and try again.")
             }
         }
     }
@@ -204,13 +204,18 @@ enum SettingsBackup {
 
     static func summary(_ plan: Plan, applied: Bool) -> String {
         let n = plan.changed.count
-        var text = applied ? "Applied \(n) \(n == 1 ? "setting" : "settings")." : "\(n) \(n == 1 ? "setting" : "settings") will change."
-        if !plan.rejected.isEmpty { text += " Skipped \(plan.rejected.count) with invalid values." }
-        if !plan.ignored.isEmpty { text += " Ignored \(plan.ignored.count) unknown." }
+        var text: String
+        if applied {
+            text = n == 1 ? L("Applied 1 setting.") : L("Applied %lld settings.", n)
+        } else {
+            text = n == 1 ? L("1 setting will change.") : L("%lld settings will change.", n)
+        }
+        if !plan.rejected.isEmpty { text += " " + L("Skipped %lld with invalid values.", plan.rejected.count) }
+        if !plan.ignored.isEmpty { text += " " + L("Ignored %lld unknown.", plan.ignored.count) }
         return text
     }
 
-    static let reopenNote = "Some settings apply after you reopen the goggles windows."
+    static var reopenNote: String { L("Some settings apply after you reopen the goggles windows.") }
     static let suggestedFileName = "GogglesView-settings.json"
 }
 
@@ -247,9 +252,9 @@ struct SettingsBackupSection: View {
         do {
             let data = try SettingsBackup.encode(appVersion: UpdateChecker.currentVersion)
             try data.write(to: url, options: .atomic)
-            message = "Saved settings to \(url.lastPathComponent)."
+            message = L("Saved settings to %@.", url.lastPathComponent)
         } catch {
-            message = "Could not save the file: \(error.localizedDescription)"
+            message = L("Could not save the file: %@", error.localizedDescription)
         }
     }
 
@@ -262,19 +267,19 @@ struct SettingsBackupSection: View {
         do {
             let data = try Data(contentsOf: url)
             let plan = try SettingsBackup.plan(from: data)
-            guard plan.count > 0 else { message = "Nothing to change. " + SettingsBackup.summary(plan, applied: true); return }
+            guard plan.count > 0 else { message = L("Nothing to change.") + " " + SettingsBackup.summary(plan, applied: true); return }
             let alert = NSAlert()
-            alert.messageText = "Import \(plan.count) \(plan.count == 1 ? "setting" : "settings")?"
+            alert.messageText = plan.count == 1 ? L("Import 1 setting?") : L("Import %lld settings?", plan.count)
             alert.informativeText = SettingsBackup.summary(plan, applied: false) + " " + SettingsBackup.reopenNote
-            alert.addButton(withTitle: "Import")
-            alert.addButton(withTitle: "Cancel")
+            alert.addButton(withTitle: L("Import"))
+            alert.addButton(withTitle: L("Cancel"))
             guard alert.runModal() == .alertFirstButtonReturn else { return }
             SettingsBackup.apply(plan)
             message = SettingsBackup.summary(plan, applied: true) + " " + SettingsBackup.reopenNote
         } catch let e as SettingsBackup.ImportError {
             message = e.message
         } catch {
-            message = "Could not read the file: \(error.localizedDescription)"
+            message = L("Could not read the file: %@", error.localizedDescription)
         }
     }
 }

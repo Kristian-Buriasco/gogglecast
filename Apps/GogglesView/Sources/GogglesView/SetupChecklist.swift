@@ -52,49 +52,49 @@ struct SetupChecklist {
         let regItem: Item
         switch registration {
         case .enabled:
-            regItem = Item(id: "helper-registered", title: "Background service approved and running", status: .pass, fix: nil, action: nil)
+            regItem = Item(id: "helper-registered", title: L("Background service approved and running"), status: .pass, fix: nil, action: nil)
         case .requiresApproval:
-            regItem = Item(id: "helper-registered", title: "Background service needs your approval", status: .fail,
-                           fix: "Switch on GogglesView in System Settings > General > Login Items & Extensions.", action: .openLoginItems)
+            regItem = Item(id: "helper-registered", title: L("Background service needs your approval"), status: .fail,
+                           fix: L("Switch on GogglesView in System Settings > General > Login Items & Extensions."), action: .openLoginItems)
         case .notRegistered, .notFound:
-            regItem = Item(id: "helper-registered", title: "Background service not set up", status: .fail,
-                           fix: "Set it up from Settings > Advanced > Background service (Re-register), then approve it in System Settings > General > Login Items & Extensions. The setup assistant can do this for you.",
+            regItem = Item(id: "helper-registered", title: L("Background service not set up"), status: .fail,
+                           fix: L("Set it up from Settings > Advanced > Background service (Re-register), then approve it in System Settings > General > Login Items & Extensions. The setup assistant can do this for you."),
                            action: .openLoginItems)
         case .unknown:
-            regItem = Item(id: "helper-registered", title: "Background service status unknown", status: .unknown, fix: nil, action: nil)
+            regItem = Item(id: "helper-registered", title: L("Background service status unknown"), status: .unknown, fix: nil, action: nil)
         }
 
         let reachItem: Item
         switch reachability {
         case .connected:
-            reachItem = Item(id: "helper-reachable", title: "Background service reachable", status: .pass, fix: nil, action: nil)
+            reachItem = Item(id: "helper-reachable", title: L("Background service reachable"), status: .pass, fix: nil, action: nil)
         case .connecting:
-            reachItem = Item(id: "helper-reachable", title: "Connecting to the background service…", status: .unknown, fix: nil, action: nil)
+            reachItem = Item(id: "helper-reachable", title: L("Connecting to the background service…"), status: .unknown, fix: nil, action: nil)
         case .unknown:
-            reachItem = Item(id: "helper-reachable", title: "Background service not checked yet", status: .unknown, fix: nil, action: nil)
+            reachItem = Item(id: "helper-reachable", title: L("Background service not checked yet"), status: .unknown, fix: nil, action: nil)
         case .disconnected:
-            reachItem = Item(id: "helper-reachable", title: "Background service not answering", status: .fail,
+            reachItem = Item(id: "helper-reachable", title: L("Background service not answering"), status: .fail,
                              fix: registration == .enabled
-                                ? "The background service is set up but not answering. Use Settings > Advanced > Connection > Reconnect, or Re-register under Background service."
-                                : "Fix the background service above first.",
+                                ? L("The background service is set up but not answering. Use Settings > Advanced > Connection > Reconnect, or Re-register under Background service.")
+                                : L("Fix the background service above first."),
                              action: nil)
         case .versionMismatch:
-            reachItem = Item(id: "helper-reachable", title: "Background service version mismatch", status: .fail,
-                             fix: "The installed background service is from a different GogglesView version. Re-register it from Settings > Advanced > Background service, or reinstall the app.",
+            reachItem = Item(id: "helper-reachable", title: L("Background service version mismatch"), status: .fail,
+                             fix: L("The installed background service is from a different GogglesView version. Re-register it from Settings > Advanced > Background service, or reinstall the app."),
                              action: nil)
         }
 
         let usbItem: Item
         if reachability != .connected {
-            usbItem = Item(id: "usb-device", title: "Goggles USB device", status: .unknown, fix: nil, action: nil)
+            usbItem = Item(id: "usb-device", title: L("Goggles USB device"), status: .unknown, fix: nil, action: nil)
         } else if let n = devicesFound, n > 0 {
-            usbItem = Item(id: "usb-device", title: "Goggles seen on USB", status: .pass, fix: nil, action: nil)
+            usbItem = Item(id: "usb-device", title: L("Goggles seen on USB"), status: .pass, fix: nil, action: nil)
         } else if devicesFound == 0 {
-            usbItem = Item(id: "usb-device", title: "No goggles seen on USB", status: .fail,
-                           fix: "On the goggles, turn on Settings > About > OTG Wired Connection to Computer, then unplug and replug the USB-C cable. Use a USB-C cable that carries data (not charge-only) and try another port.",
+            usbItem = Item(id: "usb-device", title: L("No goggles seen on USB"), status: .fail,
+                           fix: L("On the goggles, turn on Settings > About > OTG Wired Connection to Computer, then unplug and replug the USB-C cable. Use a USB-C cable that carries data (not charge-only) and try another port."),
                            action: nil)
         } else {
-            usbItem = Item(id: "usb-device", title: "Goggles USB device", status: .unknown, fix: nil, action: nil)
+            usbItem = Item(id: "usb-device", title: L("Goggles USB device"), status: .unknown, fix: nil, action: nil)
         }
         return [regItem, reachItem, usbItem]
     }

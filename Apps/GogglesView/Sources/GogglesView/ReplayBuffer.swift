@@ -18,8 +18,8 @@ enum ReplayPrefs {
     static var isAvailable: Bool { isAvailable(reencode: ReencodePrefs.enabled, outputActive: OutputProcessor.isActive) }
     static func isAvailable(reencode: Bool, outputActive: Bool) -> Bool { reencode || outputActive }
 
-    static let unavailableMessage = "Instant replay needs the keyframe encoder. Turn it on in Settings > Streaming."
-    static let offMessage = "Instant replay is off. Turn it on in Settings > Recording."
+    static var unavailableMessage: String { L("Instant replay needs the keyframe encoder. Turn it on in Settings > Streaming.") }
+    static var offMessage: String { L("Instant replay is off. Turn it on in Settings > Recording.") }
 
     /// Why a "save replay" request cannot work right now, or nil when it can.
     static func blockedMessage(enabled: Bool, reencode: Bool, outputActive: Bool) -> String? {
@@ -135,12 +135,12 @@ final class ReplayBuffer: ObservableObject, SampleBufferRendering {
             Self.fileName(for: Date(), prefix: RecordingPrefs.prefix, ext: RecordingPrefs.container.ext)))
         func done(_ u: URL?, _ err: String?) {
             DispatchQueue.main.async {
-                if let u { self.lastSavedURL = u; self.lastError = nil } else { self.lastError = err ?? "save failed" }
+                if let u { self.lastSavedURL = u; self.lastError = nil } else { self.lastError = err ?? L("save failed") }
                 completion?(u)
             }
         }
         guard let first = samples.first, let fmt = CMSampleBufferGetFormatDescription(first) else {
-            return done(nil, "Replay buffer is empty")
+            return done(nil, L("Replay buffer is empty"))
         }
         do {
             try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)

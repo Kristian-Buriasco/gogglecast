@@ -384,21 +384,21 @@ if args.contains("--run") || !args.dropFirst().contains(where: { $0.hasPrefix("-
     let appMenuItem = NSMenuItem()
     mainMenu.addItem(appMenuItem)
     let appMenu = NSMenu()
-    appMenu.addItem(withTitle: "About GogglesView", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
+    appMenu.addItem(withTitle: L("About GogglesView"), action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
     appMenu.addItem(.separator())
-    appMenu.addItem(withTitle: "Quit GogglesView", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+    appMenu.addItem(withTitle: L("Quit GogglesView"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
     appMenuItem.submenu = appMenu
 
     let fileMenuItem = NSMenuItem()
     mainMenu.addItem(fileMenuItem)
-    let fileMenu = NSMenu(title: "File")
+    let fileMenu = NSMenu(title: L("File"))
     fileMenu.autoenablesItems = false
     let settingsMenuTarget = MenuActionTarget { settingsWindowController.show() }
-    let settingsMenuItem = NSMenuItem(title: "Settings…", action: #selector(MenuActionTarget.invoke), keyEquivalent: ",")
+    let settingsMenuItem = NSMenuItem(title: L("Settings…"), action: #selector(MenuActionTarget.invoke), keyEquivalent: ",")
     settingsMenuItem.target = settingsMenuTarget
     fileMenu.addItem(settingsMenuItem)
     let reconnectMenuTarget = MenuActionTarget { sessionForCommand()?.coordinator.reconnect() }
-    let reconnectMenuItem = NSMenuItem(title: "Reconnect", action: #selector(MenuActionTarget.invoke), keyEquivalent: "")
+    let reconnectMenuItem = NSMenuItem(title: L("Reconnect"), action: #selector(MenuActionTarget.invoke), keyEquivalent: "")
     reconnectMenuItem.target = reconnectMenuTarget
     reconnectMenuItem.isEnabled = false
     fileMenu.addItem(reconnectMenuItem)
@@ -411,29 +411,29 @@ if args.contains("--run") || !args.dropFirst().contains(where: { $0.hasPrefix("-
 
     let gogglesMenuItem = NSMenuItem()
     mainMenu.addItem(gogglesMenuItem)
-    let gogglesMenu = NSMenu(title: "Goggles")
+    let gogglesMenu = NSMenu(title: L("Goggles"))
     gogglesMenu.autoenablesItems = false
     let openAnotherMenuTarget = MenuActionTarget { presentPicker() }
-    let openAnotherMenuItem = NSMenuItem(title: "Add Goggles…", action: #selector(MenuActionTarget.invoke), keyEquivalent: "n")
+    let openAnotherMenuItem = NSMenuItem(title: L("Add Goggles…"), action: #selector(MenuActionTarget.invoke), keyEquivalent: "n")
     openAnotherMenuItem.target = openAnotherMenuTarget
     gogglesMenu.addItem(openAnotherMenuItem)
     let copyFrameMenuTarget = MenuActionTarget {
         NotificationCenter.default.post(name: .gogglesCopyFrame, object: sessionForCommand()?.decodeSession)
     }
-    let copyFrameMenuItem = NSMenuItem(title: "Copy Frame", action: #selector(MenuActionTarget.invoke), keyEquivalent: "c")
+    let copyFrameMenuItem = NSMenuItem(title: L("Copy Frame"), action: #selector(MenuActionTarget.invoke), keyEquivalent: "c")
     copyFrameMenuItem.keyEquivalentModifierMask = [.command, .shift]
     copyFrameMenuItem.target = copyFrameMenuTarget
     gogglesMenu.addItem(copyFrameMenuItem)
     let disconnectMenuTarget = MenuActionTarget {
         if let session = sessionForCommand() { disconnectSession(session.deviceId) }
     }
-    let disconnectMenuItem = NSMenuItem(title: "Disconnect", action: #selector(MenuActionTarget.invoke), keyEquivalent: "")
+    let disconnectMenuItem = NSMenuItem(title: L("Disconnect"), action: #selector(MenuActionTarget.invoke), keyEquivalent: "")
     disconnectMenuItem.target = disconnectMenuTarget
     disconnectMenuItem.isEnabled = false
     gogglesMenu.addItem(disconnectMenuItem)
     gogglesMenu.addItem(.separator())
     let raceMenuTarget = MenuActionTarget { RaceModeController.shared.toggle() }
-    let raceMenuItem = NSMenuItem(title: "Race Mode", action: #selector(MenuActionTarget.invoke), keyEquivalent: "")
+    let raceMenuItem = NSMenuItem(title: L("Race Mode"), action: #selector(MenuActionTarget.invoke), keyEquivalent: "")
     raceMenuItem.target = raceMenuTarget
     raceMenuItem.state = RaceModePrefs.enabled ? .on : .off
     gogglesMenu.addItem(raceMenuItem)
@@ -441,20 +441,20 @@ if args.contains("--run") || !args.dropFirst().contains(where: { $0.hasPrefix("-
         raceMenuItem.state = RaceModePrefs.enabled ? .on : .off
     }
     let healthMenuTarget = MenuActionTarget { HealthWindow.show() }
-    let healthMenuItem = NSMenuItem(title: "Connection Health…", action: #selector(MenuActionTarget.invoke), keyEquivalent: "")
+    let healthMenuItem = NSMenuItem(title: L("Connection Health…"), action: #selector(MenuActionTarget.invoke), keyEquivalent: "")
     healthMenuItem.target = healthMenuTarget
     gogglesMenu.addItem(healthMenuItem)
     gogglesMenuItem.submenu = gogglesMenu
 
     let windowMenuItem = NSMenuItem()
     mainMenu.addItem(windowMenuItem)
-    let windowMenu = NSMenu(title: "Window")
-    windowMenu.addItem(withTitle: "Minimize", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
-    windowMenu.addItem(withTitle: "Zoom", action: #selector(NSWindow.performZoom(_:)), keyEquivalent: "")
-    let fullScreenItem = windowMenu.addItem(withTitle: "Enter Full Screen", action: #selector(NSWindow.toggleFullScreen(_:)), keyEquivalent: "f")
+    let windowMenu = NSMenu(title: L("Window"))
+    windowMenu.addItem(withTitle: L("Minimize"), action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
+    windowMenu.addItem(withTitle: L("Zoom"), action: #selector(NSWindow.performZoom(_:)), keyEquivalent: "")
+    let fullScreenItem = windowMenu.addItem(withTitle: L("Enter Full Screen"), action: #selector(NSWindow.toggleFullScreen(_:)), keyEquivalent: "f")
     fullScreenItem.keyEquivalentModifierMask = [.control, .command]
     windowMenu.addItem(.separator())
-    windowMenu.addItem(withTitle: "Bring All to Front", action: #selector(NSApplication.arrangeInFront(_:)), keyEquivalent: "")
+    windowMenu.addItem(withTitle: L("Bring All to Front"), action: #selector(NSApplication.arrangeInFront(_:)), keyEquivalent: "")
     windowMenuItem.submenu = windowMenu
 
     app.mainMenu = mainMenu
@@ -638,9 +638,9 @@ if args.contains("--run") || !args.dropFirst().contains(where: { $0.hasPrefix("-
     )
     let helpMenuItem = NSMenuItem()
     mainMenu.addItem(helpMenuItem)
-    let helpMenu = NSMenu(title: "Help")
+    let helpMenu = NSMenu(title: L("Help"))
     let setupAssistantTarget = MenuActionTarget { OnboardingWindow.show() }
-    let setupAssistantItem = NSMenuItem(title: "Setup assistant…", action: #selector(MenuActionTarget.invoke), keyEquivalent: "")
+    let setupAssistantItem = NSMenuItem(title: L("Setup assistant…"), action: #selector(MenuActionTarget.invoke), keyEquivalent: "")
     setupAssistantItem.target = setupAssistantTarget
     helpMenu.addItem(setupAssistantItem)
     helpMenuItem.submenu = helpMenu

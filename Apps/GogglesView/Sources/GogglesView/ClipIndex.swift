@@ -5,11 +5,11 @@ enum ClipSort: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var title: String {
         switch self {
-        case .newest: "Newest first"
-        case .oldest: "Oldest first"
-        case .longest: "Longest first"
-        case .largest: "Largest first"
-        case .name: "Name"
+        case .newest: L("Newest first")
+        case .oldest: L("Oldest first")
+        case .longest: L("Longest first")
+        case .largest: L("Largest first")
+        case .name: L("Name")
         }
     }
 }
@@ -21,11 +21,11 @@ enum ClipDateFilter: Equatable {
 
     var title: String {
         switch self {
-        case .any: "Any date"
-        case .today: "Today"
-        case .last7Days: "Last 7 days"
-        case .last30Days: "Last 30 days"
-        case .custom(let r): "\(r.lowerBound.formatted(date: .abbreviated, time: .omitted)) to \(r.upperBound.formatted(date: .abbreviated, time: .omitted))"
+        case .any: L("Any date")
+        case .today: L("Today")
+        case .last7Days: L("Last 7 days")
+        case .last30Days: L("Last 30 days")
+        case .custom(let r): L("%@ to %@", r.lowerBound.formatted(date: .abbreviated, time: .omitted), r.upperBound.formatted(date: .abbreviated, time: .omitted))
         }
     }
 
@@ -46,7 +46,7 @@ enum ClipDateFilter: Equatable {
 enum ClipTagMatch: String, CaseIterable, Identifiable {
     case any, all
     var id: String { rawValue }
-    var title: String { self == .any ? "Any selected tag" : "All selected tags" }
+    var title: String { self == .any ? L("Any selected tag") : L("All selected tags") }
 }
 
 struct ClipFilter: Equatable {
@@ -81,7 +81,7 @@ enum ClipGoggles {
 
     static func label(_ m: ClipMetadata?) -> String? {
         if let n = m?.gogglesName, !n.isEmpty { return n }
-        if let s = m?.gogglesSerial, !s.isEmpty { return "Serial \(s)" }
+        if let s = m?.gogglesSerial, !s.isEmpty { return L("Serial %@", s) }
         return nil
     }
 }
@@ -159,13 +159,13 @@ enum ClipIndex {
         }
         var out = byKey.map { ClipGoggles.Option(key: $0.key, label: $0.value) }
             .sorted { $0.label.localizedStandardCompare($1.label) == .orderedAscending }
-        if hasUnknown && !out.isEmpty { out.append(.init(key: ClipGoggles.unknownKey, label: "Unknown goggles")) }
+        if hasUnknown && !out.isEmpty { out.append(.init(key: ClipGoggles.unknownKey, label: L("Unknown goggles"))) }
         return out
     }
 
     static func countLabel(shown: Int, total: Int) -> String {
-        let noun = total == 1 ? "clip" : "clips"
-        return shown == total ? "\(total) \(noun)" : "\(shown) of \(total) \(noun)"
+        if shown == total { return total == 1 ? L("%lld clip", total) : L("%lld clips", total) }
+        return total == 1 ? L("%lld of %lld clip", shown, total) : L("%lld of %lld clips", shown, total)
     }
 
     /// Shift-click: the visible urls between `anchor` and `target`, inclusive. Falls back to just the target.

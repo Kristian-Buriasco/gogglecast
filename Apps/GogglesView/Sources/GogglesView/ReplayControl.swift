@@ -26,10 +26,10 @@ struct ReplayControl: View {
                 HStack(spacing: 6) {
                     Button { save() } label: { Image(systemName: "gobackward") }
                         .keyboardShortcut("p", modifiers: [.command, .shift])
-                        .help("Save last \(seconds)s (\(Int(buffer.bufferedSeconds))s buffered)")
+                        .help(L("Save last %llds (%llds buffered)", seconds, Int(buffer.bufferedSeconds)))
                         .disabled(buffer.bufferedSeconds < 1)
                         .accessibilityLabel("Save instant replay")
-                        .accessibilityValue("\(Int(buffer.bufferedSeconds)) seconds buffered")
+                        .accessibilityValue(L("%lld seconds buffered", Int(buffer.bufferedSeconds)))
                         .accessibilityIdentifier("replayButton")
                     if let toast { Text(toast).font(.caption).lineLimit(1) }
                 }
@@ -47,7 +47,7 @@ struct ReplayControl: View {
             } else if buffer.bufferedSeconds >= 1 {
                 save()
             } else {
-                ToastHUD.shared.show("The replay buffer is still filling. Try again in a few seconds.")
+                ToastHUD.shared.show(L("The replay buffer is still filling. Try again in a few seconds."))
             }
         }
     }
@@ -71,7 +71,7 @@ struct ReplayControl: View {
         buffer.save { url in
             OutputActivityBoard.shared.endBusy()
             if let url { NotificationCenter.default.post(name: .gogglesReplaySaved, object: session, userInfo: ["path": url.path]) }
-            show(url.map { "Saved \($0.lastPathComponent)" } ?? (buffer.lastError ?? "Save failed"))
+            show(url.map { L("Saved %@", $0.lastPathComponent) } ?? (buffer.lastError ?? L("Save failed")))
         }
     }
 
@@ -92,15 +92,15 @@ struct ReplaySettingsSection: View {
         if !(reencode || OutputProcessor.isActive) { return ReplayPrefs.unavailableMessage }
         let real = ReplayPrefs.achievableSeconds(requested: seconds, bitrateMbps: bitrate)
         let cap = ReplayBuffer.byteCap / (1024 * 1024)
-        let window = real < seconds ? "At \(bitrate) Mbps the buffer holds about \(real) s, not \(seconds) s. " : ""
-        return window + "The buffer lives in memory and uses up to \(cap) MB while replay is on."
+        let window = real < seconds ? L("At %lld Mbps the buffer holds about %lld s, not %lld s. ", bitrate, real, seconds) : ""
+        return window + L("The buffer lives in memory and uses up to %lld MB while replay is on.", cap)
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Instant replay").font(.headline)
             Toggle("Keep a replay buffer (⇧⌘P saves it)", isOn: $enabled)
-            Stepper("Window: \(seconds) s", value: $seconds, in: ReplayPrefs.secondsRange, step: 5)
+            Stepper(L("Window: %lld s", seconds), value: $seconds, in: ReplayPrefs.secondsRange, step: 5)
                 .disabled(!enabled)
             Text(caption).font(.caption).foregroundStyle(.secondary)
         }

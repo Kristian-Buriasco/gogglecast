@@ -71,11 +71,11 @@ public enum HelperRegistration {
     /// and the Diagnostics copy).
     public static func plainDescription(_ status: SMAppService.Status) -> String {
         switch status {
-        case .enabled: return "Running and approved"
-        case .requiresApproval: return "Waiting for your approval in System Settings"
-        case .notRegistered: return "Not set up yet"
-        case .notFound: return "Not found. Reinstall GogglesView"
-        @unknown default: return "Unknown"
+        case .enabled: return L("Running and approved")
+        case .requiresApproval: return L("Waiting for your approval in System Settings")
+        case .notRegistered: return L("Not set up yet")
+        case .notFound: return L("Not found. Reinstall GogglesView")
+        @unknown default: return L("Unknown")
         }
     }
 
@@ -91,7 +91,7 @@ public enum HelperRegistration {
         } catch {
             Logging.xpc.error("helper register() failed: \(String(describing: error), privacy: .public)")
             ConnectionTrace.shared.record("helper register() failed: \(error)")
-            return "Couldn't set up the background service: \(error.localizedDescription)"
+            return L("Couldn't set up the background service: %@", error.localizedDescription)
         }
     }
 

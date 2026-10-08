@@ -18,9 +18,9 @@ struct NetworkStreamControl: View {
             .foregroundStyle(streamer.lastError != nil ? Color.orange : (streamer.isStreaming ? Color.green : Color.primary))
         }
         .help(streamer.lastError ?? (streamer.isStreaming
-              ? "Streaming to udp://\(NetStreamPrefs.host):\(NetStreamPrefs.port)" : "Start network stream"))
+              ? L("Streaming to udp://%@:%lld", NetStreamPrefs.host, NetStreamPrefs.port) : L("Start network stream")))
         .accessibilityLabel("Network stream")
-        .accessibilityValue(streamer.lastError ?? (streamer.isStreaming ? String(format: "Streaming, %.1f megabits per second", mbps) : "Stopped"))
+        .accessibilityValue(streamer.lastError ?? (streamer.isStreaming ? L("Streaming, %.1f megabits per second", mbps) : L("Stopped")))
         .accessibilityIdentifier("networkStreamButton")
         .onReceive(tick) { _ in
             mbps = Double(streamer.bytesSent &- lastBytes) * 8 / 1_000_000
@@ -73,7 +73,7 @@ struct NetworkStreamSettingsSection: View {
             TextField("Host (unicast or multicast)", text: $host)
             TextField("Port", value: $port, format: .number.grouping(.never))
             Toggle("Start automatically", isOn: $autoStart)
-            Text("Receiver: udp://@:\(String(port)) (OBS Media Source / VLC). Change applies on next start. Source resolution and bitrate are passed through unchanged.")
+            Text(L("Receiver: udp://@:%@ (OBS Media Source / VLC). Change applies on next start. Source resolution and bitrate are passed through unchanged.", String(port)))
                 .font(.caption).foregroundStyle(.secondary)
         }
     }

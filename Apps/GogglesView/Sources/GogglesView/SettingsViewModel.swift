@@ -146,7 +146,7 @@ public final class SettingsViewModel: ObservableObject {
                 let newStatus = try HelperRegistration.register()
                 status = newStatus
                 if newStatus == .requiresApproval {
-                    actionMessage = "Waiting for your approval. Opening Login Items & Extensions…"
+                    actionMessage = L("Waiting for your approval. Opening Login Items & Extensions…")
                     openLoginItemsSettings()
                 } else {
                     actionMessage = nil
@@ -156,7 +156,7 @@ public final class SettingsViewModel: ObservableObject {
                 actionMessage = nil
             }
         } catch {
-            actionMessage = "Couldn't change this setting: \(error.localizedDescription)"
+            actionMessage = L("Couldn't change this setting: %@", error.localizedDescription)
             // Re-read the real status rather than trusting the toggle's
             // intended new value -- a failed register()/unregister() call
             // may have left the daemon in whatever state it was already in,
@@ -171,13 +171,13 @@ public final class SettingsViewModel: ObservableObject {
             let newStatus = try HelperRegistration.register()
             status = newStatus
             actionMessage = newStatus == .enabled
-                ? "Background service set up again."
+                ? L("Background service set up again.")
                 : HelperRegistration.plainDescription(newStatus)
             if newStatus == .requiresApproval {
                 openLoginItemsSettings()
             }
         } catch {
-            actionMessage = "Couldn't set up the background service: \(error.localizedDescription)"
+            actionMessage = L("Couldn't set up the background service: %@", error.localizedDescription)
             status = HelperRegistration.status
         }
     }

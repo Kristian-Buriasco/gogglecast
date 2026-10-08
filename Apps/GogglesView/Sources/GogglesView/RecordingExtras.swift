@@ -74,16 +74,18 @@ enum RecordingExtras {
     static let minAge: TimeInterval = 86_400
 
     static func autoDeleteMessage(count: Int) -> String {
-        "Moved \(count) old recording\(count == 1 ? "" : "s") to the Trash"
+        count == 1 ? L("Moved 1 old recording to the Trash") : L("Moved %lld old recordings to the Trash", count)
     }
 
     /// "Off" for 0, otherwise the value with its unit (`valueLabel(30, unit: "min")` is "30 min").
     static func valueLabel(_ value: Int, unit: String) -> String {
-        value <= 0 ? "Off" : "\(value) \(unit)"
+        value <= 0 ? L("Off") : "\(value) \(unit)"
     }
 
     static func autoDeleteConfirmation(days: Int, folder: URL) -> String {
-        "GogglesView will move recordings older than \(days) day\(days == 1 ? "" : "s") in \(folder.path) to the Trash every time it launches. Continue?"
+        days == 1
+            ? L("GogglesView will move recordings older than 1 day in %@ to the Trash every time it launches. Continue?", folder.path)
+            : L("GogglesView will move recordings older than %lld days in %@ to the Trash every time it launches. Continue?", days, folder.path)
     }
 
     /// What loop mode may delete after a segment rotated: nothing unless that segment was finalised.
@@ -142,7 +144,7 @@ struct RecordingMarker: Codable, Equatable {
 }
 
 enum RecordingMarkers {
-    static let defaultLabels = ["Highlight", "Crash", "Near miss", "Good line", "Landing", "Issue"]
+    static var defaultLabels: [String] { [L("Highlight"), L("Crash"), L("Near miss"), L("Good line"), L("Landing"), L("Issue")] }
 
     static func sidecarURL(for recording: URL) -> URL {
         recording.deletingPathExtension().appendingPathExtension("markers.json")

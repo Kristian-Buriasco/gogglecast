@@ -299,7 +299,7 @@ struct StabilizerSettingsSection: View {
             HStack {
                 Text("Strength")
                 Slider(value: $strength, in: 0...1).disabled(!enabled)
-                Text("\(Int(strength * 100))%").monospacedDigit().frame(width: 40, alignment: .trailing)
+                Text(verbatim: "\(Int(strength * 100))%").monospacedDigit().frame(width: 40, alignment: .trailing)
             }
             if status.paused {
                 Text("Stabilization is paused because this Mac can't keep up with the frame rate. It tries again every few seconds.")

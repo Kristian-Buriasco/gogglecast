@@ -34,8 +34,8 @@ struct BurnInSettingsSection: View {
             Picker("Corner", selection: $corner) {
                 ForEach(BurnInCorner.allCases) { Text($0.label).tag($0.rawValue) }
             }
-            slider("Logo size", value: $scale, range: BurnInPrefs.scaleRange, suffix: "% of width")
-            slider("Opacity", value: $opacity, range: BurnInPrefs.opacityRange, suffix: "%")
+            slider(L("Logo size"), value: $scale, range: BurnInPrefs.scaleRange, suffix: L("% of width"))
+            slider(L("Opacity"), value: $opacity, range: BurnInPrefs.opacityRange, suffix: "%")
             Toggle("Burn in current time", isOn: $showTime)
             Toggle("Burn in stream stats (resolution, fps, bitrate)", isOn: $showStats)
             Picker("Codec", selection: $codec) {
@@ -43,7 +43,7 @@ struct BurnInSettingsSection: View {
             }
             .pickerStyle(.segmented)
             Picker("Format", selection: $container) {
-                ForEach(RecordingPrefs.Container.allCases) { Text(".\($0.ext)").tag($0.rawValue) }
+                ForEach(RecordingPrefs.Container.allCases) { Text(verbatim: ".\($0.ext)").tag($0.rawValue) }
             }
             .pickerStyle(.segmented)
             HStack {
@@ -76,7 +76,7 @@ struct BurnInSettingsSection: View {
         }
         .frame(width: 96, height: 54)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(image == nil ? "Logo preview, no logo selected" : "Logo preview")
+        .accessibilityLabel(image == nil ? L("Logo preview, no logo selected") : L("Logo preview"))
         .id(logoFile)
     }
 
@@ -88,7 +88,7 @@ struct BurnInSettingsSection: View {
                    in: Double(range.lowerBound)...Double(range.upperBound))
                 .accessibilityLabel(title)
                 .accessibilityValue("\(value.wrappedValue)\(suffix)")
-            Text("\(value.wrappedValue)\(suffix)").font(.caption.monospacedDigit()).frame(width: 90, alignment: .trailing)
+            Text(verbatim: "\(value.wrappedValue)\(suffix)").font(.caption.monospacedDigit()).frame(width: 90, alignment: .trailing)
                 .accessibilityHidden(true)
         }
     }
@@ -104,7 +104,7 @@ struct BurnInSettingsSection: View {
             logoFile = dest.lastPathComponent
             importError = nil
         } catch {
-            importError = "Couldn't import: \(error.localizedDescription)"
+            importError = L("Couldn't import: %@", error.localizedDescription)
         }
     }
 }

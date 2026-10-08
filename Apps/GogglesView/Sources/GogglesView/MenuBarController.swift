@@ -147,7 +147,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         case .toggleNetworkStream:
             NotificationCenter.default.post(name: .gogglesToggleNetworkStream, object: session.decodeSession)
         case .addMarker:
-            SessionControlBoard.shared.recorder(for: session.decodeSession)?.addMarker(label: "Marker")
+            SessionControlBoard.shared.recorder(for: session.decodeSession)?.addMarker(label: L("Marker"))
         case .copyFrame:
             NotificationCenter.default.post(name: .gogglesCopyFrame, object: session.decodeSession)
         case .toggleRecording, .saveReplay, .screenshot:
@@ -199,7 +199,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         liveTitles = []
         let sessions = registry.all
         if sessions.isEmpty {
-            let none = NSMenuItem(title: "No goggles open", action: nil, keyEquivalent: "")
+            let none = NSMenuItem(title: L("No goggles open"), action: nil, keyEquivalent: "")
             none.isEnabled = false
             menu.addItem(none)
         }
@@ -245,28 +245,28 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             }
             let deviceId = session.deviceId
             sub.addItem(.separator())
-            sub.addItem(item("Reconnect") { [weak session] in session?.coordinator.reconnect() })
-            sub.addItem(item("Disconnect") { [weak self] in self?.onDisconnect(deviceId) })
+            sub.addItem(item(L("Reconnect")) { [weak session] in session?.coordinator.reconnect() })
+            sub.addItem(item(L("Disconnect")) { [weak self] in self?.onDisconnect(deviceId) })
             header.submenu = sub
             menu.addItem(header)
         }
         menu.addItem(.separator())
-        menu.addItem(item("Add Goggles…") { [weak self] in self?.onOpenAnother() })
-        menu.addItem(item("Setup assistant…") {
+        menu.addItem(item(L("Add Goggles…")) { [weak self] in self?.onOpenAnother() })
+        menu.addItem(item(L("Setup assistant…")) {
             NSApp.activate(ignoringOtherApps: true)
             OnboardingWindow.show()
         })
-        let raceItem = item("Race Mode") { RaceModeController.shared.toggle() }
+        let raceItem = item(L("Race Mode")) { RaceModeController.shared.toggle() }
         raceItem.state = RaceModePrefs.enabled ? .on : .off
         menu.addItem(raceItem)
         if let onOpenSettings {
-            menu.addItem(item("Settings…") {
+            menu.addItem(item(L("Settings…")) {
                 NSApp.activate(ignoringOtherApps: true)
                 onOpenSettings()
             })
         }
         menu.addItem(.separator())
-        menu.addItem(NSMenuItem(title: "Quit GogglesView", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+        menu.addItem(NSMenuItem(title: L("Quit GogglesView"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
     }
 
     // MARK: - Glyph
@@ -280,8 +280,8 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         var summary = sessions
             .map { "\($0.label): \(MenuBarController.displayText(for: $0.coordinator.uiState))" }
             .joined(separator: "; ")
-        if recording { summary += " (recording)" }
-        statusItem.button?.image?.accessibilityDescription = "GogglesView: \(summary.isEmpty ? "no goggles open" : summary)"
+        if recording { summary = L("%@ (recording)", summary) }
+        statusItem.button?.image?.accessibilityDescription = L("GogglesView: %@", summary.isEmpty ? L("no goggles open") : summary)
         statusItem.button?.toolTip = summary.isEmpty ? "GogglesView" : summary
     }
 
@@ -325,8 +325,8 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     static func displayText(for state: GogglesUIState, stats: StreamStats? = nil, resolution: String? = nil) -> String {
         switch state {
         case .live:
-            guard let stats else { return "Live" }
-            return ["Live", resolution, "\(stats.fps)fps"].compactMap { $0 }.joined(separator: " · ")
+            guard let stats else { return L("Live") }
+            return [L("Live"), resolution, "\(stats.fps)fps"].compactMap { $0 }.joined(separator: " · ")
         default:
             return ConnectionMessages.shortStatus(for: state)
         }

@@ -148,19 +148,19 @@ struct ProfileSettingsSection: View {
                     .frame(maxWidth: 260)
                     .onSubmit { ProfileStore.shared.setNickname(nickname, for: serial) }
                     .onChange(of: nickname) { ProfileStore.shared.setNickname($0, for: serial) }
-                    .accessibilityLabel("Nickname for goggles \(serial)")
+                    .accessibilityLabel(L("Nickname for goggles %@", serial))
                     .accessibilityIdentifier("profileNicknameField")
                 HStack {
                     Button("Save current settings to this goggles") {
                         ProfileStore.shared.saveCurrentSettings(for: serial)
-                        message = "Saved."
+                        message = L("Saved.")
                     }
                     .accessibilityIdentifier("profileSaveButton")
                     Toggle("Auto-apply on connect", isOn: $autoApply)
                         .onChange(of: autoApply) { ProfileStore.shared.setAutoApply($0, for: serial) }
                         .accessibilityIdentifier("profileAutoApplyToggle")
                 }
-                Text("S/N \(serial)").font(.caption).foregroundStyle(.secondary)
+                Text(verbatim: "S/N \(serial)").font(.caption).foregroundStyle(.secondary)
                 if let message { Text(message).font(.caption).foregroundStyle(.secondary) }
             } else {
                 Text("Connect goggles to name them and save settings per device.")

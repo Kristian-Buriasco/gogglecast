@@ -92,7 +92,7 @@ struct ClipFilterBar: View {
     }
 
     private var gogglesMenu: some View {
-        let title = goggles.first { $0.key == filter.goggles }?.label ?? "All goggles"
+        let title = goggles.first { $0.key == filter.goggles }?.label ?? L("All goggles")
         return Menu {
             Button("All goggles") { filter.goggles = nil }
             Divider()
@@ -116,7 +116,7 @@ struct ClipFilterBar: View {
                 Button {
                     if on { filter.tags.removeAll { ClipMetadata.tagKey($0) == ClipMetadata.tagKey(t.tag) } } else { filter.tags.append(t.tag) }
                 } label: {
-                    if on { Label("\(t.tag) (\(t.count))", systemImage: "checkmark") } else { Text("\(t.tag) (\(t.count))") }
+                    if on { Label("\(t.tag) (\(t.count))" as String, systemImage: "checkmark") } else { Text(verbatim: "\(t.tag) (\(t.count))") }
                 }
             }
             if !tags.isEmpty {
@@ -127,12 +127,12 @@ struct ClipFilterBar: View {
                 if !filter.tags.isEmpty { Button("Clear tags") { filter.tags = [] } }
             }
         } label: {
-            Label(filter.tags.isEmpty ? "Tags" : "Tags (\(filter.tags.count))", systemImage: "tag")
+            Label(filter.tags.isEmpty ? L("Tags") : L("Tags (%lld)", filter.tags.count), systemImage: "tag")
         }
         .menuStyle(.button).fixedSize()
         .tint(filter.tags.isEmpty ? nil : .accentColor)
         .accessibilityLabel("Filter by tags")
-        .accessibilityValue(filter.tags.isEmpty ? "None selected" : filter.tags.joined(separator: ", "))
+        .accessibilityValue(filter.tags.isEmpty ? L("None selected") : filter.tags.joined(separator: ", "))
     }
 
     private var sortMenu: some View {
@@ -158,14 +158,14 @@ struct TagChip: View {
             if removable {
                 Button { onRemove?() } label: { Image(systemName: "xmark").font(.system(size: 8, weight: .bold)) }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Remove tag \(text)")
+                    .accessibilityLabel(L("Remove tag %@", text))
             }
         }
         .font(.caption2)
         .padding(.horizontal, 6).padding(.vertical, 2)
         .background(Capsule().fill(Color.accentColor.opacity(0.18)))
         .accessibilityElement(children: removable ? .contain : .ignore)
-        .accessibilityLabel(removable ? "" : "Tag \(text)")
+        .accessibilityLabel(removable ? "" : L("Tag %@", text))
     }
 }
 
@@ -198,7 +198,7 @@ struct TagEntryField: View {
                     Label(s, systemImage: "tag").font(.caption)
                 }
                 .buttonStyle(.plain).foregroundStyle(.secondary)
-                .accessibilityLabel("Add existing tag \(s)")
+                .accessibilityLabel(L("Add existing tag %@", s))
             }
         }
     }
@@ -283,7 +283,7 @@ struct BulkTagSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Tag \(clips.count) \(clips.count == 1 ? "clip" : "clips")").font(.headline)
+            Text(clips.count == 1 ? L("Tag 1 clip") : L("Tag %lld clips", clips.count)).font(.headline)
             Text("Add").font(.caption).foregroundStyle(.secondary)
             TagEntryField(existing: allTags, current: add) { add = ClipMetadata.normalizedTags(add + $0) }
             if !add.isEmpty { FlowTags(tags: add) { t in add.removeAll { ClipMetadata.tagKey($0) == ClipMetadata.tagKey(t) } } }
@@ -295,13 +295,13 @@ struct BulkTagSheet: View {
                         Button {
                             if marked { remove.removeAll { ClipMetadata.tagKey($0) == ClipMetadata.tagKey(t.tag) } } else { remove.append(t.tag) }
                         } label: {
-                            Text("\(t.tag) (\(t.count))").font(.caption).strikethrough(marked)
+                            Text(verbatim: "\(t.tag) (\(t.count))").font(.caption).strikethrough(marked)
                                 .padding(.horizontal, 6).padding(.vertical, 2)
                                 .background(Capsule().fill(marked ? Color.red.opacity(0.25) : Color.primary.opacity(0.1)))
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("\(t.tag), on \(t.count) selected clips")
-                        .accessibilityValue(marked ? "Will be removed" : "Kept")
+                        .accessibilityLabel(L("%@, on %lld selected clips", t.tag, t.count))
+                        .accessibilityValue(marked ? L("Will be removed") : L("Kept"))
                         .accessibilityHint("Toggles removal")
                     }
                 }

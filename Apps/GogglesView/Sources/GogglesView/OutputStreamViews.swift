@@ -17,8 +17,8 @@ struct SRTStreamControl: View {
         .disabled(!available && !out.isStreaming)
         .accessibilityLabel("SRT stream")
         .accessibilityValue(AccessibilityLabels.streamState(isStreaming: out.isStreaming, connected: out.connected, error: out.lastError))
-        .help(!available ? "libsrt not found (brew install srt, or set the path in Settings > Streaming)"
-              : out.lastError ?? (out.isStreaming ? (out.connected ? "SRT connected" : "SRT waiting for peer") : "Start SRT stream"))
+        .help(!available ? L("libsrt not found (brew install srt, or set the path in Settings > Streaming)")
+              : out.lastError ?? (out.isStreaming ? (out.connected ? L("SRT connected") : L("SRT waiting for peer")) : L("Start SRT stream")))
         .onAppear { available = SRTOutput.isAvailable() }
         .onDisappear { stop() }
     }
@@ -49,9 +49,9 @@ struct SRTSettingsSection: View {
         let m = SRTMode(rawValue: mode) ?? .caller
         VStack(alignment: .leading, spacing: 6) {
             Text("SRT Output").font(.headline)
-            Text(found.map { "libsrt: \($0)" } ?? "libsrt not found. Install with `brew install srt` or choose the library below. It is loaded at runtime only, never bundled.")
+            Text(found.map { "libsrt: \($0)" } ?? L("libsrt not found. Install with `brew install srt` or choose the library below. It is loaded at runtime only, never bundled."))
                 .font(.caption).foregroundStyle(found == nil ? Color.orange : Color.secondary)
-            LibraryPathRow(title: "libsrt path (optional)", path: $libPath)
+            LibraryPathRow(title: L("libsrt path (optional)"), path: $libPath)
             Picker("Mode", selection: $mode) {
                 Text("Caller (connect to receiver)").tag(SRTMode.caller.rawValue)
                 Text("Listener (wait for receiver)").tag(SRTMode.listener.rawValue)
@@ -85,8 +85,8 @@ struct NDIStreamControl: View {
         .disabled(!available && !out.isStreaming)
         .accessibilityLabel("NDI output")
         .accessibilityValue(AccessibilityLabels.streamState(isStreaming: out.isStreaming, connected: out.isStreaming, error: out.lastError))
-        .help(!available ? "NDI runtime not found (install NDI Tools or the NDI SDK)"
-              : out.lastError ?? (out.isStreaming ? "Sending NDI source \(NDIPrefs.sourceName)" : "Start NDI output (experimental)"))
+        .help(!available ? L("NDI runtime not found (install NDI Tools or the NDI SDK)")
+              : out.lastError ?? (out.isStreaming ? L("Sending NDI source %@", NDIPrefs.sourceName) : L("Start NDI output (experimental)")))
         .onAppear { available = NDIOutput.isAvailable() }
         .onDisappear { stop() }
     }
@@ -112,9 +112,9 @@ struct NDISettingsSection: View {
         let found = OutputLibrary.resolveNDI(userPath: libPath)
         VStack(alignment: .leading, spacing: 6) {
             Text("NDI Output (experimental)").font(.headline)
-            Text(found.map { "NDI runtime: \($0)" } ?? "NDI runtime not found. Install NDI Tools / the NDI SDK or choose libndi.dylib below. It is loaded at runtime only, never bundled.")
+            Text(found.map { "NDI runtime: \($0)" } ?? L("NDI runtime not found. Install NDI Tools / the NDI SDK or choose libndi.dylib below. It is loaded at runtime only, never bundled."))
                 .font(.caption).foregroundStyle(found == nil ? Color.orange : Color.secondary)
-            LibraryPathRow(title: "libndi.dylib path (optional)", path: $libPath)
+            LibraryPathRow(title: L("libndi.dylib path (optional)"), path: $libPath)
             TextField("Source name", text: $name)
             Toggle("I accept the unverified NDI ABI (may crash)", isOn: $ack).disabled(found == nil)
             Text("Experimental: may not work with every NDI receiver.")

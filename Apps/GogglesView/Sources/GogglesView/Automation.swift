@@ -69,20 +69,20 @@ extension AutomationCommand {
     /// Short human description for the on-screen notice.
     var noticeText: String {
         switch self {
-        case .startRecording: return "Start recording"
-        case .stopRecording: return "Stop recording"
-        case .toggleRecording: return "Toggle recording"
-        case .saveReplay: return "Save replay"
-        case .screenshot: return "Screenshot"
-        case .toggleFreeze: return "Freeze / resume video"
-        case .addMarker: return "Add marker"
-        case .startStream: return "Start network stream"
-        case .stopStream: return "Stop network stream"
-        case .showWindow: return "Show window"
-        case .copyFrame: return "Copy frame"
-        case .raceOn: return "Race mode on"
-        case .raceOff: return "Race mode off"
-        case .raceToggle: return "Toggle race mode"
+        case .startRecording: return L("Start recording")
+        case .stopRecording: return L("Stop recording")
+        case .toggleRecording: return L("Toggle recording")
+        case .saveReplay: return L("Save replay")
+        case .screenshot: return L("Screenshot")
+        case .toggleFreeze: return L("Freeze / resume video")
+        case .addMarker: return L("Add marker")
+        case .startStream: return L("Start network stream")
+        case .stopStream: return L("Stop network stream")
+        case .showWindow: return L("Show window")
+        case .copyFrame: return L("Copy frame")
+        case .raceOn: return L("Race mode on")
+        case .raceOff: return L("Race mode off")
+        case .raceToggle: return L("Toggle race mode")
         }
     }
 }
@@ -264,7 +264,7 @@ final class AutomationController: NSObject {
         switch urlGate.decide(urlEnabled: AutomationPrefs.urlEnabled(defaults)) {
         case .ignoredNotify:
             Self.log.info("URL command ignored (URL commands are off)")
-            notify("A gogglesview:// command was ignored. To allow URL commands, turn on Settings > Advanced > Automation > Allow gogglesview:// URL commands.")
+            notify(L("A gogglesview:// command was ignored. To allow URL commands, turn on Settings > Advanced > Automation > Allow gogglesview:// URL commands."))
             return .disabled
         case .ignored:
             Self.log.info("URL command ignored (URL commands are off)")
@@ -273,7 +273,7 @@ final class AutomationController: NSObject {
             Self.log.info("URL command dropped (rate limit)")
             return nil
         case .allowed:
-            notify("URL command: \(request.command.noticeText)")
+            notify(L("URL command: %@", request.command.noticeText))
         }
         let result = perform(request)
         if case .unavailable(let message) = result { notify(message) }

@@ -36,7 +36,7 @@ struct OBSSettingsSection: View {
                 SecureField("Password", text: $password, prompt: Text("Leave empty if OBS has none"))
                     .accessibilityLabel("OBS WebSocket password")
                 HStack {
-                    Button(testing ? "Testing..." : "Test connection") { runTest() }
+                    Button(testing ? L("Testing...") : L("Test connection")) { runTest() }
                         .disabled(testing)
                         .accessibilityLabel("Test OBS connection")
                     if let testResult { Text(testResult).font(.caption).lineLimit(2) }
@@ -50,14 +50,14 @@ struct OBSSettingsSection: View {
             Group {
                 Toggle("Record in OBS while I'm live", isOn: $recordWithStream)
                     .accessibilityValue(AccessibilityLabels.onOff(recordWithStream))
-                Stepper("Stop after the signal is lost for \(grace) s", value: $grace, in: OBSPrefs.graceRange, step: 5)
+                Stepper(L("Stop after the signal is lost for %lld s", grace), value: $grace, in: OBSPrefs.graceRange, step: 5)
                     .disabled(!recordWithStream)
                     .accessibilityLabel("Stop OBS recording after signal loss")
-                    .accessibilityValue(AccessibilityLabels.quantity(grace, unit: "seconds"))
+                    .accessibilityValue(AccessibilityLabels.quantity(grace, unit: L("seconds")))
                 Toggle("Switch OBS scenes", isOn: $switchScenes)
                     .accessibilityValue(AccessibilityLabels.onOff(switchScenes))
-                scenePicker("Scene when live", selection: $liveScene, role: "live")
-                scenePicker("Scene when lost", selection: $lostScene, role: "lost")
+                scenePicker(L("Scene when live"), selection: $liveScene, role: "live")
+                scenePicker(L("Scene when lost"), selection: $lostScene, role: "lost")
                 Toggle("Stop the OBS recording when I stop mine", isOn: $stopWithMine)
                     .accessibilityValue(AccessibilityLabels.onOff(stopWithMine))
                 Text("Only affects a recording GogglesView started in OBS. If a start or stop fails, you see one message here and nothing is retried.")
@@ -97,7 +97,7 @@ struct OBSSettingsSection: View {
         Task {
             let r = await OBSIntegration.testConnection(host: h, port: p, password: pw)
             switch r {
-            case .success(let v): testResult = "Connected to OBS \(v.obsVersion)"
+            case .success(let v): testResult = L("Connected to OBS %@", v.obsVersion)
             case .failure(let e): testResult = e.localizedDescription
             }
             testing = false

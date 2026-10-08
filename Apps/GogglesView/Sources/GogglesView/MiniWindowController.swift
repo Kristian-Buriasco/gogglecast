@@ -112,7 +112,7 @@ struct MiniWindowControl: View {
         .keyboardShortcut("m", modifiers: [.command, .shift])
         .help("Floating mini window (⇧⌘M)")
         .accessibilityLabel("Floating mini window")
-        .accessibilityValue(enabled ? "On" : "Off")
+        .accessibilityValue(enabled ? L("On") : L("Off"))
         .accessibilityIdentifier("miniWindowButton")
         .onAppear { MiniWindowController.shared.sync(session: session) }
         .onChange(of: enabled) { _, _ in MiniWindowController.shared.sync(session: session) }

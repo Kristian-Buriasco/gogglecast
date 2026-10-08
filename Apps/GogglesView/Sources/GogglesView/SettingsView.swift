@@ -25,6 +25,15 @@ struct SettingsView: View {
     enum Tab: String, CaseIterable, Identifiable {
         case general = "General", display = "Display", recording = "Recording", streaming = "Streaming", advanced = "Advanced"
         var id: String { rawValue }
+        var title: String {
+            switch self {
+            case .general: return L("General")
+            case .display: return L("Display")
+            case .recording: return L("Recording")
+            case .streaming: return L("Streaming")
+            case .advanced: return L("Advanced")
+            }
+        }
         var icon: String {
             switch self {
             case .general: return "gearshape"
@@ -47,7 +56,7 @@ struct SettingsView: View {
             Divider().opacity(0.4)
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    Text(tab.wrappedValue.rawValue)
+                    Text(tab.wrappedValue.title)
                         .font(.title2.bold())
                         .padding(.bottom, 2)
                     switch tab.wrappedValue {
@@ -113,7 +122,7 @@ struct SettingsView: View {
                 Button { tab.wrappedValue = t } label: {
                     HStack(spacing: 10) {
                         Image(systemName: t.icon).frame(width: 20).accessibilityHidden(true)
-                        Text(t.rawValue)
+                        Text(t.title)
                         Spacer()
                     }
                     .padding(.horizontal, 10).padding(.vertical, 7)
@@ -125,7 +134,7 @@ struct SettingsView: View {
                 .accessibilityAddTraits(tab.wrappedValue == t ? .isSelected : [])
             }
             Spacer()
-            Text("GogglesView \(UpdateChecker.currentVersion)")
+            Text(verbatim: "GogglesView \(UpdateChecker.currentVersion)")
                 .font(.caption2).foregroundStyle(.secondary)
                 .padding(.horizontal, 10)
         }
@@ -232,7 +241,7 @@ struct SettingsView: View {
                 }
             }
             Picker("Format", selection: $recordingContainer) {
-                ForEach(RecordingPrefs.Container.allCases) { Text(".\($0.ext)").tag($0.rawValue) }
+                ForEach(RecordingPrefs.Container.allCases) { Text(verbatim: ".\($0.ext)").tag($0.rawValue) }
             }
             .pickerStyle(.segmented)
             TextField("File name prefix", text: $recordingPrefix, prompt: Text("GogglesView"))

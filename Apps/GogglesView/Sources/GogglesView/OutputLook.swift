@@ -378,7 +378,7 @@ struct LookSettingsSection: View {
             HStack {
                 Text("Intensity").frame(width: 80, alignment: .leading)
                 Slider(value: $intensity, in: 0...1).disabled(name.isEmpty)
-                Text("\(Int(intensity * 100))%").monospacedDigit().frame(width: 44, alignment: .trailing)
+                Text(verbatim: "\(Int(intensity * 100))%").monospacedDigit().frame(width: 44, alignment: .trailing)
             }
             Toggle("Apply to the preview", isOn: $preview).disabled(name.isEmpty)
             Toggle("Apply to recordings and streams", isOn: $output).disabled(name.isEmpty)
@@ -393,13 +393,13 @@ struct LookSettingsSection: View {
         panel.allowedContentTypes = [.init(filenameExtension: "cube") ?? .data]
         panel.allowsMultipleSelection = false
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        message = "Reading look…"
+        message = L("Reading look…")
         // Large tables take a moment to parse; keep the UI responsive.
         Task.detached {
             let imported = try? LUTLibrary.importFile(url)
             await MainActor.run {
                 if let imported { name = imported; names = LUTLibrary.names(); message = nil }
-                else { message = "Couldn't read that file as a 3D .cube LUT (max 64 MB, size 2 to 129)." }
+                else { message = L("Couldn't read that file as a 3D .cube LUT (max 64 MB, size 2 to 129).") }
             }
         }
     }
@@ -417,12 +417,12 @@ struct OutputFramingSettingsSection: View {
             Text("Output framing").font(.headline)
             Toggle("Use a separate crop for recordings, replay and streams", isOn: $enabled)
             Picker("Aspect", selection: $aspect) {
-                ForEach([FramingAspect.fit, .r16x9, .r4x3, .r1x1, .r9x16]) { Text($0 == .fit ? "Full" : $0.title).tag($0.rawValue) }
+                ForEach([FramingAspect.fit, .r16x9, .r4x3, .r1x1, .r9x16]) { Text($0 == .fit ? L("Full") : $0.title).tag($0.rawValue) }
             }
             .pickerStyle(.segmented).disabled(!enabled)
-            row("Zoom", $zoom, 1...4, format: "%.1fx")
-            row("Horizontal", $panX, -1...1, format: "%+.2f")
-            row("Vertical", $panY, -1...1, format: "%+.2f")
+            row(L("Zoom"), $zoom, 1...4, format: "%.1fx")
+            row(L("Horizontal"), $panX, -1...1, format: "%+.2f")
+            row(L("Vertical"), $panY, -1...1, format: "%+.2f")
             Text("Crop recordings and streams separately from the preview, for example 9:16 for shorts. Change the aspect while stopped; it takes effect on the next recording or stream. Zoom and position can change live.")
                 .font(.caption).foregroundStyle(.secondary)
         }
@@ -431,7 +431,7 @@ struct OutputFramingSettingsSection: View {
     private func row(_ title: String, _ value: Binding<Double>, _ range: ClosedRange<Double>, format: String) -> some View {
         HStack {
             Text(title).frame(width: 80, alignment: .leading)
-            Slider(value: value, in: range).disabled(!enabled || (title != "Zoom" && zoom <= 1))
+            Slider(value: value, in: range).disabled(!enabled || (title != L("Zoom") && zoom <= 1))
             Text(String(format: format, value.wrappedValue)).monospacedDigit().frame(width: 48, alignment: .trailing)
         }
     }

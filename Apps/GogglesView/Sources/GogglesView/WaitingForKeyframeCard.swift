@@ -85,7 +85,7 @@ struct WaitingForKeyframeCard: View {
         let total = max(0, Int(now.timeIntervalSince(enteredAt)))
         let minutes = total / 60
         let seconds = total % 60
-        return String(format: "Waiting… %d:%02d", minutes, seconds)
+        return L("Waiting… %d:%02d", minutes, seconds)
     }
 }
 

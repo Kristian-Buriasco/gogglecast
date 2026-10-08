@@ -70,7 +70,7 @@ enum MenuBarMiniControls {
     /// Per-device submenu title: "DJI Goggles 3 (…1234) — Live · ● REC 01:23".
     static func headerTitle(_ s: MiniControlsSnapshot) -> String {
         var title = "\(s.label): \(s.statusText)"
-        if s.isRecording { title += " · ● REC \(formatElapsed(s.recordingElapsed))" }
+        if s.isRecording { title += L(" · ● REC %@", formatElapsed(s.recordingElapsed)) }
         return title
     }
 
@@ -78,28 +78,28 @@ enum MenuBarMiniControls {
     static func infoLine(_ s: MiniControlsSnapshot) -> String {
         var parts: [String] = []
         if s.isLive, let fps = s.fps { parts.append("\(fps) fps") } else { parts.append("— fps") }
-        if let battery = s.batteryPercent { parts.append("Battery \(battery)%") }
-        parts.append(s.isRecording ? "Recording \(formatElapsed(s.recordingElapsed))" : "Not recording")
+        if let battery = s.batteryPercent { parts.append(L("Battery %lld%%", battery)) }
+        parts.append(s.isRecording ? L("Recording %@", formatElapsed(s.recordingElapsed)) : L("Not recording"))
         return parts.joined(separator: " · ")
     }
 
     /// Mirrors the enabled rules of the window's own footer controls.
     static func items(_ s: MiniControlsSnapshot) -> [MiniControlItem] {
         [
-            MiniControlItem(action: .toggleRecording, title: s.isRecording ? "Stop Recording" : "Start Recording",
+            MiniControlItem(action: .toggleRecording, title: s.isRecording ? L("Stop Recording") : L("Start Recording"),
                             isEnabled: s.isRecording || s.isLive, isOn: s.isRecording),
-            MiniControlItem(action: .saveReplay, title: s.replayEnabled ? "Save Replay" : "Save Replay (off in Settings)",
+            MiniControlItem(action: .saveReplay, title: s.replayEnabled ? L("Save Replay") : L("Save Replay (off in Settings)"),
                             isEnabled: s.replayEnabled && s.isLive, isOn: false),
-            MiniControlItem(action: .screenshot, title: "Screenshot", isEnabled: s.isLive, isOn: false),
-            MiniControlItem(action: .toggleFreeze, title: s.isFrozen ? "Resume Video" : "Freeze Video",
+            MiniControlItem(action: .screenshot, title: L("Screenshot"), isEnabled: s.isLive, isOn: false),
+            MiniControlItem(action: .toggleFreeze, title: s.isFrozen ? L("Resume Video") : L("Freeze Video"),
                             isEnabled: s.isLive || s.isFrozen, isOn: s.isFrozen),
-            MiniControlItem(action: .addMarker, title: "Add Marker", isEnabled: s.isRecording, isOn: false),
-            MiniControlItem(action: .showWindow, title: s.isWindowVisible ? "Hide Window" : "Show Window",
+            MiniControlItem(action: .addMarker, title: L("Add Marker"), isEnabled: s.isRecording, isOn: false),
+            MiniControlItem(action: .showWindow, title: s.isWindowVisible ? L("Hide Window") : L("Show Window"),
                             isEnabled: true, isOn: false),
             MiniControlItem(action: .toggleNetworkStream,
-                            title: s.isNetworkStreaming ? "Stop Network Stream" : "Start Network Stream",
+                            title: s.isNetworkStreaming ? L("Stop Network Stream") : L("Start Network Stream"),
                             isEnabled: s.networkStreamAvailable, isOn: s.isNetworkStreaming),
-            MiniControlItem(action: .copyFrame, title: "Copy Frame", isEnabled: s.isLive, isOn: false),
+            MiniControlItem(action: .copyFrame, title: L("Copy Frame"), isEnabled: s.isLive, isOn: false),
         ]
     }
 

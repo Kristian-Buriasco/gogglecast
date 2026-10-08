@@ -39,8 +39,8 @@ struct OSDOverlay: View {
         if fps { out.append("\(stats.fps) fps") }
         if bitrate { out.append(String(format: "%.1f Mbps", stats.bitrateKbps / 1000)) }
         if showLatency, let latencyMs { out.append(String(format: "%.0f ms", latencyMs)) }
-        if drops { out.append("\(stats.cumulativeDrops) dropped") }
-        if showBattery, let batteryPercent { out.append("Goggles \(batteryPercent)%") }
+        if drops { out.append(L("%lld dropped", Int(stats.cumulativeDrops))) }
+        if showBattery, let batteryPercent { out.append(L("Goggles %lld%%", batteryPercent)) }
         return out
     }
 

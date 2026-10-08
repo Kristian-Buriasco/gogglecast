@@ -18,7 +18,7 @@ struct ClipGalleryView: View {
         let tags = ClipIndex.allTags(model.clips)
         return Group {
             if model.clips.isEmpty {
-                Text("No recordings yet. Press ⇧⌘R while goggles are live to record. Recordings are saved to \(RecordingPrefs.directory.path).").foregroundStyle(.secondary)
+                Text(L("No recordings yet. Press ⇧⌘R while goggles are live to record. Recordings are saved to %@.", RecordingPrefs.directory.path)).foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 VStack(spacing: 0) {
@@ -45,7 +45,7 @@ struct ClipGalleryView: View {
                 bulkTagging = false
             }, onCancel: { bulkTagging = false })
         }
-        .confirmationDialog("Move \(selection.count) clips to the Trash?", isPresented: $confirmTrash) {
+        .confirmationDialog(L("Move %lld clips to the Trash?", selection.count), isPresented: $confirmTrash) {
             Button("Move to Trash", role: .destructive) { model.trash(selectedClips); selection = [] }
             Button("Cancel", role: .cancel) {}
         }
@@ -62,7 +62,7 @@ struct ClipGalleryView: View {
 
     private var selectionBar: some View {
         HStack(spacing: 10) {
-            Text("\(selection.count) selected").font(.caption).foregroundStyle(.secondary)
+            Text(L("%lld selected", selection.count)).font(.caption).foregroundStyle(.secondary)
             Button("Tag selected…") { bulkTagging = true }.accessibilityLabel("Tag selected clips")
             Button("Move to Trash", role: .destructive) { confirmTrash = true }.accessibilityLabel("Move selected clips to Trash")
             Button("Deselect") { selection = [] }.accessibilityLabel("Deselect all clips")
@@ -130,7 +130,7 @@ private struct ClipCell: View {
         card
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(cardLabel)
-            .accessibilityValue(selected ? "Selected" : "")
+            .accessibilityValue(selected ? L("Selected") : "")
             .accessibilityAddTraits(.isButton)
             .accessibilityHint("Opens the recording")
             .accessibilityAction(named: "Open") { NSWorkspace.shared.open(clip.url) }
@@ -139,7 +139,7 @@ private struct ClipCell: View {
             .accessibilityAction(named: "Trim") { onTrim() }
             .accessibilityAction(named: AccessibilityLabels.favouriteToggle(isOn: favourite)) { onMetadata { $0.favourite.toggle() } }
             .accessibilityAction(named: "Edit tags and note") { showDetail = true }
-            .accessibilityAction(named: selected ? "Deselect" : "Select") { onClick() }
+            .accessibilityAction(named: selected ? L("Deselect") : L("Select")) { onClick() }
             .accessibilityAction(named: "Move to Trash") { onTrash() }
             .contextMenu { menuItems }
     }
@@ -160,12 +160,12 @@ private struct ClipCell: View {
                 }
             }
             Text(clip.name).font(.callout).lineLimit(1).truncationMode(.middle)
-            Text("\(dateText) · \(ClipLibrary.formatDuration(clip.duration)) · \(ClipLibrary.formatSize(clip.size))")
+            Text(verbatim: "\(dateText) · \(ClipLibrary.formatDuration(clip.duration)) · \(ClipLibrary.formatSize(clip.size))")
                 .font(.caption).foregroundStyle(.secondary).lineLimit(1)
             if !tags.isEmpty {
                 HStack(spacing: 4) {
                     ForEach(tags.prefix(3), id: \.self) { TagChip(text: $0) }
-                    if tags.count > 3 { Text("+\(tags.count - 3)").font(.caption2).foregroundStyle(.secondary) }
+                    if tags.count > 3 { Text(verbatim: "+\(tags.count - 3)").font(.caption2).foregroundStyle(.secondary) }
                 }
             }
         }
@@ -187,14 +187,14 @@ private struct ClipCell: View {
         Button("Share…") { share() }
         Button("Trim…") { onTrim() }
         Divider()
-        Button(favourite ? "Remove from favourites" : "Add to favourites") { onMetadata { $0.favourite.toggle() } }
+        Button(favourite ? L("Remove from favourites") : L("Add to favourites")) { onMetadata { $0.favourite.toggle() } }
         Button("Tags and note…") { showDetail = true }
         if selected && selectedCount > 1 {
             Button("Tag selected…") { onTagSelected() }
         }
         Divider()
         if selected && selectedCount > 1 {
-            Button("Move \(selectedCount) selected to Trash", role: .destructive) { onTrashSelected() }
+            Button(L("Move %lld selected to Trash", selectedCount), role: .destructive) { onTrashSelected() }
         } else {
             Button("Move to Trash", role: .destructive) { onTrash() }
         }
@@ -224,7 +224,7 @@ final class ClipGalleryWindowController: NSObject {
     func show() {
         if window == nil {
             let w = NSWindow(contentViewController: NSHostingController(rootView: ClipGalleryView()))
-            w.title = "Clip Gallery"
+            w.title = L("Clip Gallery")
             w.styleMask = [.titled, .closable, .miniaturizable, .resizable]
             w.setContentSize(NSSize(width: 760, height: 520))
             w.isReleasedWhenClosed = false

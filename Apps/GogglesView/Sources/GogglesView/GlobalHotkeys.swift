@@ -84,9 +84,9 @@ enum GlobalHotkeyAction: UInt32, CaseIterable {
     var modifiersKey: String { "globalHotkey.\(rawValue).modifiers" }
     var title: String {
         switch self {
-        case .toggleRecording: return "Start/stop recording"
-        case .screenshot: return "Screenshot"
-        case .saveReplay: return "Save instant replay"
+        case .toggleRecording: return L("Start/stop recording")
+        case .screenshot: return L("Screenshot")
+        case .saveReplay: return L("Save instant replay")
         }
     }
     var notification: Notification.Name {
@@ -167,7 +167,7 @@ final class GlobalHotkeys: ObservableObject {
                                          GetApplicationEventTarget(), 0, &ref)
             if st == noErr, let ref { refs.append(ref) } else { failed.append(combo.display) }
         }
-        lastError = failed.isEmpty ? nil : "Could not register \(failed.joined(separator: ", ")) (already in use by another app)"
+        lastError = failed.isEmpty ? nil : L("Could not register %@ (already in use by another app)", failed.joined(separator: ", "))
     }
 
     func uninstall() {
@@ -236,7 +236,7 @@ struct GlobalHotkeysSettingsSection: View {
                 HStack {
                     Text(a.title)
                     Spacer()
-                    Button(recording == a ? "Press keys… (esc cancels)" : (combos[a]?.display ?? a.combo.display)) {
+                    Button(recording == a ? L("Press keys… (esc cancels)") : (combos[a]?.display ?? a.combo.display)) {
                         message = nil
                         recording = recording == a ? nil : a
                     }
@@ -246,7 +246,7 @@ struct GlobalHotkeysSettingsSection: View {
                         set: { if !$0, recording == a { recording = nil } }
                     )) { combo in
                         if let other = GlobalHotkeyBindings.conflict(for: a, candidate: combo, assignments: combos) {
-                            message = "\(combo.display) is already used by \"\(other.title)\""
+                            message = L("%@ is already used by \"%@\"", combo.display, other.title)
                         } else {
                             GlobalHotkeyBindings.set(combo, for: a)
                             message = nil

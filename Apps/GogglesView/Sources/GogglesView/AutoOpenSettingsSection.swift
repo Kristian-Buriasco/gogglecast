@@ -14,7 +14,7 @@ struct AutoOpenSettingsSection: View {
                 get: { isOn },
                 set: { apply($0) }
             ))
-            Text("Status: \(HelperRegistration.plainDescription(status))")
+            Text(L("Status: %@", HelperRegistration.plainDescription(status)))
                 .font(.caption).foregroundStyle(.secondary)
             if status == .requiresApproval {
                 Button("Open Login Items Settings…") { AutoOpenRegistration.openLoginItemsSettings() }

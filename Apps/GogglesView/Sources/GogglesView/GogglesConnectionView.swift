@@ -69,23 +69,23 @@ struct GogglesConnectionView: View {
     }
 
     private func takeScreenshot() {
-        guard let frame = session.copyDisplayedFrame() else { showNote("No frame yet"); return }
+        guard let frame = session.copyDisplayedFrame() else { showNote(L("No frame yet")); return }
         do {
             let url = try Screenshot.save(frame)
-            showNote("Saved \(url.lastPathComponent)", revealing: url)
+            showNote(L("Saved %@", url.lastPathComponent), revealing: url)
             NotificationCenter.default.post(name: .gogglesScreenshotSaved, object: session, userInfo: ["path": url.path])
         } catch {
-            showNote("Screenshot failed")
+            showNote(L("Screenshot failed"))
         }
     }
 
     private func copyFrame() {
-        guard let frame = session.copyDisplayedFrame() else { showNote("No frame yet"); return }
+        guard let frame = session.copyDisplayedFrame() else { showNote(L("No frame yet")); return }
         do {
             try Screenshot.copyFrameToPasteboard(frame)
-            showNote("Copied frame")
+            showNote(L("Copied frame"))
         } catch {
-            showNote("Copy failed")
+            showNote(L("Copy failed"))
         }
     }
 
@@ -151,8 +151,8 @@ struct GogglesConnectionView: View {
             .buttonStyle(.plain)
             .disabled(!isLive && !recorder.isRecording)
             .keyboardShortcut("r", modifiers: [.command, .shift])
-            .help(recorder.isRecording ? "Stop recording (⇧⌘R)" : "Record to ~/Movies/GogglesView (⇧⌘R)")
-            .accessibilityLabel(recorder.isRecording ? "Stop recording" : "Start recording")
+            .help(recorder.isRecording ? L("Stop recording (⇧⌘R)") : L("Record to ~/Movies/GogglesView (⇧⌘R)"))
+            .accessibilityLabel(recorder.isRecording ? L("Stop recording") : L("Start recording"))
             .accessibilityValue(AccessibilityLabels.recordState(isRecording: recorder.isRecording, elapsed: recorder.isRecording ? Self.formatElapsed(recorder.elapsed) : nil))
             .accessibilityIdentifier("recordButton")
         }
@@ -221,7 +221,7 @@ struct GogglesConnectionView: View {
     /// "Saved to ~/Movies/GogglesView", with a Show in Finder action.
     private func noteSaved(_ url: URL) {
         let folder = (url.deletingLastPathComponent().path as NSString).abbreviatingWithTildeInPath
-        showNote("Saved to \(folder)", revealing: url, for: 8)
+        showNote(L("Saved to %@", folder), revealing: url, for: 8)
     }
 
     private func startRecording() {
@@ -403,7 +403,7 @@ struct GogglesConnectionView: View {
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
             .disabled(onOpenSettings == nil)
-            .help(onOpenSettings == nil ? "Settings isn't available in this build." : "Open Settings")
+            .help(onOpenSettings == nil ? L("Settings isn't available in this build.") : L("Open Settings"))
             .accessibilityHint("Opens the Settings window")
             .accessibilityIdentifier("settingsButton")
 

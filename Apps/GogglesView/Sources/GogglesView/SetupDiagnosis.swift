@@ -60,10 +60,10 @@ enum SetupDiagnosis {
 
             var title: String {
                 switch self {
-                case .openSystemSettings: return "Open System Settings"
-                case .registerHelper: return "Set up background service"
-                case .reconnectHelper: return "Reconnect"
-                case .retryConnection: return "Retry"
+                case .openSystemSettings: return L("Open System Settings")
+                case .registerHelper: return L("Set up background service")
+                case .reconnectHelper: return L("Reconnect")
+                case .retryConnection: return L("Retry")
                 }
             }
         }
@@ -79,14 +79,14 @@ enum SetupDiagnosis {
         let action: Action?
     }
 
-    static let otgInstructions = [
-        "On the goggles: Settings > About > turn on OTG Wired Connection to Computer.",
-        "Unplug the USB-C cable, then plug it back in. The switch only takes effect after replugging.",
-    ]
-    static let cableHints = [
-        "Use a USB-C cable that carries data (charge-only cables don't work) and plug it into the goggles' USB-C port.",
-        "Try another Mac port.",
-    ]
+    static var otgInstructions: [String] { [
+        L("On the goggles: Settings > About > turn on OTG Wired Connection to Computer."),
+        L("Unplug the USB-C cable, then plug it back in. The switch only takes effect after replugging."),
+    ] }
+    static var cableHints: [String] { [
+        L("Use a USB-C cable that carries data (charge-only cables don't work) and plug it into the goggles' USB-C port."),
+        L("Try another Mac port."),
+    ] }
     static let shareLiveviewLabel = "Share Liveview to Mobile Device via Wi-Fi"
 
     private static func step(_ id: Step.ID, _ state: Step.State, _ title: String, _ message: String,
@@ -99,66 +99,66 @@ enum SetupDiagnosis {
         // A claim (or a failed claim) proves the goggles are on USB even if the registry probe missed them.
         let seen = usbSeen || claim == .claimed || claimFailed
         let helperReady = helper == .ready
-        let bs = "Background service"
+        let bs = L("Background service")
 
         let helperStep: Step
         switch helper {
         case .ready:
-            helperStep = step(.helper, .done, bs, "The background service is approved and running.")
+            helperStep = step(.helper, .done, bs, L("The background service is approved and running."))
         case .needsApproval:
             helperStep = step(.helper, .attention, bs,
-                              "macOS is waiting for your approval. In System Settings > General > Login Items & Extensions, switch on GogglesView.",
+                              L("macOS is waiting for your approval. In System Settings > General > Login Items & Extensions, switch on GogglesView."),
                               action: .openSystemSettings)
         case .notRegistered:
             helperStep = step(.helper, .attention, bs,
-                              "GogglesView needs a small background service to talk to the goggles. Set it up, then approve it in System Settings.",
+                              L("GogglesView needs a small background service to talk to the goggles. Set it up, then approve it in System Settings."),
                               action: .registerHelper)
         case .connecting:
-            helperStep = step(.helper, .attention, bs, "Starting the background service…")
+            helperStep = step(.helper, .attention, bs, L("Starting the background service…"))
         case .unreachable:
             helperStep = step(.helper, .attention, bs,
-                              "The background service is approved but isn't answering. Try reconnecting.",
+                              L("The background service is approved but isn't answering. Try reconnecting."),
                               action: .reconnectHelper)
         case .versionMismatch:
             helperStep = step(.helper, .attention, bs,
-                              "The background service is from a different version of GogglesView. Set it up again, or reinstall the app.",
+                              L("The background service is from a different version of GogglesView. Set it up again, or reinstall the app."),
                               action: .registerHelper)
         case .unknown:
-            helperStep = step(.helper, .pending, bs, "Checking the background service…")
+            helperStep = step(.helper, .pending, bs, L("Checking the background service…"))
         }
 
         let usbStep: Step
         if claimFailed {
-            usbStep = step(.usb, .attention, "Goggles on USB",
-                           "Your goggles are connected, but GogglesView couldn't take control of them. Another app or a macOS network adapter may be using them. Quit other goggles or capture apps, unplug and replug, then retry.",
-                           hints: ["If it keeps failing, open System Settings > Network and turn off the new network adapter macOS added for the goggles."],
+            usbStep = step(.usb, .attention, L("Goggles on USB"),
+                           L("Your goggles are connected, but GogglesView couldn't take control of them. Another app or a macOS network adapter may be using them. Quit other goggles or capture apps, unplug and replug, then retry."),
+                           hints: [L("If it keeps failing, open System Settings > Network and turn off the new network adapter macOS added for the goggles.")],
                            action: .retryConnection)
         } else if seen {
-            usbStep = step(.usb, .done, "Goggles on USB", "Your goggles are connected over USB.")
+            usbStep = step(.usb, .done, L("Goggles on USB"), L("Your goggles are connected over USB."))
         } else {
-            usbStep = step(.usb, .attention, "Goggles on USB",
-                           "No goggles found on USB yet. Check the steps below: the OTG switch, the cable, the port and that the goggles are awake.")
+            usbStep = step(.usb, .attention, L("Goggles on USB"),
+                           L("No goggles found on USB yet. Check the steps below: the OTG switch, the cable, the port and that the goggles are awake."))
         }
 
         let otgStep: Step
         if seen {
-            otgStep = step(.otg, .done, "OTG and cable", "OTG is on and the cable works: the goggles show up on USB.")
+            otgStep = step(.otg, .done, L("OTG and cable"), L("OTG is on and the cable works: the goggles show up on USB."))
         } else {
-            otgStep = step(.otg, .attention, "OTG and cable", "Turn on OTG on the goggles, then replug the cable.",
+            otgStep = step(.otg, .attention, L("OTG and cable"), L("Turn on OTG on the goggles, then replug the cable."),
                            instructions: otgInstructions, hints: cableHints)
         }
 
         let videoStep: Step
         if !(helperReady && seen && !claimFailed) {
-            videoStep = step(.video, .pending, "Video", "This starts once the steps above are done.")
+            videoStep = step(.video, .pending, L("Video"), L("This starts once the steps above are done."))
         } else if video == .live {
-            videoStep = step(.video, .done, "Video", "Video is arriving from your goggles.")
+            videoStep = step(.video, .done, L("Video"), L("Video is arriving from your goggles."))
         } else {
-            videoStep = step(.video, .attention, "Video",
+            videoStep = step(.video, .attention, L("Video"),
                              video == .waitingForKeyframe
-                                ? "Connected, but no picture yet. Turn sharing off and on again on the goggles."
-                                : "Start Share Liveview on the goggles.",
-                             instructions: ["On the goggles, open the shortcut menu (5D button or AR dial) and turn on '\(shareLiveviewLabel)'. If it's already on, turn it off and on again."])
+                                ? L("Connected, but no picture yet. Turn sharing off and on again on the goggles.")
+                                : L("Start Share Liveview on the goggles."),
+                             instructions: [L("On the goggles, open the shortcut menu (5D button or AR dial) and turn on '%@'. If it's already on, turn it off and on again.", shareLiveviewLabel)])
         }
         return [helperStep, usbStep, otgStep, videoStep]
     }
@@ -169,8 +169,8 @@ enum SetupDiagnosis {
 
     /// One line for Settings: all good, or the first step that needs attention.
     static func healthLine(_ steps: [Step]) -> String {
-        if isComplete(steps) { return "Everything is working." }
-        guard let step = steps.first(where: { $0.state != .done }) else { return "Checking…" }
+        if isComplete(steps) { return L("Everything is working.") }
+        guard let step = steps.first(where: { $0.state != .done }) else { return L("Checking…") }
         return "\(step.title): \(step.message)"
     }
 }

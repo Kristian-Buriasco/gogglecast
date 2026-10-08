@@ -112,6 +112,10 @@ enum DiagnosticsReport {
 
     /// Blocking (up to ~10s for the log query); call off the main thread.
     static func collect() -> String {
+        Localization.english { collectEnglish() }
+    }
+
+    private static func collectEnglish() -> String {
         let info = Bundle.main.infoDictionary ?? [:]
         let app = """
         version: \(info["CFBundleShortVersionString"] as? String ?? "unknown") (build \(info["CFBundleVersion"] as? String ?? "unknown"))

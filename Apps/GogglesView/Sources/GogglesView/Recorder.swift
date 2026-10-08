@@ -617,33 +617,33 @@ enum RecorderError: LocalizedError {
 
 /// Plain-language wording for recording problems (unit-tested).
 enum RecordingProblem {
-    static let unsupportedFormatMessage = "This stream can't be recorded in the chosen format. Try .mov in Settings > Recording."
+    static var unsupportedFormatMessage: String { L("This stream can't be recorded in the chosen format. Try .mov in Settings > Recording.") }
 
     static func folderName(_ folder: URL) -> String { folder.lastPathComponent }
 
     static func genericMessage(folder: URL) -> String {
-        "Recording couldn't be saved. Check that the folder '\(folderName(folder))' exists and has free space, then try again."
+        L("Recording couldn't be saved. Check that the folder '%@' exists and has free space, then try again.", folderName(folder))
     }
     static func notEnoughSpaceMessage(folder: URL) -> String {
-        "There isn't enough free space to record (less than 500 MB left in '\(folderName(folder))'). Free up space or choose another folder in Settings > Recording."
+        L("There isn't enough free space to record (less than 500 MB left in '%@'). Free up space or choose another folder in Settings > Recording.", folderName(folder))
     }
     static func diskFullMessage(folder: URL) -> String {
-        "Recording stopped because the disk is full. Free up space or choose another folder in Settings > Recording."
+        L("Recording stopped because the disk is full. Free up space or choose another folder in Settings > Recording.")
     }
     static func folderMissingMessage(folder: URL) -> String {
-        "Recording couldn't be saved because the folder '\(folderName(folder))' is missing. Choose another folder in Settings > Recording."
+        L("Recording couldn't be saved because the folder '%@' is missing. Choose another folder in Settings > Recording.", folderName(folder))
     }
     static func notWritableMessage(folder: URL) -> String {
-        "Recording couldn't be saved because GogglesView can't write to the folder '\(folderName(folder))'. Choose another folder in Settings > Recording."
+        L("Recording couldn't be saved because GogglesView can't write to the folder '%@'. Choose another folder in Settings > Recording.", folderName(folder))
     }
     static func fileMissingMessage(folder: URL) -> String {
-        "The recording file is gone. The folder '\(folderName(folder))' may have been deleted or the drive unplugged."
+        L("The recording file is gone. The folder '%@' may have been deleted or the drive unplugged.", folderName(folder))
     }
     static func lowSpaceStopMessage(folder: URL) -> String {
-        "Recording stopped and was saved because the disk is almost full (less than 500 MB left)."
+        L("Recording stopped and was saved because the disk is almost full (less than 500 MB left).")
     }
     static func slowDiskNote(dropped: Int) -> String {
-        "Disk is slow, \(dropped) frame\(dropped == 1 ? "" : "s") dropped"
+        dropped == 1 ? L("Disk is slow, 1 frame dropped") : L("Disk is slow, %lld frames dropped", dropped)
     }
 
     private enum Cause { case diskFull, folderMissing, notWritable }
@@ -686,10 +686,10 @@ enum RecordingAlerts {
     static func presentFailure(_ message: String, onOpenSettings: (() -> Void)?) {
         let alert = NSAlert()
         alert.alertStyle = .warning
-        alert.messageText = "Recording problem"
+        alert.messageText = L("Recording problem")
         alert.informativeText = message
-        if onOpenSettings != nil { alert.addButton(withTitle: "Open Settings") }
-        alert.addButton(withTitle: "OK")
+        if onOpenSettings != nil { alert.addButton(withTitle: L("Open Settings")) }
+        alert.addButton(withTitle: L("OK"))
         if alert.runModal() == .alertFirstButtonReturn, onOpenSettings != nil {
             UserDefaults.standard.set("Recording", forKey: "settingsTab")
             onOpenSettings?()

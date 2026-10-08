@@ -29,7 +29,7 @@ struct BurnInRecordControl: View {
             .disabled(!isLive && !recorder.isRecording)
             .keyboardShortcut("b", modifiers: [.command, .shift])
             .help(helpText)
-            .accessibilityLabel(recorder.isRecording ? "Stop burn-in recording" : "Start burn-in recording")
+            .accessibilityLabel(recorder.isRecording ? L("Stop burn-in recording") : L("Start burn-in recording"))
             .accessibilityValue(AccessibilityLabels.recordState(isRecording: recorder.isRecording, elapsed: recorder.isRecording ? Self.formatElapsed(recorder.elapsed) : nil))
             .accessibilityHint("Records a re-encoded copy with the logo and text burned in")
             .accessibilityIdentifier("burnInRecordButton")
@@ -41,9 +41,9 @@ struct BurnInRecordControl: View {
 
     private var helpText: String {
         if recorder.isRecording {
-            return "Stop burn-in recording (⇧⌘B)" + (recorder.droppedFrames > 0 ? " — \(recorder.droppedFrames) frames dropped" : "")
+            return L("Stop burn-in recording (⇧⌘B)") + (recorder.droppedFrames > 0 ? " — " + L("%lld frames dropped", recorder.droppedFrames) : "")
         }
-        return "Record with logo/text burned in (re-encoded) (⇧⌘B)"
+        return L("Record with logo/text burned in (re-encoded) (⇧⌘B)")
     }
 
     private func start() {
