@@ -16,9 +16,9 @@ struct WebViewerControl: View {
             Image(systemName: "safari")
                 .foregroundStyle(server.lastError != nil ? Color.orange : server.isRunning ? Color.green : Color.primary)
         }
-        .help(server.lastError ?? (server.isRunning ? "Web viewer on port \(port)" : "Start web viewer"))
+        .help(server.lastError ?? (server.isRunning ? L("Web viewer on port %lld", port) : L("Start web viewer")))
         .accessibilityLabel("Web viewer")
-        .accessibilityValue(server.lastError ?? (server.isRunning ? "Running on port \(port)" : "Stopped"))
+        .accessibilityValue(server.lastError ?? (server.isRunning ? L("Running on port %lld", port) : L("Stopped")))
         .onAppear { apply(justEnabled: false) }
         .onChange(of: enabled) { old, new in apply(justEnabled: new && !old) }
         .onChange(of: port) { _, _ in if enabled { apply(justEnabled: false) } }
@@ -65,7 +65,7 @@ struct WebViewerSettingsSection: View {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(value, forType: .string)
             }
-            .accessibilityLabel("Copy \(label) URL")
+            .accessibilityLabel(L("Copy %@ URL", label))
         }
     }
 
@@ -83,13 +83,13 @@ struct WebViewerSettingsSection: View {
                 TextField("Access token", text: $token)
                 Button("Generate") { token = WebViewerPrefs.generateToken() }
             }
-            Text(lan ? "A token is required while other devices are allowed." : "With the token empty only this Mac can connect, and only through localhost.")
+            Text(lan ? L("A token is required while other devices are allowed.") : L("With the token empty only this Mac can connect, and only through localhost."))
                 .font(.caption).foregroundStyle(.secondary)
-            urlRow(url, label: lan ? "This Mac (.local)" : "This Mac")
+            urlRow(url, label: lan ? L("This Mac (.local)") : L("This Mac"))
             if lan {
                 if let ip = WebViewerAddress.preferredIPv4(from: WebHostPolicy.localAddresses()) {
                     let ipURL = WebViewerPrefs.viewerURL(host: ip, port: effectivePort, token: token)
-                    urlRow(ipURL, label: "IP address")
+                    urlRow(ipURL, label: L("IP address"))
                     HStack(alignment: .top, spacing: 12) {
                         if let qr = WebViewerQR.image(for: ipURL) {
                             Image(decorative: qr, scale: 1).interpolation(.none).resizable()

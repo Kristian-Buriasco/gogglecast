@@ -697,6 +697,7 @@ if let idx = args.firstIndex(of: "--settings-shot"), idx + 2 < args.count {
     let tab = args[idx + 1], out = URL(fileURLWithPath: args[idx + 2])
     let height = idx + 3 < args.count ? CGFloat(Double(args[idx + 3]) ?? 580) : 580
     DocShots.overridePrefs(["settingsTab": tab]) // in-memory only; the real defaults are untouched
+    SecretStore.backend = DocShots.EmptySecrets()
     SettingsView.heightOverride = height
     UpdateChecker.versionOverride = ProcessInfo.processInfo.environment["GOGGLESVIEW_SHOT_VERSION"]
     let app = NSApplication.shared

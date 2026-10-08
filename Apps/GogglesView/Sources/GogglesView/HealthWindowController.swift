@@ -12,8 +12,8 @@ enum HealthWindow {
         if let window { window.makeKeyAndOrderFront(nil); return }
         guard let target = BenchmarkRouting.targetProvider?() else {
             let alert = NSAlert()
-            alert.messageText = "No goggles window is open"
-            alert.informativeText = "Open your goggles and wait for the live picture, then open Connection health."
+            alert.messageText = L("No goggles window is open")
+            alert.informativeText = L("Open your goggles and wait for the live picture, then open Connection health.")
             alert.runModal()
             return
         }
@@ -22,7 +22,7 @@ enum HealthWindow {
         let host = NSHostingController(rootView: ConnectionHealthView(model: model))
         host.sizingOptions = []
         let w = NSWindow(contentViewController: host)
-        w.title = "Connection health"
+        w.title = L("Connection health")
         w.styleMask = [.titled, .closable, .resizable]
         w.setContentSize(NSSize(width: 600, height: 720))
         w.isReleasedWhenClosed = false

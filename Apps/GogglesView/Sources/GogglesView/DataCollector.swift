@@ -106,7 +106,7 @@ struct DataCollectControl: View {
                 .menuStyle(.borderlessButton).fixedSize()
                 .help("Drop a marker in the data log")
                 .accessibilityLabel("Drop data marker")
-                Text("\(collector.frames)").font(.caption.monospacedDigit()).foregroundStyle(.orange)
+                Text(verbatim: "\(collector.frames)").font(.caption.monospacedDigit()).foregroundStyle(.orange)
                 if let m = collector.lastMarker { Text(m).font(.caption2).foregroundStyle(.secondary) }
             }
             Button {
@@ -125,9 +125,9 @@ struct DataCollectControl: View {
                     .foregroundStyle(collector.isCollecting ? Color.orange : Color.secondary)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(collector.isCollecting ? "Stop data collection" : "Start data collection")
+            .accessibilityLabel(collector.isCollecting ? L("Stop data collection") : L("Start data collection"))
             .accessibilityIdentifier("dataCollectButton")
-            .help(collector.isCollecting ? "Stop collecting and show the log" : "Collect research data (frame metadata, markers) to ~/Documents/GogglesView-data")
+            .help(collector.isCollecting ? L("Stop collecting and show the log") : L("Collect research data (frame metadata, markers) to ~/Documents/GogglesView-data"))
         }
         .onChange(of: batteryPercent) { p in collector.logBattery(p) }
         .onDisappear {

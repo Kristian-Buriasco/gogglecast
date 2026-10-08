@@ -92,8 +92,8 @@ final class NDIOutput: ObservableObject, SampleBufferRendering {
 
     func start(sourceName: String) {
         guard !isStreaming else { return }
-        guard NDIPrefs.acceptedUnverified else { fail("NDI send path is unverified; enable the experimental toggle first"); return }
-        guard let path = OutputLibrary.resolveNDI() else { fail("NDI runtime not found"); return }
+        guard NDIPrefs.acceptedUnverified else { fail(L("NDI send path is unverified; enable the experimental toggle first")); return }
+        guard let path = OutputLibrary.resolveNDI() else { fail(L("NDI runtime not found")); return }
         guard let lib = OutputLibrary.open(path, symbols: Self.symbols) else { fail("NDI runtime could not be loaded or lacks required symbols"); return }
         let initialize = unsafeBitCast(lib.fns["NDIlib_initialize"]!, to: FnInit.self)
         guard initialize() else { fail("NDIlib_initialize failed (unsupported CPU?)"); dlclose(lib.handle); return }

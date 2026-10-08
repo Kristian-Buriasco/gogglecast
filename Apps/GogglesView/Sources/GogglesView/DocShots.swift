@@ -29,6 +29,13 @@ enum DocShots {
     }
 
     /// Overrides preferences for this process only (NSArgumentDomain: highest precedence, never persisted).
+    /// Keeps the screenshot flags away from the real Keychain (an unsigned build would block on its prompt).
+    struct EmptySecrets: SecretStore.Backend {
+        func read(_ key: String) -> String? { nil }
+        func write(_ value: String, _ key: String) -> Bool { true }
+        func remove(_ key: String) {}
+    }
+
     static func overridePrefs(_ values: [String: Any], defaults d: UserDefaults = .standard) {
         var arg = d.volatileDomain(forName: UserDefaults.argumentDomain)
         for (k, v) in values { arg[k] = v }
@@ -208,7 +215,7 @@ enum DocShots {
             }
             overridePrefs([RecordingPrefs.folderKey: dir.path])
             ClipGalleryWindowController.shared.show()
-            window = NSApp.windows.first { $0.title == "Clip Gallery" }
+            window = NSApp.windows.first { $0.title == L("Clip Gallery") }
             window?.setContentSize(NSSize(width: 820, height: 620))
             delay = 3
         case "mini-window":

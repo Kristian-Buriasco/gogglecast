@@ -32,8 +32,8 @@ enum SRTPrefs {
     static func receiverHint(mode: SRTMode, port: Int, hasPassphrase: Bool) -> String {
         let pw = hasPassphrase ? "&passphrase=<your passphrase>" : ""
         switch mode {
-        case .caller: return "Start the receiver first as listener: srt://:\(port)?mode=listener\(pw)"
-        case .listener: return "Receiver connects to this Mac: srt://<this-mac-ip>:\(port)?mode=caller\(pw)"
+        case .caller: return L("Start the receiver first as listener: srt://:%lld?mode=listener%@", port, pw)
+        case .listener: return L("Receiver connects to this Mac: srt://<this-mac-ip>:%lld?mode=caller%@", port, pw)
         }
     }
 }
@@ -90,8 +90,8 @@ final class SRTOutput: ObservableObject, SampleBufferRendering {
 
     func start(mode: SRTMode, host: String, port: Int, latencyMs: Int, passphrase: String) {
         guard !isStreaming else { return }
-        guard SRTPrefs.passphraseValid(passphrase) else { fail("Passphrase must be 10-79 characters"); return }
-        guard let path = OutputLibrary.resolveSRT() else { fail("libsrt not found (brew install srt)"); return }
+        guard SRTPrefs.passphraseValid(passphrase) else { fail(L("Passphrase must be 10-79 characters")); return }
+        guard let path = OutputLibrary.resolveSRT() else { fail(L("libsrt not found (brew install srt)")); return }
         guard let lib = OutputLibrary.open(path, symbols: Self.symbols) else {
             fail("libsrt at \(path) could not be loaded or lacks required symbols"); return
         }

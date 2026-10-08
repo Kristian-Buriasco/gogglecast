@@ -122,12 +122,12 @@ struct ConnectionHealthView: View {
                 histogramCard
 
                 Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 4) {
-                    GridRow { Text("Frame gap p50 / p95 / max").foregroundStyle(.secondary); Text("\(ms(s.gapP50Ms)) / \(ms(s.gapP95Ms)) / \(ms(s.gapMaxMs))") }
-                    GridRow { Text("Gaps over 100 / 250 / 500 ms").foregroundStyle(.secondary); Text("\(s.stalls100) / \(s.stalls250) / \(s.stalls500)") }
-                    GridRow { Text("Decode latency avg / p95").foregroundStyle(.secondary); Text("\(ms(s.latencyMs)) / \(ms(s.latencyP95Ms))") }
+                    GridRow { Text("Frame gap p50 / p95 / max").foregroundStyle(.secondary); Text(verbatim: "\(ms(s.gapP50Ms)) / \(ms(s.gapP95Ms)) / \(ms(s.gapMaxMs))") }
+                    GridRow { Text("Gaps over 100 / 250 / 500 ms").foregroundStyle(.secondary); Text(verbatim: "\(s.stalls100) / \(s.stalls250) / \(s.stalls500)") }
+                    GridRow { Text("Decode latency avg / p95").foregroundStyle(.secondary); Text(verbatim: "\(ms(s.latencyMs)) / \(ms(s.latencyP95Ms))") }
                     GridRow {
                         Text("Parameter sets").foregroundStyle(.secondary)
-                        Text("\(s.parameterSets)" + (s.parameterSetIntervalMs.map { L(", every %.1f s", $0 / 1000) } ?? ""))
+                        Text(verbatim: "\(s.parameterSets)" + (s.parameterSetIntervalMs.map { L(", every %.1f s", $0 / 1000) } ?? ""))
                     }
                     GridRow {
                         Text("Background service reports").foregroundStyle(.secondary)

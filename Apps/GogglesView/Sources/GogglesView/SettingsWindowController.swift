@@ -39,7 +39,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         // visible bug here specifically.
         hostingController.sizingOptions = []
         let window = NSWindow(contentViewController: hostingController)
-        window.title = "GogglesView Settings"
+        window.title = L("GogglesView Settings")
         // No `.resizable` -- this is a small, fixed-content settings panel,
         // not a resizable document window; matches the fixed
         // `.frame(width:height:)` `SettingsView` sets on itself.

@@ -282,10 +282,10 @@ final class WebViewerServer: ObservableObject, SampleBufferRendering {
         queue.async { [self] in
             stopLocked()
             guard let p = NWEndpoint.Port(rawValue: UInt16(clamping: port)), port > 0 else {
-                publish(error: "Invalid port"); return
+                publish(error: L("Invalid port")); return
             }
             if WebViewerPrefs.tokenRequired(allowLAN: allowLAN) && token.isEmpty {
-                publish(error: "Set an access token before allowing other devices"); return
+                publish(error: L("Set an access token before allowing other devices")); return
             }
             self.token = token
             self.allowLAN = allowLAN

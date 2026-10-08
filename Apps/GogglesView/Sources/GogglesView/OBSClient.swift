@@ -14,14 +14,14 @@ enum OBSError: LocalizedError, Equatable {
 
     var errorDescription: String? {
         switch self {
-        case .unreachable: return "Couldn't reach OBS. Is OBS running with WebSocket enabled (Tools > WebSocket Server Settings)?"
-        case .wrongPassword: return "Wrong WebSocket password"
-        case .passwordRequired: return "OBS needs a WebSocket password. Enter it here."
-        case .timeout: return "OBS did not answer in time"
-        case .notConnected: return "Not connected to OBS"
-        case .connectionLost: return "The connection to OBS was lost"
-        case .requestFailed(let code, let comment): return comment.isEmpty ? "OBS refused the request (code \(code))" : "OBS: \(comment)"
-        case .badResponse(let s): return "Unexpected answer from OBS: \(s)"
+        case .unreachable: return L("Couldn't reach OBS. Is OBS running with WebSocket enabled (Tools > WebSocket Server Settings)?")
+        case .wrongPassword: return L("Wrong WebSocket password")
+        case .passwordRequired: return L("OBS needs a WebSocket password. Enter it here.")
+        case .timeout: return L("OBS did not answer in time")
+        case .notConnected: return L("Not connected to OBS")
+        case .connectionLost: return L("The connection to OBS was lost")
+        case .requestFailed(let code, let comment): return comment.isEmpty ? L("OBS refused the request (code %lld)", code) : L("OBS: %@", comment)
+        case .badResponse(let s): return L("Unexpected answer from OBS: %@", s)
         }
     }
 }

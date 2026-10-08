@@ -168,7 +168,7 @@ struct RecoveryActionsRow: View {
                     .accessibilityHint("Tries to connect to the goggles again")
                     .accessibilityIdentifier("recoveryRetryButton")
             }
-            Button(copied ? "Copied" : (collecting ? "Collecting…" : "Copy diagnostics")) {
+            Button(copied ? L("Copied") : (collecting ? L("Collecting…") : L("Copy diagnostics"))) {
                 collecting = true
                 copied = false
                 DiagnosticsReport.copyToPasteboard {

@@ -150,7 +150,7 @@ struct OBSLiveTracker {
 final class OBSIntegration: ObservableObject {
     static let shared = OBSIntegration()
 
-    @Published private(set) var status = "Not connected"
+    @Published private(set) var status = L("Not connected")
     @Published private(set) var isConnected = false
     @Published private(set) var lastError: String?
     @Published private(set) var scenes: [String] = []
@@ -168,7 +168,7 @@ final class OBSIntegration: ObservableObject {
         ticker = nil
         guard OBSPrefs.enabled else {
             Task { await client.disconnect() }
-            isConnected = false; status = "Not connected"; lastError = nil; scenes = []
+            isConnected = false; status = L("Not connected"); lastError = nil; scenes = []
             return
         }
         if observer == nil {
@@ -238,14 +238,14 @@ final class OBSIntegration: ObservableObject {
                 lastError = nil
                 let v = try? await client.getVersion()
                 isConnected = true
-                status = "Connected to OBS \(v?.obsVersion ?? "")".trimmingCharacters(in: .whitespaces)
+                status = L("Connected to OBS %@", v?.obsVersion ?? "").trimmingCharacters(in: .whitespaces)
                 await refreshScenes()
                 await client.waitUntilClosed()
                 isConnected = false
-                status = "Not connected"
+                status = L("Not connected")
             } catch {
                 isConnected = false
-                status = "Not connected"
+                status = L("Not connected")
                 lastError = error.localizedDescription
                 if let e = error as? OBSError, e == .wrongPassword || e == .passwordRequired { return }
             }

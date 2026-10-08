@@ -43,7 +43,7 @@ final class NetworkStreamer: ObservableObject, SampleBufferRendering {
         queue.async { [self] in
             stopLocked()
             guard let nwPort = NWEndpoint.Port(rawValue: UInt16(clamping: port)), port > 0 else {
-                publish(error: "Invalid port"); return
+                publish(error: L("Invalid port")); return
             }
             wantHost = host; wantPort = nwPort; attempt = 0
             userEnabled = true

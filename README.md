@@ -51,6 +51,7 @@ The clip gallery picture uses generated sample clips, and the menu picture is re
 - Web viewer for iPad and phone: QR code, Bonjour, full screen, Add to Home Screen, see [docs/web-viewer.md](docs/web-viewer.md).
 - Setup assistant, signal-lost alert, race mode, connection health window, clip gallery search and tags, copy frame, Shortcuts actions, settings backup.
 - Secrets (stream key, tokens, webhooks) kept in the Keychain.
+- Available in English and Italian; more languages can be added, see [docs/localization.md](docs/localization.md).
 
 ## The goggles' overlay
 

@@ -75,7 +75,7 @@ final class PowerEvents {
     static let shared = PowerEvents()
 
     static let wakeReconnectDelay: TimeInterval = 1
-    static let sleepMarkerLabel = "Mac went to sleep"
+    static var sleepMarkerLabel: String { L("Mac went to sleep") }
 
     private var observers: [NSObjectProtocol] = []
     private var keeper: PowerActivityKeeper?

@@ -158,6 +158,14 @@ mkdir -p "$APP_BUNDLE/Contents/Resources"
 cp "$SCRIPT_DIR/BundleResources/GogglesView.sdef" "$APP_BUNDLE/Contents/Resources/GogglesView.sdef"
 cp "$SCRIPT_DIR/BundleResources/AppIcon.icns" "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
 
+# UI translations: one <lang>.lproj/Localizable.strings per language, copied as-is so that
+# SwiftUI and NSLocalizedString find them in the main bundle. Must happen before signing
+# (the files are sealed with the bundle). See docs/localization.md.
+for lproj in "$SCRIPT_DIR"/BundleResources/Localization/*.lproj; do
+    [[ -d "$lproj" ]] || continue
+    cp -R "$lproj" "$APP_BUNDLE/Contents/Resources/"
+done
+
 if [[ -n "$INTENTS_META" ]]; then
     cp -R "$INTENTS_META" "$APP_BUNDLE/Contents/Resources/Metadata.appintents"
 fi

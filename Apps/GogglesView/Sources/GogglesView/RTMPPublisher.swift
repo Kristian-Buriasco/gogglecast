@@ -323,9 +323,9 @@ final class RTMPPublisher: ObservableObject, SampleBufferRendering {
         queue.async { [self] in
             stopLocked()
             guard RTMPTarget.parse(url) != nil else {
-                setStatus("Idle", error: "Invalid RTMP URL (expected rtmp://host/app)"); return
+                setStatus("Idle", error: L("Invalid RTMP URL (expected rtmp://host/app)")); return
             }
-            guard !streamKey.isEmpty else { setStatus("Idle", error: "Stream key is empty"); return }
+            guard !streamKey.isEmpty else { setStatus("Idle", error: L("Stream key is empty")); return }
             wantURL = url; wantKey = streamKey
             userEnabled = true; attempt = 0
             DispatchQueue.main.async { self.isStreaming = true; self.bytesSent = 0 }
@@ -393,7 +393,7 @@ final class RTMPPublisher: ObservableObject, SampleBufferRendering {
         resetConnectionState()
         let delay = ReconnectBackoff.delay(attempt: attempt)
         attempt += 1
-        let label = "Reconnecting in \(Int(delay)) s"
+        let label = L("Reconnecting in %lld s", Int(delay))
         DispatchQueue.main.async { self.isLive = false; self.lastError = m; self.status = label }
         reconnectItem?.cancel()
         let item = DispatchWorkItem { [weak self] in
@@ -418,9 +418,9 @@ final class RTMPPublisher: ObservableObject, SampleBufferRendering {
             guard let self, self.conn != nil else { return }
             let now = Date()
             if Self.isStalled(backlog: self.backlog, lastProgress: self.lastProgress, now: now) {
-                self.fail("Connection stalled (no data accepted for \(Int(Self.stallTimeout)) s)")
+                self.fail(L("Connection stalled (no data accepted for %lld s)", Int(Self.stallTimeout)))
             } else if self.phase != .publishing, now.timeIntervalSince(self.phaseSince) >= Self.connectTimeout {
-                self.fail("Timed out waiting for the server")
+                self.fail(L("Timed out waiting for the server"))
             }
         }
         watchdog = t
@@ -456,7 +456,7 @@ final class RTMPPublisher: ObservableObject, SampleBufferRendering {
                 if let data, !data.isEmpty { self.onReceive([UInt8](data)) }
                 guard c === self.conn else { return }
                 if let err { self.fail(err.localizedDescription) }
-                else if isComplete { self.fail("Server closed the connection") }
+                else if isComplete { self.fail(L("Server closed the connection")) }
                 else { self.receiveLoop(c) }
             }
         }

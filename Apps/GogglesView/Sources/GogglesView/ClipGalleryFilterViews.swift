@@ -116,7 +116,7 @@ struct ClipFilterBar: View {
                 Button {
                     if on { filter.tags.removeAll { ClipMetadata.tagKey($0) == ClipMetadata.tagKey(t.tag) } } else { filter.tags.append(t.tag) }
                 } label: {
-                    if on { Label("\(t.tag) (\(t.count))" as String, systemImage: "checkmark") } else { Text(verbatim: "\(t.tag) (\(t.count))") }
+                    if on { Label { Text(verbatim: "\(t.tag) (\(t.count))") } icon: { Image(systemName: "checkmark") } } else { Text(verbatim: "\(t.tag) (\(t.count))") }
                 }
             }
             if !tags.isEmpty {

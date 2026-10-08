@@ -46,7 +46,7 @@ struct DevicePickerView: View {
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
             .disabled(onOpenSettings == nil)
-            .help(onOpenSettings == nil ? "Settings isn't available in this build." : "Open Settings")
+            .help(onOpenSettings == nil ? L("Settings isn't available in this build.") : L("Open Settings"))
             .accessibilityLabel("Settings")
             .accessibilityIdentifier("settingsButton")
 
@@ -88,7 +88,7 @@ struct DevicePickerView: View {
                 // screen (and its heading) is now the every-time path,
                 // not just the 2+-device case -- the heading adapts
                 // rather than always saying "Multiple Goggles found".
-                Text(candidates.count == 1 ? "Select your goggles" : "Multiple goggles found. Choose one.")
+                Text(candidates.count == 1 ? L("Select your goggles") : L("Multiple goggles found. Choose one."))
                     .font(.title3.bold())
                     .foregroundStyle(.white)
                 ScrollView {

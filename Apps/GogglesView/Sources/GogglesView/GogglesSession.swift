@@ -18,7 +18,7 @@ extension Notification.Name {
 enum GogglesSessionNaming {
     /// "DJI Goggles 3 (…1234)" -- serial suffix, or the deviceId when there's no serial.
     static func deviceLabel(product: String?, serial: String?, deviceId: String) -> String {
-        let name = (product?.isEmpty == false ? product! : "Goggles")
+        let name = (product?.isEmpty == false ? product! : L("Goggles"))
         if let serial, !serial.isEmpty {
             return "\(name) (…\(serial.suffix(4)))"
         }
@@ -142,7 +142,7 @@ final class GogglesSession: NSObject, RegistrableSession, NSWindowDelegate {
         cursorAutoHider = CursorAutoHider(window: window)
 
         EventHookInstaller.install(coordinator: coordinator)
-        signalAlert = SignalAlertController(coordinator: coordinator, deviceLabel: { [weak self] in self?.window.title ?? "Goggles" })
+        signalAlert = SignalAlertController(coordinator: coordinator, deviceLabel: { [weak self] in self?.window.title ?? L("Goggles") })
         SessionLogger.attach(coordinator: coordinator, decodeSession: decodeSession).store(in: &cancellables)
         autoMarkers = AutoMarkerController(
             deviceId: deviceId, session: decodeSession,
@@ -260,8 +260,8 @@ final class GogglesSession: NSObject, RegistrableSession, NSWindowDelegate {
         if let prompt {
             let alert = NSAlert()
             alert.messageText = prompt
-            alert.addButton(withTitle: "Hide window")
-            alert.addButton(withTitle: "Stop and disconnect")
+            alert.addButton(withTitle: L("Hide window"))
+            alert.addButton(withTitle: L("Stop and disconnect"))
             if alert.runModal() == .alertSecondButtonReturn {
                 NotificationCenter.default.post(name: .gogglesStopAndDisconnect, object: deviceId)
                 return false

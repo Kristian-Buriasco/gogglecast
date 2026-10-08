@@ -87,8 +87,8 @@ struct BurnInSettingsSection: View {
                                   set: { value.wrappedValue = BurnInPrefs.clamp(Int($0.rounded()), to: range) }),
                    in: Double(range.lowerBound)...Double(range.upperBound))
                 .accessibilityLabel(title)
-                .accessibilityValue("\(value.wrappedValue)\(suffix)")
-            Text(verbatim: "\(value.wrappedValue)\(suffix)").font(.caption.monospacedDigit()).frame(width: 90, alignment: .trailing)
+                .accessibilityValue(Text(verbatim: "\(value.wrappedValue)\(suffix)"))
+            Text(verbatim: "\(value.wrappedValue)\(suffix)").font(.caption.monospacedDigit()).fixedSize().frame(minWidth: 90, alignment: .trailing)
                 .accessibilityHidden(true)
         }
     }
