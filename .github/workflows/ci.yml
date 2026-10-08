@@ -42,8 +42,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: compnerd/gha-setup-swift@main
         with:
-          branch: swift-6.0-release
-          tag: 6.0-RELEASE
+          branch: swift-6.3-release
+          tag: 6.3-RELEASE
       - name: Build and test gvnet (Windows)
         working-directory: Tools/gvnet
         run: swift test
