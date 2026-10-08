@@ -163,7 +163,7 @@ private func le16(_ v: Int) -> [UInt8] { [UInt8(v & 0xFF), UInt8((v >> 8) & 0xFF
     }
 
     @Test func vtSignalQuality() {
-        guard case .vtSignalQuality(let v)? = Telemetry.decode(frame(0x09, 0x08, [0x80 | 87])) else {
+        guard case .vtSignalQuality(let v)? = Telemetry.decode(frame(0x09, 0x08, [UInt8(0x80 | 87)])) else {
             Issue.record("expected vtSignalQuality"); return
         }
         #expect(v.upSignalQuality == 87)
@@ -171,7 +171,9 @@ private func le16(_ v: Int) -> [UInt8] { [UInt8(v & 0xFF), UInt8((v >> 8) & 0xFF
     }
 
     @Test func rcPushParam() {
-        let p = le16(364) + le16(1024) + le16(1684) + le16(1000) + le16(0) + [0x01, 0x08, 0x00]
+        var p: [UInt8] = []
+        for v in [364, 1024, 1684, 1000, 0] { p += le16(v) }
+        p += [0x01, 0x08, 0x00]
         guard case .rcPushParam(let v)? = Telemetry.decode(frame(0x06, 0x05, p)) else {
             Issue.record("expected rcPushParam"); return
         }
@@ -211,6 +213,7 @@ private func le16(_ v: Int) -> [UInt8] { [UInt8(v & 0xFF), UInt8((v >> 8) & 0xFF
         let pkt = Telemetry.scanFrames(in: n3Frame0099)[0].packet
         #expect(Telemetry.decode(pkt) == .asciiStrings(["camcap_common"]))
         // Unknown cmd with no ASCII -> nil.
-        #expect(Telemetry.decode(frame(0x55, 0x01, [0x00, 0x01, 0x02])) == nil)
+        let unknown = Telemetry.decode(frame(0x55, 0x01, [0x00, 0x01, 0x02]))
+        #expect(unknown == nil)
     }
 }

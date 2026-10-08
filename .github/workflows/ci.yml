@@ -18,3 +18,21 @@ jobs:
       - name: Test helper
         working-directory: Helper/GogglesHelper
         run: swift test
+  linux:
+    runs-on: ubuntu-latest
+    container: swift:6.0
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test gvnet (Linux)
+        working-directory: Tools/gvnet
+        run: swift test
+      - name: Loopback run against the fake goggles
+        working-directory: Tools/gvnet
+        run: |
+          apt-get update -qq && apt-get install -y -qq python3
+          swift build
+          python3 scripts/fake_goggles.py > /tmp/fg.log 2>&1 &
+          sleep 1
+          .build/debug/gvnet --host 127.0.0.1 --bind 127.0.0.1 --seconds 3 --out /tmp/gv.h264 --stats
+          wait
+          test "$(head -c 5 /tmp/gv.h264 | xxd -p)" = "0000000167"
