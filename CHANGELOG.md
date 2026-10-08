@@ -4,6 +4,23 @@ All notable changes to this project are documented here. Format based on [Keep a
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-08
+
+### Added
+- OBS Studio integration (Settings > Streaming > OBS Studio, over obs-websocket v5): optionally start OBS recording when the goggles go live and stop it after a grace period when the signal is lost, switch OBS scenes on live and lost, and stop OBS when you stop your own recording. Every rule is off by default, the WebSocket password is in the Keychain, and it only ever stops a recording it started. See `docs/obs.md`.
+- Automatic markers while recording (Settings > Recording, on by default): signal lost and restored, goggles battery low, replay saved, screenshot taken, race mode on and off. The same debounced events as the hooks, no second detector, and duplicates within 2 s are dropped. Auto markers show in cyan on the trim timeline.
+- Markers become real chapters: when a recording with markers stops, the file is rewritten without re-encoding so QuickTime, editors and `ffprobe -show_chapters` list them. The original is replaced only after the copy verifies (plays, same duration, same chapter titles); any failure leaves it untouched. The `.markers.json` file stays the source of truth. Trimming keeps the markers inside the cut.
+- A better web viewer for iPad and phone: a QR code and `.local` address in Settings, Bonjour discovery, full-screen playback, tap to freeze, a LIVE indicator with a "Back to live" button, automatic reconnect, and "Add to Home Screen" as a full-screen app. See `docs/web-viewer.md`.
+
+### Changed
+- The web viewer uses 1 second segments and starts closer to the live edge: expect roughly 3 to 5 s behind live instead of 4 to 8 s (not yet measured on hardware).
+- `NSAllowsLocalNetworking` is set so OBS can be reached on your local network over `ws://`.
+
+### Known limits
+- OBS rules act only on live and lost events that happen while OBS is connected; start OBS first. Chapters are added when a recording stops, so a crash leaves the video without chapters (the sidecar still has the markers), and stopping a very large recording takes a few seconds longer.
+- None of the new features has been tried against real OBS, a real iPad or in QuickTime and editors yet, and the earlier list still stands: unplug and replug, sleep and wake, the signal alert, RTMP and SRT outputs, the setup assistant flow and the Shortcuts actions.
+
+
 ## [0.6.2] - 2026-10-07
 
 ### Added

@@ -46,6 +46,10 @@ The clip gallery picture uses generated sample clips, and the menu picture is re
 - Several goggles at once, each in its own window.
 - Menu bar controls, global hotkeys, event hooks, `gogglesview://` URL scheme and AppleScript.
 - Session log, benchmark/latency report, diagnostics, onboarding and self-test.
+- OBS Studio control over obs-websocket (start recording and switch scenes when the goggles go live), see [docs/obs.md](docs/obs.md).
+- Automatic markers that become chapters in the recording, trim that keeps them.
+- Web viewer for iPad and phone: QR code, Bonjour, full screen, Add to Home Screen, see [docs/web-viewer.md](docs/web-viewer.md).
+- Setup assistant, signal-lost alert, race mode, connection health window, clip gallery search and tags, copy frame, Shortcuts actions, settings backup.
 - Secrets (stream key, tokens, webhooks) kept in the Keychain.
 
 ## The goggles' overlay
