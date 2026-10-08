@@ -59,6 +59,8 @@ enum SettingsBackup {
             .init(key: RecordingPrefs.prefixKey, kind: .text(60)), b(RecordingPrefs.autoStartKey),
             i(RecordingExtras.splitMinutesKey, 0...120), i(RecordingExtras.splitMegabytesKey, 0...100_000),
             i(RecordingExtras.loopKeepMinutesKey, 0...1_440), i(RecordingExtras.autoDeleteDaysKey, 0...3_650),
+            b(AutoMarkerPrefs.enabledKey), b(AutoMarkerPrefs.signalKey), b(AutoMarkerPrefs.batteryKey),
+            b(AutoMarkerPrefs.capturesKey), b(AutoMarkerPrefs.raceKey),
             // Burn-in (no logo file)
             s(BurnInPrefs.cornerKey, BurnInCorner.allCases.map(\.rawValue)),
             i(BurnInPrefs.scaleKey, BurnInPrefs.scaleRange), i(BurnInPrefs.opacityKey, BurnInPrefs.opacityRange),

@@ -106,7 +106,7 @@ final class RaceModeController {
         applied = on
         sessions().forEach { $0.decodeSession.applyRaceMode(on) }
         MiniWindowController.shared.refresh()
-        NotificationCenter.default.post(name: .gogglesRaceModeChanged, object: nil)
+        NotificationCenter.default.post(name: .gogglesRaceModeChanged, object: nil, userInfo: ["on": on])
     }
 }
 #endif

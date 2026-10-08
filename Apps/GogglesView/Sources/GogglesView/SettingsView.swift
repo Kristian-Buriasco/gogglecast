@@ -74,6 +74,7 @@ struct SettingsView: View {
                     case .recording:
                         card { recordingSection }
                         card { RecordingExtrasSettingsSection() }
+                        card { AutoMarkerSettingsSection() }
                         card { ReplaySettingsSection() }
                         card { BurnInSettingsSection() }
                         card { GallerySettingsRow() }

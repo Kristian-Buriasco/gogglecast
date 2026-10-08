@@ -58,7 +58,11 @@ final class TrimModel: ObservableObject {
                 timer.invalidate()
                 guard let self else { return }
                 self.exporting = false
-                if s.status == .completed { ClipMetadataStore.carryOver(from: self.clip.url, to: out); done(out) } else { self.error = s.error?.localizedDescription ?? "Export failed" }
+                if s.status == .completed {
+                    ClipMetadataStore.carryOver(from: self.clip.url, to: out)
+                    ClipLibrary.writeMarkers(ClipLibrary.trimmedMarkers(self.clip.markers, start: self.start, end: self.end), for: out)
+                    done(out)
+                } else { self.error = s.error?.localizedDescription ?? "Export failed" }
             }
         }
     }
@@ -119,15 +123,15 @@ private struct HandleRow: View {
                 if !markers.isEmpty {
                     GeometryReader { g in
                         ForEach(Array(markers.enumerated()), id: \.offset) { _, m in
-                            Rectangle().fill(Color.orange).frame(width: 2, height: 8)
+                            Rectangle().fill(m.isAuto ? Color.cyan : Color.orange).frame(width: 2, height: 8)
                                 .accessibilityElement()
-                                .accessibilityLabel("Marker \(m.label)")
+                                .accessibilityLabel(m.isAuto ? "Automatic marker \(m.label)" : "Marker \(m.label)")
                                 .accessibilityAddTraits(.isButton)
                                 .accessibilityHint("Moves the \(label.lowercased()) handle to this marker")
                                 .accessibilityAction { set(m.t) }
                                 .position(x: 8 + (g.size.width - 16) * CGFloat(m.t / max(range.upperBound, 0.001)), y: 4)
                                 .onTapGesture { set(m.t) }
-                                .help(m.label)
+                                .help(m.isAuto ? "\(m.label) (automatic)" : m.label)
                         }
                     }.frame(height: 10)
                 }

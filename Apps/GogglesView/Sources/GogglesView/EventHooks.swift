@@ -296,6 +296,8 @@ enum EventHookInstaller {
             if let e = debouncer.value.tick(at: Date()) {
                 EventBus.shared.post(e, payload: ["deviceId": deviceId])
                 Task { @MainActor in OBSIntegration.shared.streamEvent(e, deviceId: deviceId) }
+                NotificationCenter.default.post(name: .gogglesHookEventFired, object: nil,
+                                                userInfo: ["event": e, "deviceId": deviceId])
             }
         }.store(in: &bag)
 
@@ -304,6 +306,8 @@ enum EventHookInstaller {
             let threshold = EventHookConfig.batteryThreshold
             if EventHookLogic.batteryCrossedBelow(previous: lastBattery, current: pct, threshold: threshold), let pct {
                 EventBus.shared.post(.batteryLow, payload: ["percent": pct, "threshold": threshold, "deviceId": deviceId])
+                NotificationCenter.default.post(name: .gogglesHookEventFired, object: nil,
+                                                userInfo: ["event": AppEvent.batteryLow, "deviceId": deviceId, "percent": pct])
             }
             if pct != nil { lastBattery = pct }
         }.store(in: &bag)

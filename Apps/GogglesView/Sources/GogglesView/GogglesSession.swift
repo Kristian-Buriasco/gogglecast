@@ -58,6 +58,7 @@ final class GogglesSession: NSObject, RegistrableSession, NSWindowDelegate {
     private var initialInfo: DevicePickerCandidate?
     private(set) var isTornDown = false
     private var signalAlert: SignalAlertController?
+    private var autoMarkers: AutoMarkerController?
 
     /// Fired when this session's window becomes key (registry -> active session).
     var onBecameKey: ((GogglesSession) -> Void)?
@@ -143,6 +144,16 @@ final class GogglesSession: NSObject, RegistrableSession, NSWindowDelegate {
         EventHookInstaller.install(coordinator: coordinator)
         signalAlert = SignalAlertController(coordinator: coordinator, deviceLabel: { [weak self] in self?.window.title ?? "Goggles" })
         SessionLogger.attach(coordinator: coordinator, decodeSession: decodeSession).store(in: &cancellables)
+        autoMarkers = AutoMarkerController(
+            deviceId: deviceId, session: decodeSession,
+            isRecording: { [weak decodeSession] in
+                guard let decodeSession else { return false }
+                return SessionControlBoard.shared.recorder(for: decodeSession)?.isRecording == true
+            },
+            addMarker: { [weak decodeSession] label in
+                guard let decodeSession else { return }
+                SessionControlBoard.shared.recorder(for: decodeSession)?.addMarker(label: label, auto: true)
+            })
         // A decoder without a keyframe shows the "waiting for the first picture" card even when the
         // helper says live, and makes the coordinator ask for a keyframe (then reconnect).
         decodeSession.$isWaitingForKeyframe
@@ -214,6 +225,7 @@ final class GogglesSession: NSObject, RegistrableSession, NSWindowDelegate {
         isTornDown = true
         signalAlert?.userDisconnected()
         signalAlert = nil
+        autoMarkers = nil
         NotificationCenter.default.post(name: .gogglesSessionWillClose, object: decodeSession)
         client.stopStreaming(deviceId: deviceId)
         coordinator.detach()
