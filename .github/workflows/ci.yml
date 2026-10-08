@@ -35,4 +35,4 @@ jobs:
           sleep 1
           .build/debug/gvnet --host 127.0.0.1 --bind 127.0.0.1 --seconds 3 --out /tmp/gv.h264 --stats
           wait
-          test "$(head -c 5 /tmp/gv.h264 | xxd -p)" = "0000000167"
+          test "$(head -c 5 /tmp/gv.h264 | od -An -tx1 | tr -d ' \n')" = "0000000167"
