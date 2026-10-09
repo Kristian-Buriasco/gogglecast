@@ -211,6 +211,8 @@ struct ExposureSettingsSection: View {
     @AppStorage(ExposurePrefs.peakingSensitivityKey) private var sensitivity = PeakingSensitivity.medium.rawValue
     @AppStorage(ExposurePrefs.peakingColorKey) private var color = PeakingColor.red.rawValue
 
+    private var levelText: String { level >= 100 ? "100%" : "\(level)%" }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Exposure and focus aids").font(.headline)
@@ -219,7 +221,7 @@ struct ExposureSettingsSection: View {
                 Text("Stripes from").frame(width: 80, alignment: .leading)
                 Slider(value: Binding(get: { Double(level) }, set: { level = Int($0.rounded()) }), in: 50...100, step: 5)
                     .disabled(!zebra)
-                Text(verbatim: level >= 100 ? "100%" : "\(level)%").monospacedDigit().frame(width: 44, alignment: .trailing)
+                Text(verbatim: levelText).monospacedDigit().frame(width: 44, alignment: .trailing)
             }
             Toggle("Focus peaking", isOn: $peaking)
             HStack {
