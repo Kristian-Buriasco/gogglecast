@@ -11,7 +11,8 @@ Settings > Display > **Program output (HDMI)**, or Goggles menu > Program Output
 - **One feed** shows a single picture with nothing drawn on it: a fixed goggles, or the one in the active window. Use it as the program picture.
 - Feeds are named "Feed 1, Feed 2, ..." by default. Name them ("Runner 3", up to 24 characters) in the same card. Names never include the goggles serial number.
 - Zebra stripes and focus peaking are never drawn on the program output or the capture window.
-- One Mac can drive as many HDMI displays as it has outputs; the program output uses one of them. For several separate program pictures, use the Capture window per goggles with the mixer's window capture, or NDI/SRT.
+- Add up to four outputs, each on its own display and each with its own choice (a grid or one feed). That is the ATEM-style set-up: one HDMI per feed, or one multiview plus program feeds. Automatic gives each output the next free external display; two outputs never share a display. A Mac mini drives two displays directly; more need USB or Thunderbolt HDMI adapters.
+- For OBS, each goggles window can show a Capture window (Settings > Display > Capture window) that OBS takes with Window Capture, one per feed.
 
 ## Several goggles on one Mac
 

@@ -799,8 +799,6 @@
 "Feed %lld" = "Flux %lld";
 "NO SIGNAL" = "AUCUN SIGNAL";
 "Program output (HDMI)" = "Sortie programme (HDMI)";
-"Show the program output" = "Afficher la sortie programme";
-"Automatic (first external display)" = "Automatique (premier écran externe)";
 "main display" = "écran principal";
 "This is your main display: the program output will cover your controls. Pick an external display unless you know what you are doing." = "Ceci est votre écran principal : la sortie programme recouvrira vos commandes. Choisissez un écran externe, sauf si vous savez ce que vous faites.";
 "Show" = "Afficher";
@@ -810,5 +808,10 @@
 "Follow the active window" = "Suivre la fenêtre active";
 "Show feed names" = "Afficher les noms des flux";
 "Feed names" = "Noms des flux";
-"A clean full screen picture on the chosen display, for a vision mixer, projector or TV. The grid shows every open goggles window and marks a feed with no signal; one feed shows just that picture. Names never include the goggles serial number. Zebra stripes and peaking are not drawn here." = "Une image plein écran propre sur l’écran choisi, pour un mélangeur vidéo, un projecteur ou un téléviseur. La grille affiche chaque fenêtre de lunettes ouverte et signale un flux sans signal ; avec un seul flux, seule cette image apparaît. Les noms n’incluent jamais le numéro de série des lunettes. Les zébrures et le peaking ne sont pas dessinés ici.";
 "Program Output" = "Sortie programme";
+
+"Show the program outputs" = "Afficher les sorties programme";
+"Add output" = "Ajouter une sortie";
+"A clean full screen picture on each chosen display, for a vision mixer, projector or TV: one output per HDMI connection. A grid shows every open goggles window and marks a feed with no signal; one feed shows just that picture. Names never include the goggles serial number. Zebra stripes and peaking are not drawn here." = "Une image plein écran propre sur chaque écran choisi, pour un mélangeur vidéo, un projecteur ou un téléviseur : une sortie par connexion HDMI. La grille affiche chaque fenêtre de lunettes ouverte et signale un flux sans signal ; avec un seul flux, seule cette image apparaît. Les noms n’incluent jamais le numéro de série des lunettes. Les zébrures et le peaking ne sont pas dessinés ici.";
+"Automatic (next external display)" = "Automatique (prochain écran externe)";
+"Remove output" = "Supprimer la sortie";

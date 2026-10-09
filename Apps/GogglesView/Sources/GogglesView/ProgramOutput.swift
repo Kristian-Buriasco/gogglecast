@@ -11,21 +11,40 @@ import Combine
 // the default names never contain a goggles serial number, so nothing private ends up on screen.
 // Zebra stripes and focus peaking are never drawn here.
 
+/// One program output: a display and what it shows.
+struct ProgramOutputConfig: Codable, Equatable, Identifiable {
+    var id = UUID().uuidString
+    /// CGDirectDisplayID, 0 = automatic (the next free external display).
+    var display: UInt32 = 0
+    /// "grid" (every feed, with names) or "single" (one clean feed).
+    var layout = "grid"
+    /// deviceId for a single feed, "" = follow the active window.
+    var feed = ""
+    var showNames = true
+
+    var isGrid: Bool { layout != "single" }
+}
+
 enum ProgramOutputPrefs {
     static let enabledKey = "programOutputEnabled"
-    static let displayKey = "programOutputDisplay"      // CGDirectDisplayID, 0 = automatic
-    static let layoutKey = "programOutputLayout"        // "grid" | "single"
-    static let singleKey = "programOutputSingleDevice"  // deviceId, "" = follow the active window
-    static let namesKey = "programOutputShowNames"
+    static let outputsKey = "programOutputList"          // JSON [ProgramOutputConfig]
     static let feedNamesKey = "programOutputFeedNames"  // [deviceId: custom name]
-
-    enum Layout: String { case grid, single }
+    static let maxOutputs = 4
 
     static func enabled(_ d: UserDefaults = .standard) -> Bool { d.bool(forKey: enabledKey) }
-    static func display(_ d: UserDefaults = .standard) -> UInt32 { UInt32(clamping: d.integer(forKey: displayKey)) }
-    static func layout(_ d: UserDefaults = .standard) -> Layout { Layout(rawValue: d.string(forKey: layoutKey) ?? "") ?? .grid }
-    static func singleDevice(_ d: UserDefaults = .standard) -> String { d.string(forKey: singleKey) ?? "" }
-    static func showNames(_ d: UserDefaults = .standard) -> Bool { d.object(forKey: namesKey) as? Bool ?? true }
+
+    /// Always at least one output so the settings card has something to edit.
+    static func outputs(_ d: UserDefaults = .standard) -> [ProgramOutputConfig] {
+        guard let data = d.data(forKey: outputsKey),
+              let list = try? JSONDecoder().decode([ProgramOutputConfig].self, from: data), !list.isEmpty
+        else { return [ProgramOutputConfig()] }
+        return Array(list.prefix(maxOutputs))
+    }
+
+    static func setOutputs(_ list: [ProgramOutputConfig], defaults d: UserDefaults = .standard) {
+        d.set(try? JSONEncoder().encode(Array(list.prefix(maxOutputs))), forKey: outputsKey)
+    }
+
     static func feedNames(_ d: UserDefaults = .standard) -> [String: String] { d.dictionary(forKey: feedNamesKey) as? [String: String] ?? [:] }
 
     static func setFeedName(_ name: String, for deviceId: String, defaults d: UserDefaults = .standard) {
@@ -66,12 +85,32 @@ struct ProgramScreenInfo: Equatable {
 }
 
 enum ProgramDisplayChoice {
-    /// The display to use. An explicit choice wins when that display is connected. Automatic means the
-    /// first display that is not the main one, and never the only screen the operator is working on.
+    /// The display for each output, in order (nil = no display, nothing is shown). An explicit choice
+    /// wins when that display is connected and not already used by an earlier output. Automatic takes
+    /// the next external display nobody picked, and never the main display. An unplugged choice does
+    /// not jump to another display.
+    static func assign(outputs: [ProgramOutputConfig], screens: [ProgramScreenInfo]) -> [UInt32?] {
+        var used = Set<UInt32>()
+        var result = [UInt32?](repeating: nil, count: outputs.count)
+        // Explicit choices first, so an automatic output never steals a display that is picked later.
+        for (i, o) in outputs.enumerated() where o.display != 0 {
+            if screens.contains(where: { $0.id == o.display }), !used.contains(o.display) {
+                result[i] = o.display; used.insert(o.display)
+            }
+        }
+        let explicit = Set(outputs.map(\.display).filter { $0 != 0 })
+        for (i, o) in outputs.enumerated() where o.display == 0 {
+            if let free = screens.first(where: { !$0.isMain && !used.contains($0.id) && !explicit.contains($0.id) }) {
+                result[i] = free.id; used.insert(free.id)
+            }
+        }
+        return result
+    }
+
+    /// Single-output convenience (kept for the tests and simple callers).
     static func pick(preferred: UInt32, screens: [ProgramScreenInfo]) -> UInt32? {
-        if preferred != 0, screens.contains(where: { $0.id == preferred }) { return preferred }
-        if preferred != 0 { return nil }  // the chosen display is unplugged: do not jump to another one
-        return screens.first(where: { !$0.isMain })?.id
+        var o = ProgramOutputConfig(); o.display = preferred
+        return assign(outputs: [o], screens: screens)[0]
     }
 }
 
@@ -174,8 +213,8 @@ final class ProgramOutputController: ObservableObject {
 
     private var sessions: () -> [GogglesSession] = { [] }
     private var active: () -> GogglesSession? = { nil }
-    private var window: NSWindow?
-    private var shownKey = ""
+    private var windows: [String: NSWindow] = [:]   // output id -> window
+    private var shownKeys: [String: String] = [:]
     private var observers: [AnyCancellable] = []
     private var pending: DispatchWorkItem?
 
@@ -215,11 +254,11 @@ final class ProgramOutputController: ObservableObject {
         NSScreen.screens.first { ($0.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value == id }
     }
 
-    private func close() {
-        window?.orderOut(nil)
-        window?.contentView = nil  // drops the display layers
-        window = nil
-        shownKey = ""
+    private func close(_ outputId: String) {
+        windows[outputId]?.orderOut(nil)
+        windows[outputId]?.contentView = nil  // drops the display layers
+        windows[outputId] = nil
+        shownKeys[outputId] = nil
     }
 
     func refresh() {
@@ -228,91 +267,113 @@ final class ProgramOutputController: ObservableObject {
         let info = zip(all, names).map { ProgramFeedInfo(id: $0.deviceId, name: $1) }
         if info != available { available = info }
 
-        guard ProgramOutputPrefs.enabled(),
-              let displayID = ProgramDisplayChoice.pick(preferred: ProgramOutputPrefs.display(), screens: Self.screenInfos()),
-              let screen = screen(for: displayID) else { close(); return }
+        let outputs = ProgramOutputPrefs.outputs()
+        for id in Set(windows.keys).subtracting(outputs.map(\.id)) { close(id) }
+        guard ProgramOutputPrefs.enabled() else { for id in Array(windows.keys) { close(id) }; return }
 
-        var feeds: [ProgramFeed] = zip(all, names).map {
+        let assigned = ProgramDisplayChoice.assign(outputs: outputs, screens: Self.screenInfos())
+        let allFeeds: [ProgramFeed] = zip(all, names).map {
             ProgramFeed(id: $0.deviceId, name: $1, session: $0.decodeSession, coordinator: $0.coordinator)
         }
-        let layout = ProgramOutputPrefs.layout()
-        if layout == .single {
-            let wanted = ProgramOutputPrefs.singleDevice()
-            let chosen = wanted.isEmpty ? active()?.deviceId : wanted
-            feeds = feeds.filter { $0.id == chosen }
+        for (output, displayID) in zip(outputs, assigned) {
+            guard let displayID, let screen = screen(for: displayID) else { close(output.id); continue }
+            var feeds = allFeeds
+            if !output.isGrid {
+                let chosen = output.feed.isEmpty ? active()?.deviceId : output.feed
+                feeds = feeds.filter { $0.id == chosen }
+            }
+            let key = "\(displayID)|\(screen.frame)|\(output.layout)|\(output.showNames)|" + feeds.map { "\($0.id):\($0.name)" }.joined(separator: ",")
+            guard key != shownKeys[output.id] else { continue }
+            shownKeys[output.id] = key
+
+            let host = NSHostingView(rootView: ProgramOutputView(feeds: feeds, showNames: output.showNames, multiview: output.isGrid))
+            let container = ProgramContainerView(frame: NSRect(origin: .zero, size: screen.frame.size))
+            host.frame = container.bounds
+            host.autoresizingMask = [.width, .height]
+            container.addSubview(host)
+
+            let w = windows[output.id] ?? ProgramWindow(contentRect: screen.frame, styleMask: [.borderless], backing: .buffered, defer: false)
+            w.contentView = container
+            w.setFrame(screen.frame, display: true)
+            w.backgroundColor = .black
+            w.hasShadow = false
+            w.isOpaque = true
+            w.isReleasedWhenClosed = false
+            w.level = .screenSaver
+            w.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary, .ignoresCycle]
+            w.title = "GogglesView Program"
+            w.orderFrontRegardless()
+            windows[output.id] = w
         }
-        let showNames = ProgramOutputPrefs.showNames()
-        let key = "\(displayID)|\(screen.frame)|\(layout.rawValue)|\(showNames)|" + feeds.map { "\($0.id):\($0.name)" }.joined(separator: ",")
-        guard key != shownKey else { return }
-        shownKey = key
-
-        let host = NSHostingView(rootView: ProgramOutputView(feeds: feeds, showNames: showNames, multiview: layout == .grid))
-        let container = ProgramContainerView(frame: NSRect(origin: .zero, size: screen.frame.size))
-        host.frame = container.bounds
-        host.autoresizingMask = [.width, .height]
-        container.addSubview(host)
-
-        let w = window ?? ProgramWindow(contentRect: screen.frame, styleMask: [.borderless], backing: .buffered, defer: false)
-        w.contentView = container
-        w.setFrame(screen.frame, display: true)
-        w.backgroundColor = .black
-        w.hasShadow = false
-        w.isOpaque = true
-        w.isReleasedWhenClosed = false
-        w.level = .screenSaver
-        w.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary, .ignoresCycle]
-        w.title = "GogglesView Program"
-        w.orderFrontRegardless()
-        window = w
     }
 }
 
 struct ProgramOutputSettingsSection: View {
     @ObservedObject private var controller = ProgramOutputController.shared
     @AppStorage(ProgramOutputPrefs.enabledKey) private var enabled = false
-    @AppStorage(ProgramOutputPrefs.displayKey) private var display = 0
-    @AppStorage(ProgramOutputPrefs.layoutKey) private var layout = ProgramOutputPrefs.Layout.grid.rawValue
-    @AppStorage(ProgramOutputPrefs.singleKey) private var single = ""
-    @AppStorage(ProgramOutputPrefs.namesKey) private var showNames = true
+    @State private var outputs = ProgramOutputPrefs.outputs()
     @State private var screens = ProgramOutputController.screenInfos()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Program output (HDMI)").font(.headline)
-            Toggle("Show the program output", isOn: $enabled)
-            Picker("Display", selection: $display) {
-                Text("Automatic (first external display)").tag(0)
-                ForEach(screens, id: \.id) { s in
-                    Text(verbatim: s.isMain ? "\(s.name) (\(L("main display")))" : s.name).tag(Int(s.id))
-                }
+            Toggle("Show the program outputs", isOn: $enabled)
+            ForEach($outputs) { $o in
+                OutputRow(output: $o, screens: screens, feeds: controller.available,
+                          canRemove: outputs.count > 1) { outputs.removeAll { $0.id == o.id } }
             }
-            if display != 0, screens.first(where: { Int($0.id) == display })?.isMain == true {
-                Text("This is your main display: the program output will cover your controls. Pick an external display unless you know what you are doing.")
-                    .font(.caption).foregroundStyle(.orange)
-            }
-            Picker("Show", selection: $layout) {
-                Text("All feeds in a grid").tag(ProgramOutputPrefs.Layout.grid.rawValue)
-                Text("One feed").tag(ProgramOutputPrefs.Layout.single.rawValue)
-            }
-            if layout == ProgramOutputPrefs.Layout.single.rawValue {
-                Picker("Feed", selection: $single) {
-                    Text("Follow the active window").tag("")
-                    ForEach(controller.available) { f in Text(verbatim: f.name).tag(f.id) }
-                }
-            } else {
-                Toggle("Show feed names", isOn: $showNames)
+            if outputs.count < ProgramOutputPrefs.maxOutputs {
+                Button("Add output") { outputs.append(ProgramOutputConfig()) }
             }
             if !controller.available.isEmpty {
                 Text("Feed names").font(.subheadline).padding(.top, 4)
-                ForEach(controller.available) { f in
-                    FeedNameRow(info: f)
-                }
+                ForEach(controller.available) { f in FeedNameRow(info: f) }
             }
-            Text("A clean full screen picture on the chosen display, for a vision mixer, projector or TV. The grid shows every open goggles window and marks a feed with no signal; one feed shows just that picture. Names never include the goggles serial number. Zebra stripes and peaking are not drawn here.")
+            Text("A clean full screen picture on each chosen display, for a vision mixer, projector or TV: one output per HDMI connection. A grid shows every open goggles window and marks a feed with no signal; one feed shows just that picture. Names never include the goggles serial number. Zebra stripes and peaking are not drawn here.")
                 .font(.caption).foregroundStyle(.secondary)
         }
+        .onChange(of: outputs) { ProgramOutputPrefs.setOutputs($0) }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)) { _ in
             screens = ProgramOutputController.screenInfos()
+        }
+    }
+}
+
+private struct OutputRow: View {
+    @Binding var output: ProgramOutputConfig
+    let screens: [ProgramScreenInfo]
+    let feeds: [ProgramFeedInfo]
+    let canRemove: Bool
+    let remove: () -> Void
+
+    var body: some View {
+        GroupBox {
+            VStack(alignment: .leading, spacing: 6) {
+                Picker("Display", selection: Binding(get: { Int(output.display) }, set: { output.display = UInt32($0) })) {
+                    Text("Automatic (next external display)").tag(0)
+                    ForEach(screens, id: \.id) { s in
+                        Text(verbatim: s.isMain ? "\(s.name) (\(L("main display")))" : s.name).tag(Int(s.id))
+                    }
+                }
+                if output.display != 0, screens.first(where: { Int($0.id) == Int(output.display) })?.isMain == true {
+                    Text("This is your main display: the program output will cover your controls. Pick an external display unless you know what you are doing.")
+                        .font(.caption).foregroundStyle(.orange)
+                }
+                Picker("Show", selection: $output.layout) {
+                    Text("All feeds in a grid").tag("grid")
+                    Text("One feed").tag("single")
+                }
+                if output.isGrid {
+                    Toggle("Show feed names", isOn: $output.showNames)
+                } else {
+                    Picker("Feed", selection: $output.feed) {
+                        Text("Follow the active window").tag("")
+                        ForEach(feeds) { f in Text(verbatim: f.name).tag(f.id) }
+                    }
+                }
+                if canRemove { Button("Remove output", role: .destructive, action: remove) }
+            }
+            .padding(4)
         }
     }
 }

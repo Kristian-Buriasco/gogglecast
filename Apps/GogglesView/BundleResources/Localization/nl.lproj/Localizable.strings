@@ -797,8 +797,6 @@
 "Feed %lld" = "Feed %lld";
 "NO SIGNAL" = "GEEN SIGNAAL";
 "Program output (HDMI)" = "Programma-uitgang (HDMI)";
-"Show the program output" = "Programma-uitgang tonen";
-"Automatic (first external display)" = "Automatisch (eerste externe scherm)";
 "main display" = "hoofdscherm";
 "This is your main display: the program output will cover your controls. Pick an external display unless you know what you are doing." = "Dit is je hoofdscherm: de programma-uitgang bedekt je bediening. Kies een extern scherm, tenzij je weet wat je doet.";
 "Show" = "Toon";
@@ -808,5 +806,10 @@
 "Follow the active window" = "Volg het actieve venster";
 "Show feed names" = "Feednamen tonen";
 "Feed names" = "Feednamen";
-"A clean full screen picture on the chosen display, for a vision mixer, projector or TV. The grid shows every open goggles window and marks a feed with no signal; one feed shows just that picture. Names never include the goggles serial number. Zebra stripes and peaking are not drawn here." = "Een schoon beeld op volledig scherm op het gekozen scherm, voor een videomixer, projector of tv. Het raster toont elk geopend brilvenster en markeert een feed zonder signaal; bij één feed zie je alleen dat beeld. Namen bevatten nooit het serienummer van de bril. Zebra en peaking worden hier niet getekend.";
 "Program Output" = "Programma-uitgang";
+
+"Show the program outputs" = "Programma-uitgangen tonen";
+"Add output" = "Uitgang toevoegen";
+"A clean full screen picture on each chosen display, for a vision mixer, projector or TV: one output per HDMI connection. A grid shows every open goggles window and marks a feed with no signal; one feed shows just that picture. Names never include the goggles serial number. Zebra stripes and peaking are not drawn here." = "Een schoon beeld op volledig scherm op elk gekozen scherm, voor een videomixer, projector of tv: één uitgang per HDMI-verbinding. Het raster toont elk geopend brilvenster en markeert een feed zonder signaal; bij één feed zie je alleen dat beeld. Namen bevatten nooit het serienummer van de bril. Zebra en peaking worden hier niet getekend.";
+"Automatic (next external display)" = "Automatisch (volgende externe scherm)";
+"Remove output" = "Uitgang verwijderen";

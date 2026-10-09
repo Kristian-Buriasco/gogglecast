@@ -5,7 +5,7 @@ All notable changes to this project are documented here. Format based on [Keep a
 ## [Unreleased]
 
 ### Added
-- Program output (Settings > Display, Goggles menu): a clean full screen picture on a chosen display, such as an HDMI output to a vision mixer or projector. Either a grid of every open goggles feed with names and a NO SIGNAL marker, or one feed on its own. Feed names are chosen by you and never contain a serial number. See `docs/events.md`.
+- Program output (Settings > Display, Goggles menu): up to four clean full screen outputs, each on its own display (for example one HDMI per feed into a vision mixer, or a multiview). Either a grid of every open goggles feed with names and a NO SIGNAL marker, or one feed on its own. Feed names are chosen by you and never contain a serial number. See `docs/events.md`.
 - Dutch. The app follows the macOS language: set macOS to Dutch and the interface appears in Dutch (791 strings, same scope as Italian and French). The translation is machine-assisted: corrections are welcome, see `docs/localization.md`.
 
 ## [0.8.1] - 2026-10-09

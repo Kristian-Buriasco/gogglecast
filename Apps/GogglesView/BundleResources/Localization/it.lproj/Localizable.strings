@@ -868,8 +868,6 @@
 "Feed %lld" = "Feed %lld";
 "NO SIGNAL" = "NESSUN SEGNALE";
 "Program output (HDMI)" = "Uscita programma (HDMI)";
-"Show the program output" = "Mostra l'uscita programma";
-"Automatic (first external display)" = "Automatico (primo display esterno)";
 "main display" = "display principale";
 "This is your main display: the program output will cover your controls. Pick an external display unless you know what you are doing." = "Questo è il display principale: l'uscita programma coprirà i tuoi controlli. Scegli un display esterno, a meno che tu non sappia cosa stai facendo.";
 "Show" = "Mostra";
@@ -879,5 +877,10 @@
 "Follow the active window" = "Segui la finestra attiva";
 "Show feed names" = "Mostra i nomi dei feed";
 "Feed names" = "Nomi dei feed";
-"A clean full screen picture on the chosen display, for a vision mixer, projector or TV. The grid shows every open goggles window and marks a feed with no signal; one feed shows just that picture. Names never include the goggles serial number. Zebra stripes and peaking are not drawn here." = "Un'immagine pulita a schermo intero sul display scelto, per un mixer video, un proiettore o una TV. La griglia mostra ogni finestra dei visori aperta e segnala un feed senza segnale; con un solo feed vedi solo quell'immagine. I nomi non includono mai il numero di serie dei visori. Zebra e peaking non vengono disegnati qui.";
 "Program Output" = "Uscita programma";
+
+"Show the program outputs" = "Mostra le uscite programma";
+"Add output" = "Aggiungi uscita";
+"A clean full screen picture on each chosen display, for a vision mixer, projector or TV: one output per HDMI connection. A grid shows every open goggles window and marks a feed with no signal; one feed shows just that picture. Names never include the goggles serial number. Zebra stripes and peaking are not drawn here." = "Un'immagine pulita a schermo intero su ogni display scelto, per un mixer video, un proiettore o una TV: un'uscita per ogni connessione HDMI. La griglia mostra ogni finestra dei visori aperta e segnala un feed senza segnale; con un solo feed vedi solo quell'immagine. I nomi non includono mai il numero di serie dei visori. Zebra e peaking non vengono disegnati qui.";
+"Automatic (next external display)" = "Automatico (prossimo display esterno)";
+"Remove output" = "Rimuovi uscita";

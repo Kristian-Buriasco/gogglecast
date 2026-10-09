@@ -555,19 +555,21 @@
 "Feed %lld" = "Feed %lld";
 "NO SIGNAL" = "NO SIGNAL";
 "Program output (HDMI)" = "Program output (HDMI)";
-"Show the program output" = "Show the program output";
+"Show the program outputs" = "Show the program outputs";
+"Add output" = "Add output";
+"Feed names" = "Feed names";
+"A clean full screen picture on each chosen display, for a vision mixer, projector or TV: one output per HDMI connection. A grid shows every open goggles window and marks a feed with no signal; one feed shows just that picture. Names never include the goggles serial number. Zebra stripes and peaking are not drawn here." = "A clean full screen picture on each chosen display, for a vision mixer, projector or TV: one output per HDMI connection. A grid shows every open goggles window and marks a feed with no signal; one feed shows just that picture. Names never include the goggles serial number. Zebra stripes and peaking are not drawn here.";
 "Display" = "Display";
-"Automatic (first external display)" = "Automatic (first external display)";
+"Automatic (next external display)" = "Automatic (next external display)";
 "main display" = "main display";
 "This is your main display: the program output will cover your controls. Pick an external display unless you know what you are doing." = "This is your main display: the program output will cover your controls. Pick an external display unless you know what you are doing.";
 "Show" = "Show";
 "All feeds in a grid" = "All feeds in a grid";
 "One feed" = "One feed";
+"Show feed names" = "Show feed names";
 "Feed" = "Feed";
 "Follow the active window" = "Follow the active window";
-"Show feed names" = "Show feed names";
-"Feed names" = "Feed names";
-"A clean full screen picture on the chosen display, for a vision mixer, projector or TV. The grid shows every open goggles window and marks a feed with no signal; one feed shows just that picture. Names never include the goggles serial number. Zebra stripes and peaking are not drawn here." = "A clean full screen picture on the chosen display, for a vision mixer, projector or TV. The grid shows every open goggles window and marks a feed with no signal; one feed shows just that picture. Names never include the goggles serial number. Zebra stripes and peaking are not drawn here.";
+"Remove output" = "Remove output";
 /* RTMPPublisher.swift */
 "Invalid RTMP URL (expected rtmp://host/app)" = "Invalid RTMP URL (expected rtmp://host/app)";
 "Stream key is empty" = "Stream key is empty";

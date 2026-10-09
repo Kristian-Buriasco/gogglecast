@@ -65,11 +65,46 @@ import CoreGraphics
         #expect(ProgramOutputPrefs.feedNames(d)["dev"] == nil)
     }
 
-    @Test func defaultsAreOffAndGrid() {
+    @Test func defaultsAreOffWithOneGridOutput() {
         let d = UserDefaults(suiteName: "program-\(UUID().uuidString)")!
         #expect(!ProgramOutputPrefs.enabled(d))
-        #expect(ProgramOutputPrefs.layout(d) == .grid)
-        #expect(ProgramOutputPrefs.showNames(d))
-        #expect(ProgramOutputPrefs.display(d) == 0)
+        let outs = ProgramOutputPrefs.outputs(d)
+        #expect(outs.count == 1 && outs[0].isGrid && outs[0].showNames && outs[0].display == 0)
+    }
+
+    @Test func outputListRoundTripsAndIsCapped() {
+        let d = UserDefaults(suiteName: "program-\(UUID().uuidString)")!
+        var list = (0..<6).map { i -> ProgramOutputConfig in var o = ProgramOutputConfig(); o.display = UInt32(i); return o }
+        list[1].layout = "single"; list[1].feed = "dev"
+        ProgramOutputPrefs.setOutputs(list, defaults: d)
+        let back = ProgramOutputPrefs.outputs(d)
+        #expect(back.count == ProgramOutputPrefs.maxOutputs)
+        #expect(back[1].layout == "single" && back[1].feed == "dev" && !back[1].isGrid)
+    }
+
+    private let three = [ProgramScreenInfo(id: 1, name: "Built-in", isMain: true),
+                         ProgramScreenInfo(id: 7, name: "HDMI 1", isMain: false),
+                         ProgramScreenInfo(id: 8, name: "HDMI 2", isMain: false)]
+
+    @Test func twoAutomaticOutputsGetTwoDifferentExternalDisplays() {
+        let a = ProgramDisplayChoice.assign(outputs: [ProgramOutputConfig(), ProgramOutputConfig()], screens: three)
+        #expect(a == [7, 8])
+    }
+
+    @Test func automaticDoesNotStealADisplayPickedByALaterOutput() {
+        var second = ProgramOutputConfig(); second.display = 7
+        let a = ProgramDisplayChoice.assign(outputs: [ProgramOutputConfig(), second], screens: three)
+        #expect(a == [8, 7])
+    }
+
+    @Test func twoOutputsOnTheSameDisplayShowOnlyTheFirst() {
+        var a = ProgramOutputConfig(); a.display = 7
+        var b = ProgramOutputConfig(); b.display = 7
+        #expect(ProgramDisplayChoice.assign(outputs: [a, b], screens: three) == [7, nil])
+    }
+
+    @Test func moreAutomaticOutputsThanDisplaysLeavesTheRestOff() {
+        let outs = [ProgramOutputConfig(), ProgramOutputConfig(), ProgramOutputConfig()]
+        #expect(ProgramDisplayChoice.assign(outputs: outs, screens: three) == [7, 8, nil])
     }
 }
