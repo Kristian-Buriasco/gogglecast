@@ -10,7 +10,7 @@ On macOS the system's RNDIS driver does not bring the goggles' USB link up, so t
 
 ## Download
 
-Each release from 0.9 on carries prebuilt `gvnet-linux-x86_64.tar.gz`, `gvnet-linux-arm64.tar.gz` and `gvnet-windows-x86_64.zip` (with `gvnet-SHA256SUMS.txt`), built by CI from the tagged source. The Linux builds only need glibc and libstdc++; the Windows build needs nothing installed. Unpack and run `gvnet --help`-style usage below. They are unsigned: Windows SmartScreen may warn.
+Each release from 0.9 on carries prebuilt `gvnet-linux-x86_64.tar.gz`, `gvnet-linux-arm64.tar.gz` and `gvnet-windows-x86_64.zip` (with `gvnet-SHA256SUMS.txt`), built by CI from the tagged source. The Linux builds only need glibc and libstdc++; the Windows zip carries the Swift runtime DLLs next to `gvnet.exe` (keep them together) and needs the Microsoft Visual C++ runtime, which most PCs already have. Unpack and run `gvnet --help`-style usage below. They are unsigned: Windows SmartScreen may warn.
 
 ## Linux
 

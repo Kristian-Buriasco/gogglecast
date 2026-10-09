@@ -75,6 +75,7 @@ jobs:
           Write-Host "exit code: $LASTEXITCODE"
           Write-Host "output: $text"
           if ($LASTEXITCODE -ne 2 -or $text -notmatch "usage: gvnet") { throw "packaged gvnet.exe did not start (exit $LASTEXITCODE): $text" }
+          exit 0
       - uses: actions/upload-artifact@v4
         with:
           name: gvnet-${{ matrix.name }}
