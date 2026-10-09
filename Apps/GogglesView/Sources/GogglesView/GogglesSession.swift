@@ -93,6 +93,7 @@ final class GogglesSession: NSObject, RegistrableSession, NSWindowDelegate {
         coordinator.onInputDropped = { [weak decodeSession] in decodeSession?.noteInputDropped() }
         self.coordinator = coordinator
         self.decodeSession = decodeSession
+        FeedSlots.shared.assign(deviceId: deviceId, decode: decodeSession)
 
         let capture = CaptureWindowController(session: decodeSession)
         capture.title = GogglesSessionNaming.captureWindowTitle(label: label)
@@ -223,6 +224,7 @@ final class GogglesSession: NSObject, RegistrableSession, NSWindowDelegate {
     func teardown() {
         guard !isTornDown else { return }
         isTornDown = true
+        FeedSlots.shared.release(deviceId: deviceId, decode: decodeSession)
         signalAlert?.userDisconnected()
         signalAlert = nil
         autoMarkers = nil

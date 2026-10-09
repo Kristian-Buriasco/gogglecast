@@ -52,7 +52,8 @@ struct NetworkStreamControl: View {
         OverlayHint.noteStarted(.output)
         session.addKeyframeSafeConsumer(streamer)
         lastBytes = 0
-        streamer.start(host: NetStreamPrefs.host, port: NetStreamPrefs.port)
+        streamer.start(host: NetStreamPrefs.host,
+                       port: FeedPorts.port(base: NetStreamPrefs.port, slot: FeedSlots.shared.slot(decode: session), perFeed: FeedPortPrefs.perFeed))
     }
 
     private func stop() {

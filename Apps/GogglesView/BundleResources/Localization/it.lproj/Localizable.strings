@@ -884,3 +884,18 @@
 "A clean full screen picture on each chosen display, for a vision mixer, projector or TV: one output per HDMI connection. A grid shows every open goggles window and marks a feed with no signal; one feed shows just that picture. Names never include the goggles serial number. Zebra stripes and peaking are not drawn here." = "Un'immagine pulita a schermo intero su ogni display scelto, per un mixer video, un proiettore o una TV: un'uscita per ogni connessione HDMI. La griglia mostra ogni finestra dei visori aperta e segnala un feed senza segnale; con un solo feed vedi solo quell'immagine. I nomi non includono mai il numero di serie dei visori. Zebra e peaking non vengono disegnati qui.";
 "Automatic (next external display)" = "Automatico (prossimo display esterno)";
 "Remove output" = "Rimuovi uscita";
+
+"No goggles are open" = "Nessun visore aperto";
+"The SRT passphrase would end up in OBS. Clear it, or add the sources by hand." = "La passphrase SRT finirebbe in OBS. Cancellala, oppure aggiungi le sorgenti a mano.";
+"OBS refused: %@" = "OBS ha rifiutato: %@";
+"Added %lld, updated %lld. Start each window's %@ output to see video." = "Aggiunte %lld, aggiornate %lld. Avvia l'uscita %@ di ogni finestra per vedere il video.";
+"Several goggles" = "Più visori";
+"Separate port for each goggles window" = "Porta separata per ogni finestra dei visori";
+"Window 1 uses the port in Settings, window 2 the next one, and so on (NDI adds a number to the name). Needed to send several goggles at once." = "La finestra 1 usa la porta nelle Impostazioni, la finestra 2 la successiva, e così via (NDI aggiunge un numero al nome). Serve per inviare più visori insieme.";
+"Scene" = "Scena";
+"Using" = "Con";
+"Add all feeds to OBS" = "Aggiungi tutti i feed a OBS";
+"Creates one Media Source per open goggles, named after the feed (rename feeds under Program output). Press the SRT or UDP button in each window to start sending. Existing sources are updated, never deleted." = "Crea una sorgente multimediale per ogni visore aperto, con il nome del feed (rinomina i feed in Uscita programma). Premi il pulsante SRT o UDP in ogni finestra per iniziare l'invio. Le sorgenti esistenti vengono aggiornate, mai eliminate.";
+"Re-encode at 30 fps (lighter, for several goggles)" = "Ricodifica a 30 fps (più leggero, per più visori)";
+
+"Each goggles window with a recording or stream uses its own hardware encoder, and a Mac can only encode a limited number of frames per second in total (about 150 on an M1 Pro). At 30 fps, recordings and streams are half as smooth, but twice as many goggles fit. The live view stays at full frame rate." = "Ogni finestra dei visori con una registrazione o uno streaming usa il proprio encoder hardware, e un Mac può codificare solo un numero limitato di fotogrammi al secondo in totale (circa 150 su un M1 Pro). A 30 fps registrazioni e streaming sono meno fluidi, ma entrano il doppio dei visori. La vista live resta a piena frequenza.";

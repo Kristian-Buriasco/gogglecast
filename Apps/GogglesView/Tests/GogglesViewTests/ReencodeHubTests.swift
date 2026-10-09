@@ -61,6 +61,35 @@ struct ReencodeHubTests {
         #expect(flags.first == true)
     }
 
+    @Test func halfRateEncodesEveryOtherPicture() {
+        func encoded(half: Bool) -> Int {
+            var seq: UInt64 = 0
+            let hub = ReencodeHub(source: { self.frame(format: kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange, seed: UInt8(truncatingIfNeeded: seq)) },
+                                  sequence: { seq }, bitrateMbps: { 8 }, halfRate: { half })
+            let c = Collector()
+            hub.subscribe(c)
+            for _ in 0..<40 { seq += 1; hub.pollOnce(); Thread.sleep(forTimeInterval: 0.005) }
+            let wait = Date().addingTimeInterval(3)
+            while c.count == 0 && Date() < wait { Thread.sleep(forTimeInterval: 0.05) }
+            Thread.sleep(forTimeInterval: 0.3)
+            hub.unsubscribe(c)
+            return hub.framesEncoded
+        }
+        let full = encoded(half: false), half = encoded(half: true)
+        #expect(half >= 15 && half <= 25, "half rate encoded \(half) of 40")
+        #expect(full > half, "full rate encoded \(full), half \(half)")
+    }
+
+    @Test func halfRatePrefDefaultsOff() {
+        let d = UserDefaults.standard
+        let saved = d.object(forKey: ReencodePrefs.halfRateKey)
+        defer { if let saved { d.set(saved, forKey: ReencodePrefs.halfRateKey) } else { d.removeObject(forKey: ReencodePrefs.halfRateKey) } }
+        d.removeObject(forKey: ReencodePrefs.halfRateKey)
+        #expect(!ReencodePrefs.halfRate)
+        d.set(true, forKey: ReencodePrefs.halfRateKey)
+        #expect(ReencodePrefs.halfRate)
+    }
+
     @Test func stopsEncodingWhenLastSubscriberLeaves() {
         let hub = ReencodeHub(source: { self.frame(format: kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange, seed: 1) })
         let c = Collector()

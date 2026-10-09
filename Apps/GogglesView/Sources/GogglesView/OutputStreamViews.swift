@@ -28,7 +28,8 @@ struct SRTStreamControl: View {
     private func start() {
         OverlayHint.noteStarted(.output)
         session.addKeyframeSafeConsumer(out)
-        out.start(mode: SRTPrefs.mode, host: SRTPrefs.host, port: SRTPrefs.port,
+        out.start(mode: SRTPrefs.mode, host: SRTPrefs.host,
+                  port: FeedPorts.port(base: SRTPrefs.port, slot: FeedSlots.shared.slot(decode: session), perFeed: FeedPortPrefs.perFeed),
                   latencyMs: SRTPrefs.latencyMs, passphrase: SRTPrefs.passphrase)
         if !out.isStreaming { session.removeConsumer(out) }
     }
@@ -96,7 +97,7 @@ struct NDIStreamControl: View {
     private func start() {
         OverlayHint.noteStarted(.output)
         session.addKeyframeSafeConsumer(out)
-        out.start(sourceName: NDIPrefs.sourceName)
+        out.start(sourceName: FeedPorts.ndiName(base: NDIPrefs.sourceName, slot: FeedSlots.shared.slot(decode: session), perFeed: FeedPortPrefs.perFeed))
         if !out.isStreaming { session.removeConsumer(out) }
     }
 

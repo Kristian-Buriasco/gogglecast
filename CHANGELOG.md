@@ -5,6 +5,10 @@ All notable changes to this project are documented here. Format based on [Keep a
 ## [Unreleased]
 
 ### Added
+- Several goggles at once: a separate SRT/UDP port per goggles window (window 1 keeps the configured port, the next windows add 1, 2, ...), and NDI source names with a number. On by default, switchable in Settings > Streaming > OBS Studio.
+- "Add all feeds to OBS" (Settings > Streaming > OBS Studio): creates one Media Source per open goggles over the OBS WebSocket connection, pointing at that window's SRT or UDP output. Existing sources are updated, never deleted. Not checked against a real OBS yet.
+- "Re-encode at 30 fps" (Settings > Streaming): halves the hardware encoder load of recordings and streams so more goggles fit on one Mac. Measured: 6 windows keep 52 fps with it, 27 fps without.
+- A multi-goggles soak test (`GOGGLES_SOAK_FEEDS=6 GOGGLES_SOAK_SECONDS=600 swift test --filter MultiFeedSoak`) and `docs/events.md` capacity table.
 - Program output (Settings > Display, Goggles menu): up to four clean full screen outputs, each on its own display (for example one HDMI per feed into a vision mixer, or a multiview). Either a grid of every open goggles feed with names and a NO SIGNAL marker, or one feed on its own. Feed names are chosen by you and never contain a serial number. See `docs/events.md`.
 - Dutch. The app follows the macOS language: set macOS to Dutch and the interface appears in Dutch (791 strings, same scope as Italian and French). The translation is machine-assisted: corrections are welcome, see `docs/localization.md`.
 

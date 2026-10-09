@@ -14,9 +14,12 @@ import SwiftUI
 enum ReencodePrefs {
     static let enabledKey = "reencodeEnabled"
     static let bitrateKey = "reencodeBitrateMbps"
+    static let halfRateKey = "reencodeHalfRate"
     static let bitrateRange = 4...60
     static let defaultBitrate = 20
 
+    /// Encode every second picture (30 fps from a 60 fps source): half the encoder load, for several goggles.
+    static var halfRate: Bool { UserDefaults.standard.bool(forKey: halfRateKey) }
     static var enabled: Bool { UserDefaults.standard.object(forKey: enabledKey) as? Bool ?? true }
     static var bitrateMbps: Int {
         let v = UserDefaults.standard.object(forKey: bitrateKey) as? Int ?? defaultBitrate
@@ -28,6 +31,7 @@ final class ReencodeHub {
     /// Picture currently on screen. Called on the main queue by the timer, or by `pollOnce()` in tests.
     private let source: () -> CVPixelBuffer?
     private let bitrateMbps: () -> Int
+    private let halfRate: () -> Bool
     private let onIdle: () -> Void
     private let lock = NSLock()
     private var subscribers: [WeakSub] = []
@@ -51,11 +55,13 @@ final class ReencodeHub {
 
     init(source: @escaping () -> CVPixelBuffer?, sequence: (() -> UInt64)? = nil,
          bitrateMbps: @escaping () -> Int = { ReencodePrefs.bitrateMbps },
+         halfRate: @escaping () -> Bool = { ReencodePrefs.halfRate },
          onIdle: @escaping () -> Void = {}) {
         self.source = source
         self.sequence = sequence
         self.onIdle = onIdle
         self.bitrateMbps = bitrateMbps
+        self.halfRate = halfRate
     }
 
     deinit { teardownEncoder() }
@@ -110,6 +116,7 @@ final class ReencodeHub {
             let n = sequence()
             if lastSequence == n { return }
             lastSequence = n
+            if halfRate(), n % 2 == 1 { return }
         } else if let surface = CVPixelBufferGetIOSurface(buf)?.takeUnretainedValue() {
             let key = (id: IOSurfaceGetID(surface), seed: IOSurfaceGetSeed(surface))
             if let last = lastSurface, last == key { return }
@@ -195,6 +202,7 @@ final class ReencodeHub {
 struct ReencodeSettingsSection: View {
     @AppStorage(ReencodePrefs.enabledKey) private var enabled = true
     @AppStorage(ReencodePrefs.bitrateKey) private var bitrate = ReencodePrefs.defaultBitrate
+    @AppStorage(ReencodePrefs.halfRateKey) private var halfRate = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -202,6 +210,10 @@ struct ReencodeSettingsSection: View {
             Toggle("Re-encode with regular keyframes", isOn: $enabled)
             Stepper(L("Bitrate: %lld Mbps", bitrate), value: $bitrate, in: ReencodePrefs.bitrateRange)
                 .disabled(!enabled)
+            Toggle("Re-encode at 30 fps (lighter, for several goggles)", isOn: $halfRate)
+                .disabled(!enabled)
+            Text("Each goggles window with a recording or stream uses its own hardware encoder, and a Mac can only encode a limited number of frames per second in total (about 150 on an M1 Pro). At 30 fps, recordings and streams are half as smooth, but twice as many goggles fit. The live view stays at full frame rate.")
+                .font(.caption).foregroundStyle(.secondary)
             Text("The goggles send one keyframe when Share Liveview starts and none after, so instant replay, UDP, RTMP, SRT and the web viewer can't start cleanly later. This re-encodes the picture with a keyframe every second (hardware encoder, runs only while one of those is active). Turn it off to pass the goggles' stream through untouched; clips and late-joining viewers may then show grey until the next keyframe.")
                 .font(.caption).foregroundStyle(.secondary)
         }

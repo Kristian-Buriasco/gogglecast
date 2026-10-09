@@ -301,6 +301,21 @@ actor OBSClient {
         _ = try await request("SetCurrentProgramScene", data: ["sceneName": name])
     }
 
+    /// Names of the inputs of one kind (for example "ffmpeg_source").
+    func getInputNames(kind: String) async throws -> [String] {
+        let d = try await request("GetInputList", data: ["inputKind": kind])
+        return (d["inputs"]?.array ?? []).compactMap { $0.object?["inputName"]?.string }
+    }
+
+    func createInput(scene: String, name: String, kind: String, settings: [String: Any]) async throws {
+        _ = try await request("CreateInput", data: ["sceneName": scene, "inputName": name, "inputKind": kind,
+                                                    "inputSettings": settings, "sceneItemEnabled": true])
+    }
+
+    func setInputSettings(name: String, settings: [String: Any]) async throws {
+        _ = try await request("SetInputSettings", data: ["inputName": name, "inputSettings": settings, "overlay": true])
+    }
+
     func startRecord() async throws { _ = try await request("StartRecord") }
     func stopRecord() async throws { _ = try await request("StopRecord") }
 

@@ -815,3 +815,18 @@
 "A clean full screen picture on each chosen display, for a vision mixer, projector or TV: one output per HDMI connection. A grid shows every open goggles window and marks a feed with no signal; one feed shows just that picture. Names never include the goggles serial number. Zebra stripes and peaking are not drawn here." = "Une image plein écran propre sur chaque écran choisi, pour un mélangeur vidéo, un projecteur ou un téléviseur : une sortie par connexion HDMI. La grille affiche chaque fenêtre de lunettes ouverte et signale un flux sans signal ; avec un seul flux, seule cette image apparaît. Les noms n’incluent jamais le numéro de série des lunettes. Les zébrures et le peaking ne sont pas dessinés ici.";
 "Automatic (next external display)" = "Automatique (prochain écran externe)";
 "Remove output" = "Supprimer la sortie";
+
+"No goggles are open" = "Aucune paire de lunettes ouverte";
+"The SRT passphrase would end up in OBS. Clear it, or add the sources by hand." = "La phrase secrète SRT se retrouverait dans OBS. Effacez-la, ou ajoutez les sources à la main.";
+"OBS refused: %@" = "OBS a refusé : %@";
+"Added %lld, updated %lld. Start each window's %@ output to see video." = "%lld ajoutées, %lld mises à jour. Démarrez la sortie %@ de chaque fenêtre pour voir la vidéo.";
+"Several goggles" = "Plusieurs lunettes";
+"Separate port for each goggles window" = "Port séparé pour chaque fenêtre de lunettes";
+"Window 1 uses the port in Settings, window 2 the next one, and so on (NDI adds a number to the name). Needed to send several goggles at once." = "La fenêtre 1 utilise le port des Réglages, la fenêtre 2 le suivant, et ainsi de suite (NDI ajoute un numéro au nom). Nécessaire pour envoyer plusieurs lunettes à la fois.";
+"Scene" = "Scène";
+"Using" = "Avec";
+"Add all feeds to OBS" = "Ajouter tous les flux à OBS";
+"Creates one Media Source per open goggles, named after the feed (rename feeds under Program output). Press the SRT or UDP button in each window to start sending. Existing sources are updated, never deleted." = "Crée une source média par paire de lunettes ouverte, nommée d’après le flux (renommez les flux dans Sortie programme). Appuyez sur le bouton SRT ou UDP de chaque fenêtre pour démarrer l’envoi. Les sources existantes sont mises à jour, jamais supprimées.";
+"Re-encode at 30 fps (lighter, for several goggles)" = "Réencoder à 30 i/s (plus léger, pour plusieurs lunettes)";
+
+"Each goggles window with a recording or stream uses its own hardware encoder, and a Mac can only encode a limited number of frames per second in total (about 150 on an M1 Pro). At 30 fps, recordings and streams are half as smooth, but twice as many goggles fit. The live view stays at full frame rate." = "Chaque fenêtre de lunettes avec un enregistrement ou un flux utilise son propre encodeur matériel, et un Mac ne peut encoder qu’un nombre limité d’images par seconde au total (environ 150 sur un M1 Pro). À 30 i/s, enregistrements et flux sont moins fluides, mais deux fois plus de lunettes tiennent. La vue en direct reste en pleine fréquence.";

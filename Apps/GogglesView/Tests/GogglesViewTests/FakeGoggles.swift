@@ -270,7 +270,9 @@ final class FakeGoggles {
                 next += UInt64(interval * 1e9)
             }
             guard inFlight.wait(timeout: .now() + 2) == .success else { continue }
-            guard let pb = renderFrame(n, shake: shake) else { inFlight.signal(); n += 1; continue }
+            // Without a pool per iteration, Core Image's autoreleased objects pile up on this thread.
+            let pbOrNil = autoreleasepool { renderFrame(n, shake: shake) }
+            guard let pb = pbOrNil else { inFlight.signal(); n += 1; continue }
             let hostNs = DispatchTime.now().uptimeNanoseconds
             let pts = CMTime(value: Int64(hostNs), timescale: 1_000_000_000)
             let props: CFDictionary? = force ? [kVTEncodeFrameOptionKey_ForceKeyFrame: true] as CFDictionary : nil
@@ -336,13 +338,19 @@ final class FakeGoggles {
         deliverQueue.async { [self] in
             if action.notify { for t in targets { t.noteInputDropped() } }
             guard action.deliver else { return }
+            // Sessions are fed in parallel (each real goggles has its own delivery thread); frames stay in
+            // order because this queue is serial and concurrentPerform returns only when all are done.
             if wantParams, let ps = locked({ bundledParameterSets }) {
-                for t in targets { t.handle(nalData: ps, nalType: 7, isParameterSet: true, hostTime: hostTime) }
+                DispatchQueue.concurrentPerform(iterations: targets.count) {
+                    targets[$0].handle(nalData: ps, nalType: 7, isParameterSet: true, hostTime: hostTime)
+                }
                 locked { _parameterSetsDelivered += 1 }
             }
             for nal in nals {
                 let type = nal[nal.startIndex + 4] & 0x1F
-                for t in targets { t.handle(nalData: nal, nalType: type, isParameterSet: false, hostTime: hostTime) }
+                DispatchQueue.concurrentPerform(iterations: targets.count) {
+                    targets[$0].handle(nalData: nal, nalType: type, isParameterSet: false, hostTime: hostTime)
+                }
             }
             locked {
                 _framesDelivered += 1

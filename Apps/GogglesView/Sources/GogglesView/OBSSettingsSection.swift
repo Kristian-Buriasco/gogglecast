@@ -15,7 +15,20 @@ struct OBSSettingsSection: View {
     @AppStorage(OBSPrefs.stopWithMineKey) private var stopWithMine = false
     @ObservedObject private var obs = OBSIntegration.shared
     @State private var testResult: String?
+    @State private var feedScene = ""
+    @State private var feedProto = OBSFeedProtocol.srt
+    @State private var feedResult: String?
+    @AppStorage(FeedPortPrefs.perFeedKey) private var perFeed = true
+    @ObservedObject private var program = ProgramOutputController.shared
     @State private var testing = false
+
+    private func addFeeds() {
+        let scene = feedScene.isEmpty ? (obs.scenes.first ?? "") : feedScene
+        let feeds = program.available.map { (name: $0.name, slot: FeedSlots.shared.slot(deviceId: $0.id)) }
+        let proto = feedProto
+        feedResult = nil
+        Task { feedResult = await OBSIntegration.shared.addFeedSources(scene: scene, proto: proto, feeds: feeds) }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -61,6 +74,31 @@ struct OBSSettingsSection: View {
                 Toggle("Stop the OBS recording when I stop mine", isOn: $stopWithMine)
                     .accessibilityValue(AccessibilityLabels.onOff(stopWithMine))
                 Text("Only affects a recording GogglesView started in OBS. If a start or stop fails, you see one message here and nothing is retried.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            .disabled(!enabled)
+
+            Divider().padding(.vertical, 2)
+            Text("Several goggles").font(.subheadline)
+            Toggle("Separate port for each goggles window", isOn: $perFeed)
+                .accessibilityValue(AccessibilityLabels.onOff(perFeed))
+            Text("Window 1 uses the port in Settings, window 2 the next one, and so on (NDI adds a number to the name). Needed to send several goggles at once.")
+                .font(.caption).foregroundStyle(.secondary)
+            Group {
+                HStack {
+                    Picker("Scene", selection: $feedScene) {
+                        ForEach(obs.scenes, id: \.self) { Text(verbatim: $0).tag($0) }
+                    }
+                    Picker("Using", selection: $feedProto) {
+                        Text(verbatim: "SRT").tag(OBSFeedProtocol.srt)
+                        Text(verbatim: "UDP").tag(OBSFeedProtocol.udp)
+                    }
+                    .frame(width: 130)
+                }
+                Button("Add all feeds to OBS") { addFeeds() }
+                    .disabled(!obs.isConnected || program.available.isEmpty || (feedScene.isEmpty && obs.scenes.isEmpty))
+                if let feedResult { Text(feedResult).font(.caption).foregroundStyle(.secondary) }
+                Text("Creates one Media Source per open goggles, named after the feed (rename feeds under Program output). Press the SRT or UDP button in each window to start sending. Existing sources are updated, never deleted.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             .disabled(!enabled)

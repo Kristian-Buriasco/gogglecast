@@ -18,6 +18,31 @@ Settings > Display > **Program output (HDMI)**, or Goggles menu > Program Output
 
 Each goggles is one USB connection and one window. Use a powered USB hub and good cables, and test the exact set-up beforehand: it has not been soak-tested for many hours. Check Goggles > Connection Health for each window.
 
+## Several goggles into OBS
+
+- Settings > Streaming > OBS Studio: turn on **Separate port for each goggles window** (on by default). Window 1 uses the SRT/UDP port from Settings, window 2 the next port, and so on; NDI adds a number to the source name ("GogglesView 2"). The first window behaves exactly as before.
+- Connect to OBS, pick a scene and SRT or UDP, press **Add all feeds to OBS**. It makes one Media Source per open goggles, named after the feed (rename feeds under Program output), pointing at that window's port. Press again after opening more goggles: existing sources are updated, never deleted. Then press the SRT or UDP button in each goggles window to start sending.
+- With an SRT passphrase set the button refuses, because the passphrase would be written into OBS. Clear it or add the sources by hand.
+- The Media Source settings are standard but have not been checked against a real OBS yet; if a source stays black, open its properties and check the URL.
+
+## How many goggles one Mac can carry
+
+Measured with software goggles (1080p60) on an M1 Pro, each window decoding, recording and sending UDP at once:
+
+| Goggles | Re-encode on (default) | Re-encode at 30 fps | Re-encode off |
+|--------:|-----------------------:|--------------------:|--------------:|
+| 1 | 60 fps | 60 fps | 60 fps |
+| 2 | 59 fps | 60 fps | 60 fps |
+| 3 | 47 fps | 60 fps | 60 fps |
+| 4 | 37 fps | 60 fps | 60 fps |
+| 6 | 27 fps | 52 fps | 60 fps |
+
+The numbers are the frame rate each window keeps decoding. Recordings and streams run at that rate (half of it with the 30 fps option). Memory stayed flat over 5 minutes with 6 windows recording and sending.
+
+Recordings, streams, replay and the web viewer need a keyframe, which the goggles only send once, so GogglesView re-encodes each window's picture with a hardware encoder (Settings > Streaming > Keyframes). That encoder is the limit: about 150 encoded frames per second in total on this Mac, so 2 goggles at 60 fps, or 5 at 30 fps. **Re-encode at 30 fps** in the same card halves the load. Re-encode off removes the limit, but then a recording or an OBS source that starts after the goggles' one keyframe stays grey, so it only works if every output is started before Share Liveview.
+
+For OBS feeds, plan for 2 goggles at 60 fps or up to 5 at 30 fps per Mac like this one, or one Mac per two goggles. Chips with more encoders (Max, Ultra) should do better but are untested. These are software numbers: check them with the real goggles.
+
 ## A long run
 
 - Keep the Mac on power and awake: GogglesView prevents idle sleep while recording or streaming.

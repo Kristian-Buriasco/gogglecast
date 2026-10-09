@@ -440,6 +440,10 @@
 /* OBSIntegration.swift */
 "Not connected" = "Not connected";
 "Connected to OBS %@" = "Connected to OBS %@";
+"No goggles are open" = "No goggles are open";
+"The SRT passphrase would end up in OBS. Clear it, or add the sources by hand." = "The SRT passphrase would end up in OBS. Clear it, or add the sources by hand.";
+"OBS refused: %@" = "OBS refused: %@";
+"Added %lld, updated %lld. Start each window's %@ output to see video." = "Added %lld, updated %lld. Start each window's %@ output to see video.";
 /* OBSSettingsSection.swift */
 "OBS Studio" = "OBS Studio";
 "Connect to OBS over its WebSocket server to start recording and switch scenes when your goggles go live. Off by default. GogglesView only talks to the host you enter here." = "Connect to OBS over its WebSocket server to start recording and switch scenes when your goggles go live. Off by default. GogglesView only talks to the host you enter here.";
@@ -464,6 +468,13 @@
 "Scene when lost" = "Scene when lost";
 "Stop the OBS recording when I stop mine" = "Stop the OBS recording when I stop mine";
 "Only affects a recording GogglesView started in OBS. If a start or stop fails, you see one message here and nothing is retried." = "Only affects a recording GogglesView started in OBS. If a start or stop fails, you see one message here and nothing is retried.";
+"Several goggles" = "Several goggles";
+"Separate port for each goggles window" = "Separate port for each goggles window";
+"Window 1 uses the port in Settings, window 2 the next one, and so on (NDI adds a number to the name). Needed to send several goggles at once." = "Window 1 uses the port in Settings, window 2 the next one, and so on (NDI adds a number to the name). Needed to send several goggles at once.";
+"Scene" = "Scene";
+"Using" = "Using";
+"Add all feeds to OBS" = "Add all feeds to OBS";
+"Creates one Media Source per open goggles, named after the feed (rename feeds under Program output). Press the SRT or UDP button in each window to start sending. Existing sources are updated, never deleted." = "Creates one Media Source per open goggles, named after the feed (rename feeds under Program output). Press the SRT or UDP button in each window to start sending. Existing sources are updated, never deleted.";
 "Leave unchanged" = "Leave unchanged";
 /* OSDOverlay.swift */
 "%lld dropped" = "%lld dropped";
@@ -638,6 +649,8 @@
 "Keyframes for replay and streams" = "Keyframes for replay and streams";
 "Re-encode with regular keyframes" = "Re-encode with regular keyframes";
 "Bitrate: %lld Mbps" = "Bitrate: %lld Mbps";
+"Re-encode at 30 fps (lighter, for several goggles)" = "Re-encode at 30 fps (lighter, for several goggles)";
+"Each goggles window with a recording or stream uses its own hardware encoder, and a Mac can only encode a limited number of frames per second in total (about 150 on an M1 Pro). At 30 fps, recordings and streams are half as smooth, but twice as many goggles fit. The live view stays at full frame rate." = "Each goggles window with a recording or stream uses its own hardware encoder, and a Mac can only encode a limited number of frames per second in total (about 150 on an M1 Pro). At 30 fps, recordings and streams are half as smooth, but twice as many goggles fit. The live view stays at full frame rate.";
 "The goggles send one keyframe when Share Liveview starts and none after, so instant replay, UDP, RTMP, SRT and the web viewer can't start cleanly later. This re-encodes the picture with a keyframe every second (hardware encoder, runs only while one of those is active). Turn it off to pass the goggles' stream through untouched; clips and late-joining viewers may then show grey until the next keyframe." = "The goggles send one keyframe when Share Liveview starts and none after, so instant replay, UDP, RTMP, SRT and the web viewer can't start cleanly later. This re-encodes the picture with a keyframe every second (hardware encoder, runs only while one of those is active). Turn it off to pass the goggles' stream through untouched; clips and late-joining viewers may then show grey until the next keyframe.";
 /* ReplayBuffer.swift */
 "Instant replay needs the keyframe encoder. Turn it on in Settings > Streaming." = "Instant replay needs the keyframe encoder. Turn it on in Settings > Streaming.";

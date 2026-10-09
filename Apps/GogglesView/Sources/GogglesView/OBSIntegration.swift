@@ -266,6 +266,35 @@ final class OBSIntegration: ObservableObject {
         }
     }
 
+    /// Creates (or updates) one Media Source per open goggles in `scene`, pointing at the matching
+    /// SRT or UDP output. Existing sources with the same name only get their URL refreshed, so a
+    /// second press is harmless and nothing is ever deleted. Returns a one-line result for the card.
+    func addFeedSources(scene: String, proto: OBSFeedProtocol, feeds: [(name: String, slot: Int)]) async -> String {
+        guard isConnected else { return L("Not connected") }
+        guard !feeds.isEmpty else { return L("No goggles are open") }
+        if proto == .srt, !SRTPrefs.passphrase.isEmpty {
+            return L("The SRT passphrase would end up in OBS. Clear it, or add the sources by hand.")
+        }
+        let sources = OBSFeedSources.sources(
+            feeds: feeds, proto: proto, srtMode: SRTPrefs.mode, latencyMs: SRTPrefs.latencyMs,
+            srtBase: SRTPrefs.port, udpBase: NetStreamPrefs.port, perFeed: FeedPortPrefs.perFeed, obsHost: OBSPrefs.host)
+        var created = 0, updated = 0
+        do {
+            let existing = Set(try await client.getInputNames(kind: "ffmpeg_source"))
+            for src in sources {
+                let settings = OBSFeedSources.inputSettings(url: src.url)
+                if existing.contains(src.name) {
+                    try await client.setInputSettings(name: src.name, settings: settings); updated += 1
+                } else {
+                    try await client.createInput(scene: scene, name: src.name, kind: "ffmpeg_source", settings: settings); created += 1
+                }
+            }
+        } catch {
+            return L("OBS refused: %@", error.localizedDescription)
+        }
+        return L("Added %lld, updated %lld. Start each window's %@ output to see video.", created, updated, proto == .srt ? "SRT" : "UDP")
+    }
+
     func refreshScenes() async {
         if let s = try? await client.getSceneList() { scenes = s }
     }
