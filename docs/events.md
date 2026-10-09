@@ -6,7 +6,7 @@ For several goggles on one Mac, with the picture going to a vision mixer, projec
 
 Settings > Display > **Program output (HDMI)**, or Goggles menu > Program Output.
 
-- Shows a clean, borderless, full screen picture on the display you choose. Automatic picks the first external display and never covers your only screen; if you pick your main display on purpose, the output covers your controls (turn it off from the menu bar item).
+- Shows a clean, borderless, full screen picture on the display you choose. Automatic picks the first external display and never covers your only screen; if you pick your main display on purpose, the output covers your controls (turn it off with Goggles menu > Program Output, which stays reachable if it is on another display; with a single display, use the keyboard shortcut for the menu or quit the app).
 - **All feeds in a grid** shows every open goggles window as a tile (1, 2x1, 2x2, 3x2, 3x3, 4x3, 4x4, in the order the windows were opened) with its name, and marks a feed that has lost its signal with NO SIGNAL. Use it as a crew monitor.
 - **One feed** shows a single picture with nothing drawn on it: a fixed goggles, or the one in the active window. Use it as the program picture.
 - Feeds are named "Feed 1, Feed 2, ..." by default. Name them ("Runner 3", up to 24 characters) in the same card. Names never include the goggles serial number.
