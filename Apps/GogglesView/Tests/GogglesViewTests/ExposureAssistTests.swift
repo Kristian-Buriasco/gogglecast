@@ -105,6 +105,15 @@ import CoreGraphics
         #expect(ExposurePrefs.zebraLevel(d) == 50)
     }
 
+    @Test func settersFlipThePreferences() {
+        let d = UserDefaults(suiteName: "exposure-set-\(UUID().uuidString)")!
+        ExposurePrefs.setZebra(true, defaults: d)
+        ExposurePrefs.setPeaking(true, defaults: d)
+        #expect(ExposurePrefs.zebra(d) && ExposurePrefs.peaking(d))
+        ExposurePrefs.setZebra(false, defaults: d)
+        #expect(!ExposurePrefs.zebra(d) && ExposurePrefs.peaking(d))
+    }
+
     @Test func analyzerProducesAnOverlayImageAndClearsWhenOff() async {
         var buf: CVPixelBuffer?
         CVPixelBufferCreate(nil, 1920, 1080, kCVPixelFormatType_32BGRA, [kCVPixelBufferIOSurfacePropertiesKey: [String: Any]()] as CFDictionary, &buf)

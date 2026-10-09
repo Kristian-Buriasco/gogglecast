@@ -114,6 +114,33 @@ final class OBSRuleEngineTests: XCTestCase {
         XCTAssertEqual(e.handle(.streamLive, rules: record, at: at(1)), [])
     }
 
+    /// A start that failed because OBS was not connected is forgotten, so the catch-up on connect
+    /// (which feeds `.streamLive` again) starts the recording and sets the scene.
+    func testCatchUpAfterFailedStartStartsRecordingAndScene() {
+        var e = OBSRuleEngine()
+        let rules = OBSRules(recordWithStream: true, switchScenes: true, liveScene: "Live")
+        XCTAssertEqual(e.handle(.streamLive, rules: rules, at: t0), [.setScene("Live"), .startRecord])
+        e.recordingNotOwned() // what the integration does when the start failed
+        XCTAssertEqual(e.handle(.streamLive, rules: rules, at: at(5)), [.setScene("Live"), .startRecord])
+    }
+
+    func testCatchUpDoesNotRestartARecordingItOwns() {
+        var e = OBSRuleEngine()
+        XCTAssertEqual(e.handle(.streamLive, rules: record, at: t0), [.startRecord])
+        XCTAssertEqual(e.handle(.streamLive, rules: record, at: at(5)), [])
+    }
+
+    func testTrackerReportsLiveWhileAnyDeviceIsLive() {
+        var t = OBSLiveTracker()
+        XCTAssertFalse(t.isLive)
+        _ = t.update(deviceId: "a", live: true)
+        _ = t.update(deviceId: "b", live: true)
+        _ = t.update(deviceId: "a", live: false)
+        XCTAssertTrue(t.isLive)
+        _ = t.update(deviceId: "b", live: false)
+        XCTAssertFalse(t.isLive)
+    }
+
     func testStopsOnlyAfterGrace() {
         var e = OBSRuleEngine()
         _ = e.handle(.streamLive, rules: record, at: t0)

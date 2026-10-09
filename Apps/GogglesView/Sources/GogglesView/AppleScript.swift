@@ -77,6 +77,17 @@ extension NSApplication {
         set { if AutomationPrefs.enabled() { RaceModeController.shared.set(newValue) } }
     }
 
+    /// Zebra stripes and focus peaking in the preview. Settable, same "Allow automation" gate as the commands.
+    @objc var gvZebra: Bool {
+        get { ExposurePrefs.zebra() }
+        set { if AutomationPrefs.enabled() { ExposurePrefs.setZebra(newValue) } }
+    }
+
+    @objc var gvPeaking: Bool {
+        get { ExposurePrefs.peaking() }
+        set { if AutomationPrefs.enabled() { ExposurePrefs.setPeaking(newValue) } }
+    }
+
     @objc var gvBattery: NSNumber? {
         AutomationController.shared.target(device: nil)?.coordinator.batteryPercent.map { NSNumber(value: $0) }
     }

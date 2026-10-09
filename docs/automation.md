@@ -19,6 +19,8 @@ Commands act on the frontmost goggles window (the key window, else the most rece
 | `gogglesview://screenshot` | Take a screenshot |
 | `gogglesview://screenshot/copy` | Copy the current frame to the clipboard (PNG and TIFF) |
 | `gogglesview://freeze/toggle` | Freeze/unfreeze the live view |
+| `gogglesview://zebra/on`, `zebra/off`, `zebra/toggle` | Zebra stripes in the preview (app-wide) |
+| `gogglesview://peaking/on`, `peaking/off`, `peaking/toggle` | Focus peaking in the preview (app-wide) |
 | `gogglesview://marker` | Add a marker to the current recording; optional `?label=Lap%201` |
 | `gogglesview://stream/start` | Start the UDP network stream |
 | `gogglesview://stream/stop` | Stop the UDP network stream |
@@ -56,6 +58,8 @@ osascript -e 'tell application "GogglesView" to get {goggles count, recording, b
 ```
 
 Commands: `start recording`, `stop recording`, `save replay`, `take screenshot`, `copy frame`, `toggle freeze`, `add marker [label text]`, each with an optional `device text`.
+
+Settable properties: `race mode`, `zebra stripes` and `focus peaking` (booleans; need "Allow automation"). Shortcuts has "Toggle Zebra Stripes" and "Toggle Focus Peaking".
 
 Read-only properties (of the frontmost goggles window): `goggles count` (number of open goggles windows), `recording` (boolean), `battery` (percent, or `missing value`), `fps` (decoded fps, or `missing value`).
 

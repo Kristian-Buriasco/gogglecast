@@ -15,6 +15,8 @@ final class AutomationTests: XCTestCase {
             ("marker", .addMarker(label: "Marker")), ("stream/start", .startStream),
             ("stream/stop", .stopStream), ("window/show", .showWindow),
             ("race/on", .raceOn), ("race/off", .raceOff), ("race/toggle", .raceToggle),
+            ("zebra/on", .zebraOn), ("zebra/off", .zebraOff), ("zebra/toggle", .zebraToggle),
+            ("peaking/on", .peakingOn), ("peaking/off", .peakingOff), ("peaking/toggle", .peakingToggle),
         ]
         XCTAssertEqual(expected.map(\.0), AutomationURLParser.examplePaths)
         for (path, cmd) in expected {

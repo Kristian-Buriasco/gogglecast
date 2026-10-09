@@ -59,6 +59,12 @@
 "Show window" = "Show window";
 "Copy frame" = "Copy frame";
 "Toggle race mode" = "Toggle race mode";
+"Zebra stripes on" = "Zebra stripes on";
+"Zebra stripes off" = "Zebra stripes off";
+"Toggle zebra stripes" = "Toggle zebra stripes";
+"Focus peaking on" = "Focus peaking on";
+"Focus peaking off" = "Focus peaking off";
+"Toggle focus peaking" = "Toggle focus peaking";
 "A gogglesview:// command was ignored. To allow URL commands, turn on Settings > Advanced > Automation > Allow gogglesview:// URL commands." = "A gogglesview:// command was ignored. To allow URL commands, turn on Settings > Advanced > Automation > Allow gogglesview:// URL commands.";
 "URL command: %@" = "URL command: %@";
 /* AutomationSettingsSection.swift */

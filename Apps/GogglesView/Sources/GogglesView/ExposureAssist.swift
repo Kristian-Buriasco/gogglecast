@@ -25,6 +25,8 @@ enum ExposurePrefs {
         return min(max(v, 50), 100)
     }
     static func peaking(_ d: UserDefaults = .standard) -> Bool { d.bool(forKey: peakingKey) }
+    static func setZebra(_ on: Bool, defaults d: UserDefaults = .standard) { d.set(on, forKey: zebraKey) }
+    static func setPeaking(_ on: Bool, defaults d: UserDefaults = .standard) { d.set(on, forKey: peakingKey) }
     static func sensitivity(_ d: UserDefaults = .standard) -> PeakingSensitivity {
         PeakingSensitivity(rawValue: d.string(forKey: peakingSensitivityKey) ?? "") ?? .medium
     }

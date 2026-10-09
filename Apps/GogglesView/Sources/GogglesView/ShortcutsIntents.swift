@@ -63,6 +63,12 @@ enum ShortcutsMapping {
         case .raceOn: return "Race mode on"
         case .raceOff: return "Race mode off"
         case .raceToggle: return "Race mode toggled"
+        case .zebraOn: return "Zebra stripes on"
+        case .zebraOff: return "Zebra stripes off"
+        case .zebraToggle: return "Zebra stripes toggled"
+        case .peakingOn: return "Focus peaking on"
+        case .peakingOff: return "Focus peaking off"
+        case .peakingToggle: return "Focus peaking toggled"
         }
     }
 
@@ -232,6 +238,24 @@ struct ToggleFreezeIntent: AppIntent {
     }
 }
 
+struct ToggleZebraIntent: AppIntent {
+    static let title: LocalizedStringResource = "Toggle Zebra Stripes"
+    static let description = IntentDescription("Turn the zebra stripes exposure aid on or off in the preview.")
+    static let openAppWhenRun = false
+    @MainActor func perform() async throws -> some IntentResult & ProvidesDialog {
+        .result(dialog: IntentDialog(stringLiteral: try ShortcutsRunner.run(.zebraToggle, device: nil)))
+    }
+}
+
+struct ToggleFocusPeakingIntent: AppIntent {
+    static let title: LocalizedStringResource = "Toggle Focus Peaking"
+    static let description = IntentDescription("Turn focus peaking on or off in the preview.")
+    static let openAppWhenRun = false
+    @MainActor func perform() async throws -> some IntentResult & ProvidesDialog {
+        .result(dialog: IntentDialog(stringLiteral: try ShortcutsRunner.run(.peakingToggle, device: nil)))
+    }
+}
+
 struct ShowWindowIntent: AppIntent {
     static let title: LocalizedStringResource = "Show Goggles Window"
     static let description = IntentDescription("Bring the goggles window (or the device picker) to the front.")
@@ -311,6 +335,12 @@ struct GogglesViewShortcuts: AppShortcutsProvider {
         AppShortcut(intent: ToggleFreezeIntent(), phrases: [
             "Freeze the view in \(.applicationName)",
         ], shortTitle: "Toggle Freeze", systemImageName: "snowflake")
+        AppShortcut(intent: ToggleZebraIntent(), phrases: [
+            "Toggle zebra stripes in \(.applicationName)",
+        ], shortTitle: "Toggle Zebra Stripes", systemImageName: "line.diagonal")
+        AppShortcut(intent: ToggleFocusPeakingIntent(), phrases: [
+            "Toggle focus peaking in \(.applicationName)",
+        ], shortTitle: "Toggle Focus Peaking", systemImageName: "scope")
         AppShortcut(intent: GetStatusIntent(), phrases: [
             "Get \(.applicationName) status",
         ], shortTitle: "Get Status", systemImageName: "info.circle")

@@ -788,3 +788,10 @@
 "Stripes mark areas that are close to white, so you can see where highlights clip. Peaking colours sharp edges. Both only appear in the preview; recordings and streams are not changed. Race mode turns them off." = "Les zébrures marquent les zones proches du blanc, pour voir où les hautes lumières saturent. Le peaking colore les contours nets. Les deux n’apparaissent que dans l’aperçu ; enregistrements et flux ne sont pas modifiés. Le mode course les désactive.";
 "Zebra Stripes" = "Zébrures";
 "Focus Peaking" = "Focus peaking";
+
+"Zebra stripes on" = "Zébrures activées";
+"Zebra stripes off" = "Zébrures désactivées";
+"Toggle zebra stripes" = "Activer/désactiver les zébrures";
+"Focus peaking on" = "Focus peaking activé";
+"Focus peaking off" = "Focus peaking désactivé";
+"Toggle focus peaking" = "Activer/désactiver le focus peaking";

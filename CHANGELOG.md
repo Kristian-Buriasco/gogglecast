@@ -5,7 +5,11 @@ All notable changes to this project are documented here. Format based on [Keep a
 ## [Unreleased]
 
 ### Added
+- Zebra stripes and focus peaking can be switched from automation: URL commands (`zebra/on|off|toggle`, `peaking/on|off|toggle`), AppleScript properties (`zebra stripes`, `focus peaking`) and two Shortcuts actions.
 - `gvnet` (Tools/gvnet): an experimental command-line client for Linux and Windows (and macOS) that reads the goggles' liveview over a network interface and writes raw H.264 to a file, stdout or UDP. Tested against a fake goggles on loopback, CI builds, tests and loopback-runs it on Linux and Windows. Not yet tried on real goggles outside macOS. Prebuilt Linux (x86_64, arm64) and Windows binaries are attached to releases by CI. See `docs/linux-and-windows.md`.
+
+### Fixed
+- OBS rules catch up when OBS connects: if the goggles are already live when the connection comes up, the scene is set and the recording starts, instead of the earlier event being lost.
 
 ### Developer
 - CI builds and tests `gvnet` on Linux and Windows. `GogglesProtocol` builds on Linux; four of its tests need the `clean-start.gvcap` capture that is not in the repository and fail without it (also on macOS).

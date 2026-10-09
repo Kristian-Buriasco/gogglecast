@@ -133,6 +133,8 @@ struct OBSRuleEngine {
 struct OBSLiveTracker {
     private(set) var liveDevices: Set<String> = []
 
+    var isLive: Bool { !liveDevices.isEmpty }
+
     /// Returns the combined transition, if any.
     mutating func update(deviceId: String, live: Bool) -> OBSRuleEngine.Input? {
         let wasLive = !liveDevices.isEmpty
@@ -202,6 +204,14 @@ final class OBSIntegration: ObservableObject {
         feed(.sessionDisconnected)
     }
 
+    /// Events that arrived while OBS was not connected were dropped (the actions failed). When the
+    /// connection comes up and the goggles are live, apply the "live" rules now: scene and recording.
+    /// A recording OBS is already running is left alone (see `run`).
+    func catchUp() {
+        guard OBSPrefs.enabled, tracker.isLive else { return }
+        feed(.streamLive)
+    }
+
     private func feed(_ input: OBSRuleEngine.Input) {
         guard OBSPrefs.enabled else { return }
         let actions = engine.handle(input, rules: OBSPrefs.rules, at: Date())
@@ -240,6 +250,7 @@ final class OBSIntegration: ObservableObject {
                 isConnected = true
                 status = L("Connected to OBS %@", v?.obsVersion ?? "").trimmingCharacters(in: .whitespaces)
                 await refreshScenes()
+                catchUp()
                 await client.waitUntilClosed()
                 isConnected = false
                 status = L("Not connected")

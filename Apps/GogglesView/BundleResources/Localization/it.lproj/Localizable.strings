@@ -857,3 +857,10 @@
 "Stripes mark areas that are close to white, so you can see where highlights clip. Peaking colours sharp edges. Both only appear in the preview; recordings and streams are not changed. Race mode turns them off." = "Le strisce segnano le aree vicine al bianco, così vedi dove le alte luci si bruciano. Il peaking colora i bordi nitidi. Compaiono solo nell'anteprima; registrazioni e streaming non cambiano. La modalità gara li disattiva.";
 "Zebra Stripes" = "Zebra";
 "Focus Peaking" = "Focus peaking";
+
+"Zebra stripes on" = "Zebra attiva";
+"Zebra stripes off" = "Zebra disattivata";
+"Toggle zebra stripes" = "Attiva/disattiva zebra";
+"Focus peaking on" = "Focus peaking attivo";
+"Focus peaking off" = "Focus peaking disattivato";
+"Toggle focus peaking" = "Attiva/disattiva focus peaking";

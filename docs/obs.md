@@ -32,7 +32,7 @@ Each rule is off until you switch it on. They only react to GogglesView changes 
 - Switch OBS scenes: switches to the scene you choose when live and to another when lost. Pick "Leave unchanged" to skip one of them. The lists are filled from OBS when connected.
 - Stop the OBS recording when I stop mine: when you stop GogglesView's own recording, the OBS recording that GogglesView started is stopped too.
 
-If OBS is not reachable when something should happen, you see one message in the card and nothing is retried or queued.
+If OBS is not reachable when something should happen, you see one message in the card and nothing is retried or queued. The one exception is a catch-up when the connection comes up: if the goggles are live at that moment (OBS started late, or the connection dropped and came back), the "live" rules run then, so the scene is set and the recording starts. An OBS recording that is already running is still left alone. A goggles signal that was lost while OBS was away is not replayed.
 
 ## Privacy
 

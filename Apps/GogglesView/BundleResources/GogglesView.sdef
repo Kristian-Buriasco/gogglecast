@@ -71,6 +71,12 @@
             <property name="race mode" code="gRce" type="boolean" access="rw" description="Lowest-latency preview (no stabilizer, LUT, overlays).">
                 <cocoa key="gvRaceMode"/>
             </property>
+            <property name="zebra stripes" code="gZeb" type="boolean" access="rw" description="Zebra stripes over bright areas in the preview.">
+                <cocoa key="gvZebra"/>
+            </property>
+            <property name="focus peaking" code="gPek" type="boolean" access="rw" description="Colour on sharp edges in the preview.">
+                <cocoa key="gvPeaking"/>
+            </property>
             <property name="battery" code="gBat" access="r" description="Goggles battery percent, or missing value.">
                 <type type="integer"/>
                 <type type="missing value"/>

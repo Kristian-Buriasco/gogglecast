@@ -83,6 +83,12 @@ extension AutomationCommand {
         case .raceOn: return L("Race mode on")
         case .raceOff: return L("Race mode off")
         case .raceToggle: return L("Toggle race mode")
+        case .zebraOn: return L("Zebra stripes on")
+        case .zebraOff: return L("Zebra stripes off")
+        case .zebraToggle: return L("Toggle zebra stripes")
+        case .peakingOn: return L("Focus peaking on")
+        case .peakingOff: return L("Focus peaking off")
+        case .peakingToggle: return L("Toggle focus peaking")
         }
     }
 }
@@ -97,6 +103,8 @@ enum AutomationCommand: Equatable {
     case startStream, stopStream
     case showWindow
     case raceOn, raceOff, raceToggle
+    case zebraOn, zebraOff, zebraToggle
+    case peakingOn, peakingOff, peakingToggle
 }
 
 struct AutomationRequest: Equatable {
@@ -118,6 +126,7 @@ enum AutomationURLParser {
         "record/start", "record/stop", "record/toggle", "replay/save", "screenshot", "screenshot/copy",
         "freeze/toggle", "marker", "stream/start", "stream/stop", "window/show",
         "race/on", "race/off", "race/toggle",
+        "zebra/on", "zebra/off", "zebra/toggle", "peaking/on", "peaking/off", "peaking/toggle",
     ]
 
     static func parse(_ url: URL) -> AutomationRequest? {
@@ -164,6 +173,12 @@ enum AutomationURLParser {
         case "race/on": command = .raceOn
         case "race/off": command = .raceOff
         case "race/toggle": command = .raceToggle
+        case "zebra/on": command = .zebraOn
+        case "zebra/off": command = .zebraOff
+        case "zebra/toggle": command = .zebraToggle
+        case "peaking/on": command = .peakingOn
+        case "peaking/off": command = .peakingOff
+        case "peaking/toggle": command = .peakingToggle
         default: return nil
         }
         return AutomationRequest(command: command, device: device)
@@ -297,6 +312,12 @@ final class AutomationController: NSObject {
         case .raceOn: RaceModeController.shared.set(true); return .done
         case .raceOff: RaceModeController.shared.set(false); return .done
         case .raceToggle: RaceModeController.shared.toggle(); return .done
+        case .zebraOn: ExposurePrefs.setZebra(true); return .done
+        case .zebraOff: ExposurePrefs.setZebra(false); return .done
+        case .zebraToggle: ExposurePrefs.setZebra(!ExposurePrefs.zebra()); return .done
+        case .peakingOn: ExposurePrefs.setPeaking(true); return .done
+        case .peakingOff: ExposurePrefs.setPeaking(false); return .done
+        case .peakingToggle: ExposurePrefs.setPeaking(!ExposurePrefs.peaking()); return .done
         default: break
         }
         guard let session = target(device: request.device) else {
@@ -323,7 +344,8 @@ final class AutomationController: NSObject {
         case .startStream: post(.gogglesNetworkStreamStart)
         case .stopStream: post(.gogglesNetworkStreamStop)
         case .showWindow: session.focus()
-        case .raceOn, .raceOff, .raceToggle: break
+        case .raceOn, .raceOff, .raceToggle, .zebraOn, .zebraOff, .zebraToggle,
+             .peakingOn, .peakingOff, .peakingToggle: break
         }
         return .done
     }
