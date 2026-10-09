@@ -440,6 +440,10 @@ if args.contains("--run") || !args.dropFirst().contains(where: { $0.hasPrefix("-
     NotificationCenter.default.addObserver(forName: .gogglesRaceModeChanged, object: nil, queue: .main) { _ in
         raceMenuItem.state = RaceModePrefs.enabled ? .on : .off
     }
+    let programMenuTarget = MenuActionTarget { ProgramOutputController.shared.toggle() }
+    let programMenuItem = NSMenuItem(title: L("Program Output"), action: #selector(MenuActionTarget.invoke), keyEquivalent: "")
+    programMenuItem.target = programMenuTarget
+    gogglesMenu.addItem(programMenuItem)
     let zebraMenuTarget = MenuActionTarget { UserDefaults.standard.set(!ExposurePrefs.zebra(), forKey: ExposurePrefs.zebraKey) }
     let zebraMenuItem = NSMenuItem(title: L("Zebra Stripes"), action: #selector(MenuActionTarget.invoke), keyEquivalent: "")
     zebraMenuItem.target = zebraMenuTarget
@@ -451,6 +455,7 @@ if args.contains("--run") || !args.dropFirst().contains(where: { $0.hasPrefix("-
     let syncExposureMenu = {
         zebraMenuItem.state = ExposurePrefs.zebra() ? .on : .off
         peakingMenuItem.state = ExposurePrefs.peaking() ? .on : .off
+        programMenuItem.state = ProgramOutputPrefs.enabled() ? .on : .off
     }
     syncExposureMenu()
     NotificationCenter.default.addObserver(forName: UserDefaults.didChangeNotification, object: nil, queue: .main) { _ in syncExposureMenu() }
@@ -620,6 +625,8 @@ if args.contains("--run") || !args.dropFirst().contains(where: { $0.hasPrefix("-
         showWithoutSession: { presentPicker() }
     )
     RaceModeController.shared.install(sessions: { registry.all })
+    ProgramOutputController.shared.install(sessions: { registry.all }, active: { registry.activeSession })
+    _ = registry.addObserver { ProgramOutputController.shared.sessionsChanged() }
     // Sleep and wake handling, plus no idle sleep or App Nap while recording or streaming.
     PowerEvents.shared.install(sessions: { registry.all }, isBusy: { SessionControlBoard.shared.anyActiveOutput })
     presentPicker()

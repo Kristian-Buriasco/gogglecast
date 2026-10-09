@@ -5,6 +5,7 @@
 - [latency.md](latency.md): benchmark / latency mode and how to read the numbers.
 - [localization.md](localization.md): how the app is translated, how to add a language, the check script.
 - [linux-and-windows.md](linux-and-windows.md): `gvnet`, the early command-line client for Linux and Windows.
+- [events.md](events.md): running several goggles at an event, with the HDMI program output.
 - [dev-setup.md](dev-setup.md): helper registration, signing and the dev iteration loop.
 - [design.md](design.md): architecture and design decisions.
 - [parity-results.md](parity-results.md): parity-gate measurements against the reference pipeline.

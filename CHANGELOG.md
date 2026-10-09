@@ -5,6 +5,7 @@ All notable changes to this project are documented here. Format based on [Keep a
 ## [Unreleased]
 
 ### Added
+- Program output (Settings > Display, Goggles menu): a clean full screen picture on a chosen display, such as an HDMI output to a vision mixer or projector. Either a grid of every open goggles feed with names and a NO SIGNAL marker, or one feed on its own. Feed names are chosen by you and never contain a serial number. See `docs/events.md`.
 - Dutch. The app follows the macOS language: set macOS to Dutch and the interface appears in Dutch (791 strings, same scope as Italian and French). The translation is machine-assisted: corrections are welcome, see `docs/localization.md`.
 
 ## [0.8.1] - 2026-10-09
@@ -14,6 +15,7 @@ All notable changes to this project are documented here. Format based on [Keep a
 - `gvnet` (Tools/gvnet): an experimental command-line client for Linux and Windows (and macOS) that reads the goggles' liveview over a network interface and writes raw H.264 to a file, stdout or UDP. Tested against a fake goggles on loopback, CI builds, tests and loopback-runs it on Linux and Windows. Not yet tried on real goggles outside macOS. Prebuilt Linux (x86_64, arm64) and Windows binaries are attached to releases by CI. See `docs/linux-and-windows.md`.
 
 ### Fixed
+- Zebra stripes and focus peaking no longer appear in the capture window (they are for the operator's preview only).
 - OBS rules catch up when OBS connects: if the goggles are already live when the connection comes up, the scene is set and the recording starts, instead of the earlier event being lost.
 
 ### Developer

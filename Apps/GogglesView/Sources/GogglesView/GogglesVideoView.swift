@@ -200,7 +200,10 @@ struct GogglesVideoView: NSViewRepresentable {
         } else {
             session.attach(renderer: view.displayLayer)
         }
-        session.addExposureSink(owner: view) { [weak view] image in view?.setExposureOverlay(image) }
+        // Zebra and peaking are for the operator's own preview, never for capture or program windows.
+        if !isSecondary {
+            session.addExposureSink(owner: view) { [weak view] image in view?.setExposureOverlay(image) }
+        }
         view.onFailedToDecode = { [weak session] error in
             session?.recordExternalFailure(error)
         }
