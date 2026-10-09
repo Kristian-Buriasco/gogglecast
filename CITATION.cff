@@ -8,6 +8,6 @@ authors:
 repository-code: "https://github.com/Kristian-Buriasco/gogglecast"
 url: "https://github.com/Kristian-Buriasco/gogglecast"
 license: GPL-3.0-or-later
-version: 0.8.0
+version: 0.8.1
 date-released: 2026-10-08
 abstract: "Free macOS live view for the DJI Goggles 3 over USB-C."
