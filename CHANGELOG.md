@@ -4,6 +4,8 @@ All notable changes to this project are documented here. Format based on [Keep a
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-10-09
+
 ### Added
 - Zebra stripes and focus peaking can be switched from automation: URL commands (`zebra/on|off|toggle`, `peaking/on|off|toggle`), AppleScript properties (`zebra stripes`, `focus peaking`) and two Shortcuts actions.
 - `gvnet` (Tools/gvnet): an experimental command-line client for Linux and Windows (and macOS) that reads the goggles' liveview over a network interface and writes raw H.264 to a file, stdout or UDP. Tested against a fake goggles on loopback, CI builds, tests and loopback-runs it on Linux and Windows. Not yet tried on real goggles outside macOS. Prebuilt Linux (x86_64, arm64) and Windows binaries are attached to releases by CI. See `docs/linux-and-windows.md`.
