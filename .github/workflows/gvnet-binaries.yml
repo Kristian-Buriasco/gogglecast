@@ -53,6 +53,11 @@ jobs:
         run: |
           New-Item -ItemType Directory out | Out-Null
           Copy-Item Tools/gvnet/.build/release/gvnet.exe out/
+          # The Swift runtime is not linked statically on Windows: ship its DLLs next to the exe.
+          $core = (Get-Command swiftCore.dll -ErrorAction Stop).Source
+          $runtime = Split-Path $core
+          Write-Host "Swift runtime DLLs from $runtime"
+          Get-ChildItem $runtime -Filter *.dll | Copy-Item -Destination out/
           Copy-Item Tools/gvnet/scripts/fake_goggles.py out/
           Compress-Archive -Path out/* -DestinationPath gvnet-${{ matrix.name }}.zip
       - name: Smoke test the packaged binary
