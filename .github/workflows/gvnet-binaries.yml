@@ -72,6 +72,8 @@ jobs:
           # Clean PATH: the packaged exe must not depend on the Swift toolchain's DLLs.
           $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot"
           $text = (& "$PWD/out/gvnet.exe" --bogus 2>&1 | Out-String)
+          Write-Host "exit code: $LASTEXITCODE"
+          Write-Host "output: $text"
           if ($LASTEXITCODE -ne 2 -or $text -notmatch "usage: gvnet") { throw "packaged gvnet.exe did not start (exit $LASTEXITCODE): $text" }
       - uses: actions/upload-artifact@v4
         with:
