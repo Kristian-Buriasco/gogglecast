@@ -1,11 +1,12 @@
 # Localization
 
-GogglesView is available in English, Italian and French. The app follows the macOS language
+GogglesView is available in English, Italian, French and Dutch. The app follows the macOS language
 (System Settings > General > Language & Region). Adding another language means adding one
 folder of text; no code changes.
 
-The Italian and French translations are machine-assisted. Corrections are welcome: open an
-issue or a pull request that edits `it.lproj/Localizable.strings` or `fr.lproj/Localizable.strings`.
+The Italian, French and Dutch translations are machine-assisted. Corrections are welcome: open an
+issue or a pull request that edits `it.lproj/Localizable.strings`, `fr.lproj/Localizable.strings` or
+`nl.lproj/Localizable.strings`.
 
 ## How it works
 
@@ -17,6 +18,7 @@ Apps/GogglesView/BundleResources/Localization/
   en.lproj/Localizable.strings    generated, every key maps to itself
   it.lproj/Localizable.strings    Italian
   fr.lproj/Localizable.strings    French
+  nl.lproj/Localizable.strings    Dutch
 ```
 
 `Apps/GogglesView/build-stub-bundle.sh` copies every `*.lproj` folder into
@@ -134,6 +136,22 @@ English; use the assembled bundle.
 * "Goggles" is "lunettes", "recording" is "enregistrement", "marker" is "marqueur", "clip
   gallery" is "galerie de clips", "race mode" is "mode course", "Trash" is "corbeille",
   "Keychain" is "trousseau", "System Settings" is "Réglages Système".
+* Not translated: the same categories as for Italian (log messages, diagnostics and health
+  report text, file names, URL scheme, AppleScript dictionary, Shortcuts action names, web
+  viewer page, developer tools).
+
+## Translation notes (Dutch)
+
+* Natural, concise UI Dutch in the style of macOS, for Dutch and Belgian users alike, without
+  regional slang: infinitive or imperative for buttons and menu items (Opname starten, Open,
+  Annuleer), "je" in sentences, "u" avoided.
+* Kept in English: GogglesView, DJI, Goggles 3, OBS, NDI, SRT, RTMP, UDP, HLS, LUT, bitrate,
+  codec, Mbps, fps, focus peaking, keyframe, replay, webhook, and the names of the goggles' own
+  menu entries ("Share Liveview", "OTG Wired Connection to Computer").
+* "Goggles" is "bril" (plural "brillen"), "recording" is "opname", "marker" is "markering",
+  "clip gallery" is "clipgalerij", "race mode" is "racemodus", "Trash" is "prullenmand",
+  "Keychain" is "sleutelhanger", "System Settings" is "Systeminstellingen", "Login Items &
+  Extensions" is "Inlogonderdelen en extensies", "Shortcuts" is "Opdrachten", "tag" stays "tag".
 * Not translated: the same categories as for Italian (log messages, diagnostics and health
   report text, file names, URL scheme, AppleScript dictionary, Shortcuts action names, web
   viewer page, developer tools).

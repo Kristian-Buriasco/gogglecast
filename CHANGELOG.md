@@ -4,6 +4,9 @@ All notable changes to this project are documented here. Format based on [Keep a
 
 ## [Unreleased]
 
+### Added
+- Dutch. The app follows the macOS language: set macOS to Dutch and the interface appears in Dutch (791 strings, same scope as Italian and French). The translation is machine-assisted: corrections are welcome, see `docs/localization.md`.
+
 ## [0.8.1] - 2026-10-09
 
 ### Added
