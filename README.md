@@ -53,6 +53,14 @@ The clip gallery picture uses generated sample clips, and the menu picture is re
 - Secrets (stream key, tokens, webhooks) kept in the Keychain.
 - Available in English, Italian and French (machine-assisted, corrections welcome); more languages can be added, see [docs/localization.md](docs/localization.md).
 
+## Zebra stripes and focus peaking
+
+Zebra marks blown highlights and focus peaking outlines the sharpest edges, both drawn on the live view. In the picture below, zebra is set to 95 and peaking is green at medium strength: the sky and sun are striped, and the edges of the gate and the in-focus cone are outlined while the blurred cone is not.
+
+![A test scene with zebra stripes on the bright sky and sun and green focus peaking on sharp edges](docs/images/zebra-peaking.png)
+
+The scene is generated, not a goggles frame.
+
 ## The goggles' overlay
 
 The goggles draw their own overlay (flight data, battery, link strength, storage warnings) into the video they send, so it also appears in OBS, recordings and streams. With a drone linked, the camera picture sat in the middle of the frame at about 70% of its width and height, with the overlay in the margins.
@@ -62,6 +70,10 @@ The goggles draw their own overlay (flight data, battery, link strength, storage
 To get a clean picture, turn the overlay off on the goggles or crop it out. With the goggles' display scale at about 70%, a centred crop of about 1.4x (Settings > Display > Output framing zoom, or your editor) lands on the picture, and the uncropped original keeps the data. The app tells you once when you first start a stream or the capture window.
 
 Frame rate follows what the goggles send: about 35 frames per second in our test with a drone linked, 60 in an earlier one.
+
+## Linux and Windows (early)
+
+`gvnet` is a command line tool that receives the goggles' stream over the network, so it can run outside macOS. It is early: it has not yet been tried on real goggles outside macOS. See [docs/linux-and-windows.md](docs/linux-and-windows.md).
 
 ## Requirements
 
