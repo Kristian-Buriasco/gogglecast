@@ -27,11 +27,11 @@ enum OverlayHint {
         switch kind {
         case .output:
             return (L("The goggles' overlay will be in your stream"),
-                    L("The goggles draw their own on-screen display (flight data, battery, storage warnings) into the picture they send, so it appears in OBS, recordings and streams too.\n\nYou can turn it off on the goggles, or crop it out here with Output framing. That crop only affects what you record and stream; the preview stays as it is.\n\nTip: to crop the picture later but keep the overlay's data in the original, set the goggles' display scale to about 70%. The picture then sits inside the frame and a centred crop of about 1.4x (Output framing zoom, or your editor) removes the overlay."),
+                    L("The goggles draw their own on-screen display (flight data, battery, storage warnings) into the picture they send, so it appears in OBS, recordings and streams too.\n\nTo turn it off, open the goggles' Settings > Camera > Advanced camera settings > Camera View Recording and switch it off. Or crop it out here with Output framing. That crop only affects what you record and stream; the preview stays as it is."),
                     L("Open output framing"))
         case .captureWindow:
             return (L("The goggles' overlay will be in your capture"),
-                    L("The goggles draw their own on-screen display (flight data, battery, storage warnings) into the picture they send, so a Window Capture of this window shows it too.\n\nYou can turn it off on the goggles, or zoom or crop it out with Framing, which also applies to this window.\n\nTip: set the goggles' display scale to about 70% and zoom this window to about 1.4x to hide the overlay while the goggles still send it."),
+                    L("The goggles draw their own on-screen display (flight data, battery, storage warnings) into the picture they send, so a Window Capture of this window shows it too.\n\nTo turn it off, open the goggles' Settings > Camera > Advanced camera settings > Camera View Recording and switch it off. Or zoom or crop it out with Framing, which also applies to this window."),
                     L("Open framing"))
         }
     }

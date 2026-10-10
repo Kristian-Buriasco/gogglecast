@@ -129,6 +129,9 @@ final class DecodeSession: ObservableObject {
 
     /// The stabilizer's own state (cost, bypass), for the Settings caption and tests.
     var stabilizerBypassed: Bool { stabilizer.isBypassed }
+    var stabilizerStats: StabilizerStats { stabilizer.stats }
+    func resetStabilizerStats() { stabilizer.resetStats() }
+    func takeStabilizerMotionLog() -> [CGPoint] { stabilizer.takeMotionLog() }
 
     /// Fired (on whatever queue `handle`/`recordExternalFailure` is called
     /// on) whenever a sample is dropped -- parameter-set parse failure,

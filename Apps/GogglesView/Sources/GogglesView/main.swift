@@ -802,6 +802,54 @@ if args.contains("--force-state") {
 }
 #endif
 
+if args.contains("--stab-probe") {
+    // Dev probe: run the real helper stream through the stabilizer for a few seconds (forced on, in this process
+    // only) and print per second how much motion it measured and how much it corrected. Hold the camera still,
+    // then shake it, to see whether the correction follows the shake.
+    var seconds: Double = 20
+    if let i = args.firstIndex(of: "--stab-probe"), i + 1 < args.count, let v = Double(args[i + 1]) { seconds = v }
+    UserDefaults.standard.setVolatileDomain(["stabilizeEnabled": true, "stabilizeStrength": 0.6], forName: UserDefaults.argumentDomain)
+    Stabilizer.probeResidual = true
+    let session = DecodeSession()
+    let client = HelperClient()
+    client.onNALUnit = { data, nalType, isParameterSet, hostTime in
+        session.handle(nalData: data, nalType: nalType, isParameterSet: isParameterSet, hostTime: hostTime)
+    }
+    client.connect()
+    var finished = false
+    var chosen: String?
+    DispatchQueue.global().asyncAfter(deadline: .now() + 1.0) {
+        pollFirstAvailableDeviceId(client: client) { deviceId in
+            guard let deviceId else { print("[stab-probe] no device"); finished = true; return }
+            chosen = deviceId
+            client.startStreaming(deviceId: deviceId) { ok, _ in print("[stab-probe] startStreaming ok=\(ok)") }
+        }
+    }
+    var lastFrames = 0
+    var next = Date().addingTimeInterval(2)
+    let end = Date().addingTimeInterval(seconds + 3)
+    while !finished, Date() < end {
+        RunLoop.main.run(mode: .default, before: Date().addingTimeInterval(0.05))
+        if Date() >= next {
+            next = Date().addingTimeInterval(1)
+            let s = session.stabilizerStats
+            session.resetStabilizerStats()
+            print(String(format: "[stab-probe] frames=%3d resets=%2d measureFail=%2d outliers=%2d motion=%.2f correction=%.2f residual=%.2f zoom=%.2fx bypass=%@",
+                         s.frames, s.resets, s.measureFailures, s.outliers, s.meanMotionPx, s.meanCorrectionPx, s.meanResidualPx, s.meanZoom, session.stabilizerBypassed ? "yes" : "no"))
+            lastFrames = s.frames
+        }
+    }
+    if let path = ProcessInfo.processInfo.environment["STAB_DUMP"] {
+        let rows = session.takeStabilizerMotionLog().map { String(format: "%.3f,%.3f", $0.x, $0.y) }.joined(separator: "\n")
+        try? ("dx,dy\n" + rows + "\n").write(toFile: path, atomically: true, encoding: .utf8)
+        print("[stab-probe] wrote motion log to \(path)")
+    }
+    if let id = chosen { client.stopStreaming(deviceId: id) { client.disconnect() } }
+    RunLoop.main.run(until: Date().addingTimeInterval(1))
+    print("--stab-probe: done")
+    exit(0)
+}
+
 if args.contains("--test-client") {
     // Task 3.1's hardware-verification harness (brief point 3): connect via
     // `HelperClient`, call `startStreaming`, log fps for a few seconds, exit.

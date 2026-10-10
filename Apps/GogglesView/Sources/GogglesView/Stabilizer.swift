@@ -23,8 +23,17 @@ enum StabilizerPrefs {
         return min(max(v, 0), 1)
     }
 
-    /// Fraction of each edge reserved for the correction (the zoom that hides it): 4% to 10%.
+    /// Most that can be cropped from each edge for the correction (the zoom that hides it): 4% to 10%.
     static func margin(forStrength s: Double) -> Double { 0.04 + 0.06 * min(max(s, 0), 1) }
+    /// Crop used while the picture is steady: the zoom only grows when a correction needs the room.
+    static let restingMargin = 0.02
+
+    /// The crop to use now: as much as the recent corrections needed (instant attack, slow release via `peak`,
+    /// the largest correction seen lately as a fraction of the frame), never above `cap`, never below the resting
+    /// crop. Always at least what the current correction needs, so the frame edge is never revealed.
+    static func effectiveMargin(peak: Double, cap: Double) -> Double {
+        min(cap, max(restingMargin, peak + 0.01))
+    }
 }
 
 /// Low-pass filter of the cumulative camera path. Pure math, no images.
@@ -127,6 +136,27 @@ final class StabilizerStatus: ObservableObject {
     }
 }
 
+/// What the stabilizer did since the last `resetStats()`: for diagnostics and the `--stab-probe` dev flag.
+struct StabilizerStats: Equatable {
+    var frames = 0
+    /// Frames that started a new path because the frame timeline jumped (or the decoder reset).
+    var resets = 0
+    /// Frames where the motion measurement failed.
+    var measureFailures = 0
+    /// Frames whose measured motion was implausibly large and was ignored (see `Stabilizer.gate`).
+    var outliers = 0
+    var sumMotionPx = 0.0       // |motion| per frame, summed
+    var sumCorrectionPx = 0.0   // |correction| per frame, summed
+    /// Motion measured again on the stabilized output (probe only, see `Stabilizer.probeResidual`).
+    var sumResidualPx = 0.0
+    var residualFrames = 0
+    var meanResidualPx: Double { residualFrames > 0 ? sumResidualPx / Double(residualFrames) : 0 }
+    var sumZoom = 0.0
+    var meanZoom: Double { frames > 0 ? sumZoom / Double(frames) : 1 }
+    var meanMotionPx: Double { frames > 0 ? sumMotionPx / Double(frames) : 0 }
+    var meanCorrectionPx: Double { frames > 0 ? sumCorrectionPx / Double(frames) : 0 }
+}
+
 final class Stabilizer {
     private let lock = NSLock()
     /// Guards the small cross-thread state below, so readers never wait for a frame to finish.
@@ -136,6 +166,15 @@ final class Stabilizer {
     private var clockWatch = FrameClockWatch()
     private var resetRequested = false
     private var reportedBypass = false
+    private var _stats = StabilizerStats()
+    private var previousOutSmall: CVPixelBuffer?
+    /// Largest recent correction as a fraction of the frame (decays slowly), drives the adaptive zoom.
+    private var correctionPeak = 0.0
+    /// Dev probe: also measure the motion left in the stabilized output (costs a second analysis per frame).
+    nonisolated(unsafe) static var probeResidual = false
+    /// Dev probe: the raw measured motion of every frame, in order (full-size pixels), for offline tuning.
+    private(set) var motionLog: [CGPoint] = []
+    func takeMotionLog() -> [CGPoint] { statLock.lock(); defer { statLock.unlock() }; let l = motionLog; motionLog = []; return l }
     private let ci = CIContext(options: [.cacheIntermediates: false])
     private var smoother = PathSmoother(strength: StabilizerPrefs.defaultStrength)
     private var previousSmall: CVPixelBuffer?
@@ -154,6 +193,9 @@ final class Stabilizer {
         statLock.lock(); defer { statLock.unlock() }
         return budget.isBypassed(atMs: Self.nowMs())
     }
+
+    var stats: StabilizerStats { statLock.lock(); defer { statLock.unlock() }; return _stats }
+    func resetStats() { statLock.lock(); _stats = StabilizerStats(); statLock.unlock() }
 
     private static func nowMs() -> Double { Double(DispatchTime.now().uptimeNanoseconds) / 1_000_000 }
 
@@ -200,7 +242,10 @@ final class Stabilizer {
         let doReset = resetRequested
         resetRequested = false
         statLock.unlock()
-        if doReset { previousSmall = nil; smoother.reset() }
+        if doReset {
+            previousSmall = nil; smoother.reset(); correctionPeak = 0
+            statLock.lock(); _stats.resets += 1; statLock.unlock()
+        }
         let start = DispatchTime.now().uptimeNanoseconds
         let w = CVPixelBufferGetWidth(input), h = CVPixelBufferGetHeight(input)
         guard w > 64, h > 64 else { return input }
@@ -220,13 +265,31 @@ final class Stabilizer {
         ci.render(image.transformed(by: CGAffineTransform(scaleX: scale, y: scale)), to: small)
 
         var motion = CGPoint.zero
-        if let prev = previousSmall, let m = Stabilizer.measure(from: prev, to: small) {
-            motion = CGPoint(x: m.x / scale, y: m.y / scale)
+        var measureFailed = false
+        var outlier = false
+        if let prev = previousSmall {
+            if let m = Stabilizer.measure(from: prev, to: small) {
+                let gated = Stabilizer.gate(CGPoint(x: m.x / scale, y: m.y / scale), width: CGFloat(w))
+                motion = gated.motion
+                outlier = gated.rejected
+            } else { measureFailed = true }
         }
         previousSmall = small
 
-        let margin = CGFloat(StabilizerPrefs.margin(forStrength: strength))
-        let c = smoother.step(motion: motion, limit: CGSize(width: margin * CGFloat(w), height: margin * CGFloat(h)))
+        let capMargin = StabilizerPrefs.margin(forStrength: strength)
+        let c = smoother.step(motion: motion, limit: CGSize(width: CGFloat(capMargin) * CGFloat(w), height: CGFloat(capMargin) * CGFloat(h)))
+        let need = max(Double(abs(c.x)) / Double(w), Double(abs(c.y)) / Double(h))
+        correctionPeak = max(need, correctionPeak * 0.995)
+        let margin = CGFloat(StabilizerPrefs.effectiveMargin(peak: correctionPeak, cap: capMargin))
+        statLock.lock()
+        if Self.probeResidual { motionLog.append(motion) }
+        _stats.frames += 1
+        if measureFailed { _stats.measureFailures += 1 }
+        if outlier { _stats.outliers += 1 }
+        _stats.sumMotionPx += Double(hypot(motion.x, motion.y))
+        _stats.sumCorrectionPx += Double(hypot(c.x, c.y))
+        _stats.sumZoom += Double(1 / (1 - 2 * margin))
+        statLock.unlock()
         let zoom = 1 / (1 - 2 * margin)
         let cx = CGFloat(w) / 2, cy = CGFloat(h) / 2
         let t = CGAffineTransform(translationX: c.x, y: c.y)
@@ -236,6 +299,15 @@ final class Stabilizer {
         ci.render(image.transformed(by: t), to: out, bounds: CGRect(x: 0, y: 0, width: w, height: h),
                   colorSpace: image.colorSpace ?? CGColorSpace(name: CGColorSpace.itur_709))
         copyAttachments(from: input, to: out)
+        if Self.probeResidual, let probeSmall = makeBuffer(from: smallPool) {
+            ci.render(CIImage(cvPixelBuffer: out).transformed(by: CGAffineTransform(scaleX: scale, y: scale)), to: probeSmall)
+            if let prevOut = previousOutSmall, let r = Stabilizer.measure(from: prevOut, to: probeSmall) {
+                statLock.lock()
+                _stats.sumResidualPx += Double(hypot(r.x / scale, r.y / scale)); _stats.residualFrames += 1
+                statLock.unlock()
+            }
+            previousOutSmall = probeSmall
+        }
 
         let ms = Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000
         statLock.lock()
@@ -243,6 +315,18 @@ final class Stabilizer {
         budget.record(costMs: ms, intervalMs: clockWatch.intervalMs, atMs: Self.nowMs())
         statLock.unlock()
         return out
+    }
+
+    /// Largest believable motion between two frames, as a fraction of the frame width. Hard shake measures up to
+    /// about 10%; motion-blurred frames make the registration lock onto garbage and report 30 to 80% of the width in
+    /// a random direction. Those jumped the whole camera path and the correction slammed into its limit, so strong
+    /// shake came out worse than it went in. Tuned on 670 frames of real footage: gating cut the remaining shake by
+    /// about 80% at full strength, against about 33% without.
+    static let maxPlausibleMotion = 0.25
+
+    /// Returns `motion`, or zero when it is implausibly large for a frame `width` pixels wide.
+    static func gate(_ motion: CGPoint, width: CGFloat) -> (motion: CGPoint, rejected: Bool) {
+        hypot(motion.x, motion.y) > maxPlausibleMotion * width ? (.zero, true) : (motion, false)
     }
 
     /// How far the content of `to` moved relative to `from`, in pixels of those buffers (y up).

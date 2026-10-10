@@ -4,7 +4,12 @@ All notable changes to this project are documented here. Format based on [Keep a
 
 ## [Unreleased]
 
+### Changed
+- The overlay notice (first stream, capture window), the README and the site no longer suggest the display-scale trick. They now say to turn the goggles' overlay off at its source: Settings > Camera > Advanced camera settings > Camera View Recording > off.
+
 ### Fixed
+- Stabilization: on real footage about 3% of frames reported nonsense motion of 30 to 80% of the picture width (motion-blurred frames), which threw the whole correction off and made hard shake come out worse than it went in. Implausible motion is now ignored: on recorded hand shake the remaining shake dropped by about 80% at full strength (it was about 33%). The zoom that hides the edges is now adaptive: about 4% while the picture is steady, growing only when a correction needs the room and easing back afterwards, instead of a constant 8 to 25% crop.
+- When frames were dropped, the app waited for a keyframe forever: its automatic recovery only ran while the background service said "live". It now also asks for a keyframe and reconnects while the service itself waits for one. Recovery is limited by the goggles: they send a keyframe only when Share Liveview starts, so switching it off and on again on the goggles is still the reliable fix.
 - Several goggles at once: DJI goggles report the same placeholder USB serial (`987654321ABCDEF`), so every unit got the same device ID, window position and profile. The real serial number (the tail of the product name, for example `753XM567024TS7`) is now used, so each goggles has its own ID that stays the same after a replug. The window title and feed name read "Goggles 3 · 753XM567024TS7". Window positions saved under the old shared ID are reused once for the first goggles.
 
 - The app restarts its own background service when it is older than the app: after replacing the app by hand, a DMG drag or `brew upgrade`, the old service kept running the old code until it was restarted from the terminal. The app now notices at launch (the service started before its file was installed) and restarts it, with no password or terminal command.

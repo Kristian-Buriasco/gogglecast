@@ -400,6 +400,19 @@ struct GogglesConnectionCoordinatorTests {
         #expect(actions.contains(.reconnect))
     }
 
+    @Test("helper waiting for a keyframe after dropped frames: asks for one, then reconnects instead of waiting forever")
+    func helperWaitingForKeyframeEscalates() {
+        let (client, coordinator, clock) = makeCoordinator()
+        var actions: [KeyframeRecoveryPolicy.Action] = []
+        coordinator.onRecoveryAction = { actions.append($0) }
+        client.sendConnectionState(.connected)
+        client.sendHelperState("test-device", GogglesXPC.GogglesState.waitingForKeyframe.rawValue, "dropped frames, waiting for keyframe")
+        coordinator.tick()
+        #expect(actions == [.requestKeyframe])
+        for _ in 0..<16 { clock.advance(0.25); coordinator.tick() }
+        #expect(actions.contains(.reconnect), "no escalation: the goggles only send a keyframe when sharing restarts")
+    }
+
     @Test("a waiting decoder does not trigger recovery while the helper is not live")
     func noRecoveryWithoutLive() {
         let (client, coordinator, clock) = makeCoordinator()

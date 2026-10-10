@@ -69,4 +69,27 @@ final class StabilizerTests: XCTestCase {
         let a = buffer(width: 320, height: 180)
         XCTAssertTrue(Stabilizer().process(a) === a)
     }
+
+    func testImplausiblyLargeMotionIsIgnored() {
+        // real shake: up to ~10% of the width is believable, 40%+ is a failed measurement on a blurred frame
+        let real = Stabilizer.gate(CGPoint(x: 150, y: -60), width: 1920)
+        XCTAssertFalse(real.rejected)
+        XCTAssertEqual(real.motion, CGPoint(x: 150, y: -60))
+        let garbage = Stabilizer.gate(CGPoint(x: 1401, y: 768), width: 1920)
+        XCTAssertTrue(garbage.rejected)
+        XCTAssertEqual(garbage.motion, .zero)
+        XCTAssertFalse(Stabilizer.gate(CGPoint(x: 470, y: 0), width: 1920).rejected)
+        XCTAssertTrue(Stabilizer.gate(CGPoint(x: 0, y: 490), width: 1920).rejected)
+    }
+
+    func testZoomStaysSmallWhenSteadyAndGrowsWithCorrections() {
+        let cap = StabilizerPrefs.margin(forStrength: 1)
+        XCTAssertEqual(StabilizerPrefs.effectiveMargin(peak: 0, cap: cap), StabilizerPrefs.restingMargin)
+        XCTAssertEqual(StabilizerPrefs.effectiveMargin(peak: 0.05, cap: cap), 0.06, accuracy: 1e-9)
+        XCTAssertEqual(StabilizerPrefs.effectiveMargin(peak: 0.5, cap: cap), cap, "never above the cap")
+        // the crop always covers the correction that is being applied
+        for peak in stride(from: 0.0, through: cap, by: 0.005) {
+            XCTAssertGreaterThanOrEqual(StabilizerPrefs.effectiveMargin(peak: peak, cap: cap), peak)
+        }
+    }
 }

@@ -67,7 +67,7 @@ The goggles draw their own overlay (flight data, battery, link strength, storage
 
 ![A goggles frame with the picture in the middle, the overlay around it and a dashed box marking a centred crop of about 1.4x](docs/images/overlay-crop.png)
 
-To get a clean picture, turn the overlay off on the goggles or crop it out. With the goggles' display scale at about 70%, a centred crop of about 1.4x (Settings > Display > Output framing zoom, or your editor) lands on the picture, and the uncropped original keeps the data. The app tells you once when you first start a stream or the capture window.
+To get a clean picture, turn the overlay off on the goggles: Settings > Camera > Advanced camera settings > Camera View Recording > off. Or crop it out (Settings > Display > Output framing). The app tells you once when you first start a stream or the capture window.
 
 Frame rate follows what the goggles send: about 35 frames per second in our test with a drone linked, 60 in an earlier one.
 

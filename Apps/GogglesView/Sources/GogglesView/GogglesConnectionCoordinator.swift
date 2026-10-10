@@ -327,9 +327,16 @@ public final class GogglesConnectionCoordinator: ObservableObject {
         decoderWaitingForKeyframe = waiting
     }
 
+    /// True while a keyframe is awaited: the decoder has none although the helper says live, or the helper itself
+    /// waits for one (it re-armed its gate after dropped frames). The second case used to wait forever, because
+    /// the goggles send a keyframe only when sharing restarts and the app's recovery ran in the first case only.
+    var needsKeyframeRecovery: Bool {
+        (decoderWaitingForKeyframe && uiState.kind == .live) || uiState.kind == .waitingForKeyframe
+    }
+
     func tick(currentTime: Date? = nil) {
         let t = currentTime ?? now()
-        switch keyframeRecovery.update(waiting: decoderWaitingForKeyframe && uiState.kind == .live, now: t) {
+        switch keyframeRecovery.update(waiting: needsKeyframeRecovery, now: t) {
         case .none: break
         case .requestKeyframe:
             onRecoveryAction?(.requestKeyframe)
