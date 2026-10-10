@@ -230,6 +230,8 @@ struct MultiWindowMiscTests {
     func deviceLabel() {
         #expect(GogglesSessionNaming.deviceLabel(product: "DJI Goggles 3", serial: "1ABCDE9876", deviceId: "x") == "DJI Goggles 3 (…9876)")
         #expect(GogglesSessionNaming.deviceLabel(product: nil, serial: nil, deviceId: "20:3") == "Goggles (20:3)")
+        #expect(GogglesSessionNaming.deviceLabel(product: "Goggles3-753XM567024TS7", serial: "753XM567024TS7", deviceId: "x") == "Goggles 3 · 753XM567024TS7")
+        #expect(GogglesSessionNaming.deviceLabel(product: "Goggles_N3 -8HAXNC40A72W0X", serial: "8HAXNC40A72W0X", deviceId: "x") == "Goggles N3 · 8HAXNC40A72W0X")
         #expect(GogglesSessionNaming.captureWindowTitle(label: "L") == "GogglesView Capture — L")
         #expect(GogglesSessionNaming.windowMemoryName(deviceId: "A") != GogglesSessionNaming.windowMemoryName(deviceId: "B"))
     }

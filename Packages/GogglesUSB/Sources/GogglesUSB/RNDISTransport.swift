@@ -41,6 +41,30 @@ import GogglesProtocol
 /// `stream.py`'s `main()` prints at startup (`usb.util.get_string` for
 /// `iProduct`/`iSerialNumber`, `dev.idVendor`/`idProduct`/`bcdDevice`,
 /// `dev.bus`/`dev.address`).
+/// DJI goggles report the same placeholder in the USB serial field (`987654321ABCDEF`, seen on Goggles 3 and
+/// Goggles N3), so every unit looked like the same device: one device ID, one shared saved window position and
+/// profile, and two goggles on one Mac could not be told apart. The real serial number is the tail of the product
+/// name (`Goggles3-753XM567024TS7`, `Goggles_N3 -8HAXNC40A72W0X`).
+public enum GogglesSerial {
+    static let placeholders: Set<String> = ["987654321ABCDEF"]
+
+    /// The unit's real serial: a genuine USB serial if there is one, else the tail of the product name, else nil.
+    public static func resolve(usbSerial: String?, product: String?) -> String? {
+        let usb = usbSerial?.trimmingCharacters(in: .whitespaces) ?? ""
+        if !usb.isEmpty, !placeholders.contains(usb) { return usb }
+        return fromProduct(product)
+    }
+
+    static func fromProduct(_ product: String?) -> String? {
+        guard let product, let dash = product.lastIndex(of: "-") else { return nil }
+        let tail = product[product.index(after: dash)...].trimmingCharacters(in: .whitespaces)
+        guard (8...24).contains(tail.count),
+              tail.allSatisfy({ $0.isASCII && ($0.isUppercase || $0.isNumber) }),
+              tail.contains(where: \.isNumber) else { return nil }
+        return tail
+    }
+}
+
 public struct DeviceInfo: Sendable, Equatable {
     public let product: String?
     public let serial: String?
@@ -60,7 +84,7 @@ public struct DeviceInfo: Sendable, Equatable {
         address: UInt8
     ) {
         self.product = product
-        self.serial = serial
+        self.serial = GogglesSerial.resolve(usbSerial: serial, product: product)
         self.idVendor = idVendor
         self.idProduct = idProduct
         self.bcdDevice = bcdDevice

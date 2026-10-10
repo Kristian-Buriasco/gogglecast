@@ -16,13 +16,28 @@ extension Notification.Name {
 
 /// Pure naming helpers for per-device windows (unit-tested).
 enum GogglesSessionNaming {
-    /// "DJI Goggles 3 (…1234)" -- serial suffix, or the deviceId when there's no serial.
+    /// "Goggles 3 · 753XM567024TS7" when the product name ends in the serial (the real one, see `GogglesSerial`),
+    /// otherwise "DJI Goggles 3 (…1234)" -- serial suffix, or the deviceId when there's no serial.
     static func deviceLabel(product: String?, serial: String?, deviceId: String) -> String {
+        if let serial, !serial.isEmpty, let product, let model = modelName(product: product, serial: serial) {
+            return "\(model) · \(serial)"
+        }
         let name = (product?.isEmpty == false ? product! : L("Goggles"))
         if let serial, !serial.isEmpty {
             return "\(name) (…\(serial.suffix(4)))"
         }
         return "\(name) (\(deviceId))"
+    }
+
+    /// "Goggles3-753XM567024TS7" -> "Goggles 3", "Goggles_N3 -8HAXNC40A72W0X" -> "Goggles N3". Nil unless the
+    /// product name really ends in `-<serial>`.
+    static func modelName(product: String, serial: String) -> String? {
+        guard product.hasSuffix(serial), let dash = product.lastIndex(of: "-") else { return nil }
+        var model = product[..<dash].replacingOccurrences(of: "_", with: " ").trimmingCharacters(in: .whitespaces)
+        if let r = model.range(of: #"^Goggles(?=\d)"#, options: .regularExpression) {
+            model.replaceSubrange(r, with: "Goggles ")
+        }
+        return model.isEmpty ? nil : model
     }
 
     static func mainWindowTitle(label: String) -> String { "GogglesView — \(label)" }
@@ -132,7 +147,9 @@ final class GogglesSession: NSObject, RegistrableSession, NSWindowDelegate {
         if !hadSavedFrame, cascadeFrom == nil {
             // First window for this device and no other goggles open: inherit
             // the pre-multi-window single-window frame.
-            WindowMemory.copySavedFrame(from: "main", to: memoryName)
+            // Before the real serial was used, every goggles shared the placeholder serial's saved frame.
+            let legacy = GogglesSessionNaming.windowMemoryName(deviceId: "serial:987654321ABCDEF")
+            WindowMemory.copySavedFrame(from: WindowMemory.hasSavedFrame(name: legacy) ? legacy : "main", to: memoryName)
         }
         window.center()
         WindowMemory.attach(to: window, name: memoryName, restoreSize: true, contentAspect: 16.0 / 9.0)

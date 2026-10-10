@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented here. Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Fixed
+- Several goggles at once: DJI goggles report the same placeholder USB serial (`987654321ABCDEF`), so every unit got the same device ID, window position and profile. The real serial number (the tail of the product name, for example `753XM567024TS7`) is now used, so each goggles has its own ID that stays the same after a replug. The window title and feed name read "Goggles 3 · 753XM567024TS7". Window positions saved under the old shared ID are reused once for the first goggles.
+
 ## [0.9.0] - 2026-10-10
 
 ### Added
