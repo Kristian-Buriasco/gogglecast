@@ -25,3 +25,7 @@ Playback uses the browser's native HLS, so Safari (iPad, iPhone, Mac) works; oth
 Segments are cut on keyframes (the encoder emits one per second), so they are about 1 s long (previously 2 s), the playlist lists the newest 8, and it carries `EXT-X-START:TIME-OFFSET=-3` so Safari starts near the live edge. Safari normally begins about three target durations behind the end of a live playlist, so the expected glass-to-glass delay is a few seconds (roughly 3 to 5 s) instead of the earlier 4 to 8 s.
 
 These figures are an estimate from how HLS players behave, not a measurement on an iPad. The page shows its own estimate (distance from the playlist's live edge, which does not include capture, encode and network delay). Low-latency HLS with partial segments (`EXT-X-PART`) was not implemented: it needs chunked-transfer blocking playlist reload and is a much larger change.
+
+## Status page
+
+`/status` on the same address shows one tile per open goggles (name, state, fps, battery, warnings, outputs), refreshed every 2 seconds, read-only: handy on a phone at an event. It needs the same token as the viewer and never shows serial numbers. See `events.md`.

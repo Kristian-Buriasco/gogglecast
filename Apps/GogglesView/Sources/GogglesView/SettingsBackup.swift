@@ -53,6 +53,7 @@ enum SettingsBackup {
             // Stabilizer, re-encoder, race mode
             b(StabilizerPrefs.enabledKey), d(StabilizerPrefs.strengthKey, 0...1),
             b(ReencodePrefs.enabledKey), i(ReencodePrefs.bitrateKey, ReencodePrefs.bitrateRange),
+            b(ReencodePrefs.halfRateKey), b(FeedPortPrefs.perFeedKey),
             b(RaceModePrefs.key),
             // Recording (no folder)
             s(RecordingPrefs.containerKey, RecordingPrefs.Container.allCases.map(\.rawValue)),
@@ -75,7 +76,7 @@ enum SettingsBackup {
             b(OSDPrefs.showDropsKey), b(OSDPrefs.showLatencyKey), b(OSDPrefs.showBatteryKey),
             // Network stream (UDP host and port only)
             .init(key: NetStreamPrefs.hostKey, kind: .text(253)), i(NetStreamPrefs.portKey, 1...65535),
-            b(NetStreamPrefs.autoStartKey),
+            b(NetStreamPrefs.autoStartKey), b(SRTPrefs.autoStartKey),
             // Windows and orientation
             b(MiniWindowPrefs.enabledKey), b(CaptureWindowPrefs.enabledKey), b(CaptureWindowPrefs.onTopKey),
             Spec(key: OrientationPrefs.rotationKey, kind: .oneOf([0, 90, 180, 270])), b(OrientationPrefs.flipHKey), b(OrientationPrefs.flipVKey),

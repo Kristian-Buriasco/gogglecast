@@ -29,7 +29,14 @@ enum ProgramOutputPrefs {
     static let enabledKey = "programOutputEnabled"
     static let outputsKey = "programOutputList"          // JSON [ProgramOutputConfig]
     static let feedNamesKey = "programOutputFeedNames"  // [deviceId: custom name]
+    static let openAtLaunchKey = "programOutputOpenAtLaunch"
     static let maxOutputs = 4
+
+    /// The program outputs are full-screen windows. Unless the user asked for them at launch, start with them off,
+    /// so a Mac that quit with them on does not come back hidden behind a full-screen picture.
+    static func resetAtLaunch(_ d: UserDefaults = .standard) {
+        if !d.bool(forKey: openAtLaunchKey) { d.set(false, forKey: enabledKey) }
+    }
 
     static func enabled(_ d: UserDefaults = .standard) -> Bool { d.bool(forKey: enabledKey) }
 
@@ -115,6 +122,12 @@ enum ProgramDisplayChoice {
 }
 
 enum ProgramFeedNaming {
+    /// The name the crew gave this feed, or `fallback` (the window title) when there is none.
+    static func displayName(deviceId: String, fallback: String, custom: [String: String] = ProgramOutputPrefs.feedNames()) -> String {
+        let c = custom[deviceId].map(ProgramOutputPrefs.sanitizeName) ?? ""
+        return c.isEmpty ? fallback : c
+    }
+
     /// "Feed 1", "Feed 2", ... in open order, unless the crew named the feed.
     static func names(deviceIds: [String], custom: [String: String]) -> [String] {
         deviceIds.enumerated().map { i, id in
@@ -156,6 +169,13 @@ private struct ProgramTile: View {
     let showName: Bool
     let showSignal: Bool
     @ObservedObject var coordinator: GogglesConnectionCoordinator
+    @ObservedObject private var status = EventStatus.shared
+    @State private var pulse = false
+
+    private var lost: Bool { showSignal && coordinator.uiState.kind != .live }
+    private var issueText: String {
+        status.rows.first { $0.id == feed.id }?.issues.map(\.text).joined(separator: " · ") ?? ""
+    }
 
     init(feed: ProgramFeed, showName: Bool, showSignal: Bool) {
         self.feed = feed; self.showName = showName; self.showSignal = showSignal
@@ -171,12 +191,27 @@ private struct ProgramTile: View {
                 Text(verbatim: L("NO SIGNAL")).font(.system(size: 28, weight: .bold)).foregroundStyle(.red)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
+            if showSignal && !lost && !issueText.isEmpty {
+                Text(verbatim: issueText)
+                    .font(.system(size: 20, weight: .bold)).foregroundStyle(.black)
+                    .padding(.horizontal, 10).padding(.vertical, 4)
+                    .background(Color.orange, in: RoundedRectangle(cornerRadius: 6))
+                    .padding(12)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+            }
             if showName {
                 Text(verbatim: feed.name)
                     .font(.system(size: 22, weight: .semibold)).foregroundStyle(.white)
                     .padding(.horizontal, 10).padding(.vertical, 4)
                     .background(Color.black.opacity(0.55), in: RoundedRectangle(cornerRadius: 6))
                     .padding(12)
+            }
+        }
+        .overlay {
+            if lost {
+                Rectangle().stroke(Color.red, lineWidth: 8).opacity(pulse ? 1 : 0.15)
+                    .onAppear { withAnimation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true)) { pulse = true } }
+                    .onDisappear { pulse = false }
             }
         }
         .clipped()
@@ -221,6 +256,7 @@ final class ProgramOutputController: ObservableObject {
     func install(sessions: @escaping () -> [GogglesSession], active: @escaping () -> GogglesSession?) {
         self.sessions = sessions
         self.active = active
+        ProgramOutputPrefs.resetAtLaunch()
         observers = [
             NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)
                 .sink { [weak self] _ in self?.scheduleRefresh() },
@@ -311,6 +347,7 @@ final class ProgramOutputController: ObservableObject {
 struct ProgramOutputSettingsSection: View {
     @ObservedObject private var controller = ProgramOutputController.shared
     @AppStorage(ProgramOutputPrefs.enabledKey) private var enabled = false
+    @AppStorage(ProgramOutputPrefs.openAtLaunchKey) private var openAtLaunch = false
     @State private var outputs = ProgramOutputPrefs.outputs()
     @State private var screens = ProgramOutputController.screenInfos()
 
@@ -318,6 +355,7 @@ struct ProgramOutputSettingsSection: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Program output (HDMI)").font(.headline)
             Toggle("Show the program outputs", isOn: $enabled)
+            Toggle("Open the program outputs when the app starts", isOn: $openAtLaunch)
             ForEach($outputs) { $o in
                 OutputRow(output: $o, screens: screens, feeds: controller.available,
                           canRemove: outputs.count > 1) { outputs.removeAll { $0.id == o.id } }

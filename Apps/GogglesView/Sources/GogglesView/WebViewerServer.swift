@@ -143,7 +143,7 @@ struct HLSSegmenter {
 // MARK: - HTTP parsing / routing (pure)
 
 enum WebRoute: Equatable {
-    case page, playlist, segment(Int), manifest, icon(Int)
+    case page, playlist, segment(Int), manifest, icon(Int), statusPage, statusJSON
     case notFound, unauthorized, methodNotAllowed, badRequest
 }
 
@@ -178,6 +178,8 @@ struct WebRequest: Equatable {
         switch r.path {
         case "/", "/index.html": return .page
         case "/live.m3u8": return .playlist
+        case "/status", "/status.html": return .statusPage
+        case "/status.json": return .statusJSON
         case "/manifest.webmanifest": return .manifest
         case "/icon-180.png": return .icon(180)
         case "/icon-512.png": return .icon(512)
@@ -366,6 +368,8 @@ final class WebViewerServer: ObservableObject, SampleBufferRendering {
         }
         switch WebRequest.route(req, token: token) {
         case .page: reply(c, 200, "OK", "text/html; charset=utf-8", Data(WebViewerPage.html(token: token).utf8))
+        case .statusPage: reply(c, 200, "OK", "text/html; charset=utf-8", Data(WebStatusPage.html(token: token).utf8))
+        case .statusJSON: reply(c, 200, "OK", "application/json", WebStatusStore.latest)
         case .playlist:
             if let pl = segmenter.window.playlist(token: token) {
                 reply(c, 200, "OK", "application/vnd.apple.mpegurl", Data(pl.utf8))

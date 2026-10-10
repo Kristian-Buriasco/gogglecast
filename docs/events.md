@@ -2,6 +2,19 @@
 
 For several goggles on one Mac, with the picture going to a vision mixer, projector or TV over HDMI.
 
+## Operator overview and event preset
+
+- **Goggles > Operator Overview…** is one window with a row per open goggles: a colour dot (green fine, amber needs a look, red lost or critical), name, state, which outputs are sending (SRT, UDP, NDI; "(SRT)" means waiting for the receiver, "SRT!" an error), fps, battery and a Record button. Click a name to bring that window forward. **Big view** turns it into large coloured tiles, and the arrow button makes it full screen, for a screen the whole crew can read.
+- **Start all outputs / Stop all outputs** start or stop the outputs ticked next to them (SRT by default) in every window at once.
+- Warnings, shown on the overview, the program output grid, the web status page and the menu-bar icon: battery under 25% (amber) or 10% (red), a **black picture** for 10 seconds, a **picture not changing** for 15 seconds while frames keep arriving. A black or unchanging picture is only amber, since a covered camera or a still scene is the operator's call. The signal-lost alert, and the program output tile (a pulsing red frame and NO SIGNAL), use the name you gave the feed.
+- The menu-bar icon is green, yellow or red for the worst feed, including these warnings; hover it for the details.
+- While anything records, the header shows **Stop all recordings** and the bottom line shows the free space in the recordings folder, amber or red when fewer than 3 or 1 hours of recording are left (about 9 GB per hour per recording, so it warns early). Without recording none of that is shown.
+- **Settings > General > Presets > Event** is for several goggles over many hours without recording: signal-lost alert on, clean video, no recording, no replay. Settings > Streaming has **Start automatically** for UDP and SRT so a goggles that reconnects starts sending again by itself.
+
+## Status page for a phone
+
+With the web viewer on (Settings > Streaming), open `http://<this Mac>:<port>/status` (add `?t=<token>` when a token is set, as for the viewer): one big tile per goggles, refreshed every 2 seconds, read-only. It shows names, state, fps, battery, warnings and outputs, never serial numbers or device ids.
+
 ## Program output (HDMI)
 
 Settings > Display > **Program output (HDMI)**, or Goggles menu > Program Output.

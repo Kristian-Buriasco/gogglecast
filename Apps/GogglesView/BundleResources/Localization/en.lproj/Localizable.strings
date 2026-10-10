@@ -290,6 +290,10 @@
 "exit %lld" = "exit %lld";
 "failed" = "failed";
 "Choose an executable to run on %@" = "Choose an executable to run on %@";
+/* EventStatus.swift */
+"Battery %lld%%" = "Battery %lld%%";
+"Picture not changing" = "Picture not changing";
+"Black picture" = "Black picture";
 /* ExposureAssist.swift */
 "Exposure and focus aids" = "Exposure and focus aids";
 "Zebra stripes" = "Zebra stripes";
@@ -394,7 +398,6 @@
 "Show menu bar item" = "Show menu bar item";
 /* MenuBarMiniControls.swift */
 " · ● REC %@" = " · ● REC %@";
-"Battery %lld%%" = "Battery %lld%%";
 "Recording %@" = "Recording %@";
 "Stop Recording" = "Stop Recording";
 "Start Recording" = "Start Recording";
@@ -492,6 +495,20 @@
 "Setup assistant" = "Setup assistant";
 "Open setup assistant…" = "Open setup assistant…";
 "Opens a guided checklist for the background service, USB connection and video" = "Opens a guided checklist for the background service, USB connection and video";
+/* OperatorOverview.swift */
+"Operator overview" = "Operator overview";
+"SRT" = "SRT";
+"UDP" = "UDP";
+"NDI" = "NDI";
+"Start all outputs" = "Start all outputs";
+"Stop all outputs" = "Stop all outputs";
+"Stop all recordings" = "Stop all recordings";
+"List" = "List";
+"Big view" = "Big view";
+"Full screen" = "Full screen";
+"Record" = "Record";
+"%@ free in %@" = "%@ free in %@";
+"About %lld h of recording left at this rate" = "About %lld h of recording left at this rate";
 /* OutputLook.swift */
 "Color look (LUT)" = "Color look (LUT)";
 "Look" = "Look";
@@ -512,7 +529,6 @@
 "Vertical" = "Vertical";
 "Crop recordings and streams separately from the preview, for example 9:16 for shorts. Change the aspect while stopped; it takes effect on the next recording or stream. Zoom and position can change live." = "Crop recordings and streams separately from the preview, for example 9:16 for shorts. Change the aspect while stopped; it takes effect on the next recording or stream. Zoom and position can change live.";
 /* OutputStreamViews.swift */
-"SRT" = "SRT";
 "SRT stream" = "SRT stream";
 "libsrt not found (brew install srt, or set the path in Settings > Streaming)" = "libsrt not found (brew install srt, or set the path in Settings > Streaming)";
 "SRT connected" = "SRT connected";
@@ -529,7 +545,6 @@
 "Passphrase (10-79 chars, optional)" = "Passphrase (10-79 chars, optional)";
 "Passphrase must be 10-79 characters." = "Passphrase must be 10-79 characters.";
 "Works with OBS, VLC and ffplay. Latency should be 3-4x the network RTT. Changes apply on next start." = "Works with OBS, VLC and ffplay. Latency should be 3-4x the network RTT. Changes apply on next start.";
-"NDI" = "NDI";
 "NDI output" = "NDI output";
 "NDI runtime not found (install NDI Tools or the NDI SDK)" = "NDI runtime not found (install NDI Tools or the NDI SDK)";
 "Sending NDI source %@" = "Sending NDI source %@";
@@ -553,9 +568,11 @@
 "Mac went to sleep" = "Mac went to sleep";
 /* Presets.swift */
 "Streaming" = "Streaming";
+"Event" = "Event";
 "Minimal" = "Minimal";
 "Stats overlay on, network stream auto-starts, no recording/replay." = "Stats overlay on, network stream auto-starts, no recording/replay.";
 "Auto-record on connect, instant replay (60 s), clean video." = "Auto-record on connect, instant replay (60 s), clean video.";
+"Several goggles for hours: signal-lost alert on, clean video, no recording, no replay." = "Several goggles for hours: signal-lost alert on, clean video, no recording, no replay.";
 "Everything optional off; framing reset." = "Everything optional off; framing reset.";
 "Presets" = "Presets";
 "Preset" = "Preset";
@@ -567,6 +584,7 @@
 "NO SIGNAL" = "NO SIGNAL";
 "Program output (HDMI)" = "Program output (HDMI)";
 "Show the program outputs" = "Show the program outputs";
+"Open the program outputs when the app starts" = "Open the program outputs when the app starts";
 "Add output" = "Add output";
 "Feed names" = "Feed names";
 "A clean full screen picture on each chosen display, for a vision mixer, projector or TV: one output per HDMI connection. A grid shows every open goggles window and marks a feed with no signal; one feed shows just that picture. Names never include the goggles serial number. Zebra stripes and peaking are not drawn here." = "A clean full screen picture on each chosen display, for a vision mixer, projector or TV: one output per HDMI connection. A grid shows every open goggles window and marks a feed with no signal; one feed shows just that picture. Names never include the goggles serial number. Zebra stripes and peaking are not drawn here.";
@@ -889,6 +907,7 @@
 "Program Output" = "Program Output";
 "Zebra Stripes" = "Zebra Stripes";
 "Focus Peaking" = "Focus Peaking";
+"Operator Overview…" = "Operator Overview…";
 "Connection Health…" = "Connection Health…";
 "Window" = "Window";
 "Minimize" = "Minimize";

@@ -10,6 +10,7 @@ enum SRTPrefs {
     static let portKey = "srtPort"
     static let latencyKey = "srtLatencyMs"
     static let passphraseKey = "srtPassphrase"
+    static let autoStartKey = "srtAutoStart"
     static let defaultLatency = 120
 
     static var libraryPath: String? { UserDefaults.standard.string(forKey: libraryPathKey) }

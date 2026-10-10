@@ -117,6 +117,8 @@ final class SessionControlBoard {
     private struct Entry {
         weak var recorder: Recorder?
         weak var streamer: NetworkStreamer?
+        weak var srt: SRTOutput?
+        weak var ndi: NDIOutput?
     }
     private var entries: [ObjectIdentifier: Entry] = [:]
 
@@ -128,6 +130,23 @@ final class SessionControlBoard {
     func register(streamer: NetworkStreamer, for session: AnyObject) {
         entries[ObjectIdentifier(session), default: Entry()].streamer = streamer
         NotificationCenter.default.post(name: .gogglesControlBoardChanged, object: session)
+    }
+
+    func register(srt: SRTOutput, for session: AnyObject) { entries[ObjectIdentifier(session), default: Entry()].srt = srt }
+    func register(ndi: NDIOutput, for session: AnyObject) { entries[ObjectIdentifier(session), default: Entry()].ndi = ndi }
+
+    /// What this window is sending right now (UDP, SRT, NDI), for the operator overview.
+    func outputChips(for session: AnyObject) -> [OutputChip] {
+        let e = entries[ObjectIdentifier(session)]
+        func chip(_ name: String, streaming: Bool?, connected: Bool = true, error: Bool) -> OutputChip {
+            guard let streaming, streaming else { return OutputChip(name: name, state: error ? .error : .off) }
+            return OutputChip(name: name, state: error ? .error : (connected ? .on : .waiting))
+        }
+        return [
+            chip("SRT", streaming: e?.srt?.isStreaming, connected: e?.srt?.connected ?? true, error: e?.srt?.lastError != nil),
+            chip("UDP", streaming: e?.streamer?.isStreaming, error: e?.streamer?.lastError != nil),
+            chip("NDI", streaming: e?.ndi?.isStreaming, error: e?.ndi?.lastError != nil),
+        ]
     }
 
     func recorder(for session: AnyObject) -> Recorder? { entries[ObjectIdentifier(session)]?.recorder }

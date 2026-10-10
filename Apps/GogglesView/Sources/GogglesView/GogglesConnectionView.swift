@@ -459,15 +459,17 @@ struct GogglesConnectionView: View {
                 .opacity(videoOpacity)
             overlay
         }
+        .onChange(of: coordinator.displayState.kind) { _, kind in
+            if kind == .live { hadPicture = true }
+        }
     }
 
     private var videoOpacity: Double {
-        switch coordinator.displayState {
-        case .live: return 1
-        case .stalled: return 0.4
-        default: return 0
-        }
+        VideoVisibility.opacity(kind: coordinator.displayState.kind, hadPicture: hadPicture)
     }
+
+    /// True once this window has shown live video, so the last picture can stay up (dimmed) when the signal drops.
+    @State private var hadPicture = false
 
     @State private var helperSetupError: String?
 
@@ -513,3 +515,16 @@ struct GogglesConnectionView: View {
     }
 }
 #endif
+
+/// How visible the video layer is for a connection state. When the air unit drops, the goggles stop sending, and
+/// the picture used to vanish after 5 s. Now the last picture stays up, dimmed, under the "reconnecting" card.
+enum VideoVisibility {
+    static func opacity(kind: GogglesUIStateKind, hadPicture: Bool) -> Double {
+        switch kind {
+        case .live: return 1
+        case .stalled: return 0.4
+        case .handshaking, .waitingForKeyframe: return hadPicture ? 0.4 : 0
+        default: return 0
+        }
+    }
+}

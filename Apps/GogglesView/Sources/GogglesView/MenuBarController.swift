@@ -105,6 +105,8 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         stateCancellables += registry.all.compactMap {
             SessionControlBoard.shared.recorder(for: $0.decodeSession)?.$isRecording.sink(receiveValue: refresh)
         }
+        // Battery and picture warnings from the event status also colour the icon.
+        stateCancellables.append(NotificationCenter.default.publisher(for: .eventStatusChanged).sink(receiveValue: refresh))
         updateGlyph()
     }
 
@@ -273,13 +275,16 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
     private func updateGlyph() {
         let sessions = registry.all
-        let category = MenuBarController.summaryCategory(sessions.map { $0.coordinator.uiState.kind })
+        let category = MenuBarController.summaryCategory(sessions.map { $0.coordinator.uiState.kind }, status: EventStatus.shared.worst)
         let recording = MenuBarMiniControls.anyRecording(sessions.map(snapshot(for:)))
         let base = MenuBarController.glyphImage(for: category)
         statusItem.button?.image = recording ? MenuBarController.recordingBadged(base) : base
         var summary = sessions
             .map { "\($0.label): \(MenuBarController.displayText(for: $0.coordinator.uiState))" }
             .joined(separator: "; ")
+        let warnings = EventStatus.shared.rows.filter { !$0.issues.isEmpty }
+            .map { "\($0.name): \($0.issues.map(\.text).joined(separator: ", "))" }.joined(separator: "; ")
+        if !warnings.isEmpty { summary += (summary.isEmpty ? "" : "; ") + warnings }
         if recording { summary = L("%@ (recording)", summary) }
         statusItem.button?.image?.accessibilityDescription = L("GogglesView: %@", summary.isEmpty ? L("no goggles open") : summary)
         statusItem.button?.toolTip = summary.isEmpty ? "GogglesView" : summary
@@ -308,6 +313,17 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         if categories.contains(.error) { return .error }
         if categories.contains(.waiting) { return .waiting }
         return .live
+    }
+
+    /// The icon colour with the event status folded in: a red feed (a critical battery, say) makes the icon red,
+    /// an amber one (low battery, black or frozen picture) makes a healthy icon yellow.
+    static func summaryCategory(_ kinds: [GogglesUIStateKind], status: FeedHealth?) -> GogglesStatusGlyphCategory {
+        let base = summaryCategory(kinds)
+        switch status {
+        case .bad: return .error
+        case .warning: return base == .live ? .waiting : base
+        default: return base
+        }
     }
 
     /// design §6-derived short status text for the disabled top menu line --
