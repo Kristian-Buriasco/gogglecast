@@ -20,6 +20,6 @@ import Testing
 @Suite struct SecretStoreTestIsolationTests {
     @Test func testsNeverUseTheRealKeychain() {
         #expect(SecretStore.runningUnderTests)
-        #expect(SecretStore.backend is SecretStore.MemoryBackend, "a test touching the login keychain prompts for its password")
+        #expect(!(SecretStore.backend is SecretStore.KeychainBackend), "a test touching the login keychain prompts for its password")
     }
 }
