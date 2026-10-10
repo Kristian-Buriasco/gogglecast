@@ -2,6 +2,12 @@
 
 For several goggles on one Mac, with the picture going to a vision mixer, projector or TV over HDMI.
 
+## Operator overview and event preset
+
+- **Goggles > Operator Overview…** is one window with a row per open goggles: a colour dot (green live, amber connecting or stalled, red missing), name, state, fps, battery and a Record button with the running time. **Record all** starts every live window that is not recording; **Stop all** stops every recording. Click a name to bring that window forward.
+- The bottom line shows the free space in the recordings folder and turns amber or red when there are fewer than 3 or 1 hours of recording left (counted at about 9 GB per hour per recording, so it warns early).
+- **Settings > General > Presets > Event** sets auto-record when a goggles goes live, 30-minute files, the signal-lost alert on, and no replay. Settings > Streaming has **Start automatically** for UDP and SRT so a goggles that reconnects starts sending again by itself.
+
 ## Program output (HDMI)
 
 Settings > Display > **Program output (HDMI)**, or Goggles menu > Program Output.

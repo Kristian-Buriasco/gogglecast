@@ -4,6 +4,11 @@ All notable changes to this project are documented here. Format based on [Keep a
 
 ## [Unreleased]
 
+### Added
+- Operator overview (Goggles menu): one window with a row per open goggles (state, fps, battery, recording time), Record all / Stop all, and a free-disk line that warns when fewer than 3 hours of recording are left.
+- "Event" preset for several goggles over many hours: auto-record, 30-minute files, signal-lost alert on, no replay.
+- SRT output can start automatically, like the UDP stream.
+
 ## [0.8.2] - 2026-10-10
 
 ### Added

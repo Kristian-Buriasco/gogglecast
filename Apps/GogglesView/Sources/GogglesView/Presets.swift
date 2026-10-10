@@ -3,12 +3,13 @@ import SwiftUI
 /// Built-in settings bundles. Each maps UserDefaults keys to a value; `nil` means
 /// "remove the key" (falls back to the default defined where the pref is read).
 enum SettingsPreset: String, CaseIterable, Identifiable {
-    case streaming = "Streaming", recording = "Recording", minimal = "Minimal"
+    case streaming = "Streaming", recording = "Recording", event = "Event", minimal = "Minimal"
     var id: String { rawValue }
     var title: String {
         switch self {
         case .streaming: return L("Streaming")
         case .recording: return L("Recording")
+        case .event: return L("Event")
         case .minimal: return L("Minimal")
         }
     }
@@ -17,6 +18,7 @@ enum SettingsPreset: String, CaseIterable, Identifiable {
         switch self {
         case .streaming: return L("Stats overlay on, network stream auto-starts, no recording/replay.")
         case .recording: return L("Auto-record on connect, instant replay (60 s), clean video.")
+        case .event: return L("Several goggles for hours: auto-record in 30-minute files, signal-lost alert on, clean video, no replay.")
         case .minimal: return L("Everything optional off; framing reset.")
         }
     }
@@ -25,8 +27,8 @@ enum SettingsPreset: String, CaseIterable, Identifiable {
     static let managedKeys: [String] = [
         OSDPrefs.enabledKey, OSDPrefs.showFpsKey, OSDPrefs.showBitrateKey, OSDPrefs.showResolutionKey,
         OSDPrefs.showDropsKey, OSDPrefs.showLatencyKey, OSDPrefs.showBatteryKey,
-        RecordingPrefs.autoStartKey, RecordingPrefs.containerKey,
-        NetStreamPrefs.autoStartKey,
+        RecordingPrefs.autoStartKey, RecordingPrefs.containerKey, RecordingExtras.splitMinutesKey,
+        SignalAlertPrefs.enabledKey, NetStreamPrefs.autoStartKey,
         ReplayPrefs.enabledKey, ReplayPrefs.secondsKey,
         FramingPrefs.aspectKey, FramingPrefs.zoomKey, FramingPrefs.panXKey, FramingPrefs.panYKey,
         FramingPrefs.gridKey, FramingPrefs.brightnessKey, FramingPrefs.contrastKey, FramingPrefs.saturationKey,
@@ -51,6 +53,13 @@ enum SettingsPreset: String, CaseIterable, Identifiable {
             v[RecordingPrefs.containerKey] = RecordingPrefs.Container.mov.rawValue
             v[ReplayPrefs.enabledKey] = true
             v[ReplayPrefs.secondsKey] = 60
+        case .event:
+            v[OSDPrefs.enabledKey] = false
+            v[RecordingPrefs.autoStartKey] = true
+            v[RecordingPrefs.containerKey] = RecordingPrefs.Container.mov.rawValue
+            v[RecordingExtras.splitMinutesKey] = 30
+            v[SignalAlertPrefs.enabledKey] = true
+            v[ReplayPrefs.enabledKey] = false
         case .minimal:
             v[OSDPrefs.enabledKey] = false
             v[RecordingPrefs.autoStartKey] = false

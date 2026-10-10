@@ -492,6 +492,13 @@
 "Setup assistant" = "Setup assistant";
 "Open setup assistant…" = "Open setup assistant…";
 "Opens a guided checklist for the background service, USB connection and video" = "Opens a guided checklist for the background service, USB connection and video";
+/* OperatorOverview.swift */
+"Operator overview" = "Operator overview";
+"Record all" = "Record all";
+"Stop all" = "Stop all";
+"Record" = "Record";
+"%@ free in %@" = "%@ free in %@";
+"About %lld h of recording left at this rate" = "About %lld h of recording left at this rate";
 /* OutputLook.swift */
 "Color look (LUT)" = "Color look (LUT)";
 "Look" = "Look";
@@ -553,9 +560,11 @@
 "Mac went to sleep" = "Mac went to sleep";
 /* Presets.swift */
 "Streaming" = "Streaming";
+"Event" = "Event";
 "Minimal" = "Minimal";
 "Stats overlay on, network stream auto-starts, no recording/replay." = "Stats overlay on, network stream auto-starts, no recording/replay.";
 "Auto-record on connect, instant replay (60 s), clean video." = "Auto-record on connect, instant replay (60 s), clean video.";
+"Several goggles for hours: auto-record in 30-minute files, signal-lost alert on, clean video, no replay." = "Several goggles for hours: auto-record in 30-minute files, signal-lost alert on, clean video, no replay.";
 "Everything optional off; framing reset." = "Everything optional off; framing reset.";
 "Presets" = "Presets";
 "Preset" = "Preset";
@@ -889,6 +898,7 @@
 "Program Output" = "Program Output";
 "Zebra Stripes" = "Zebra Stripes";
 "Focus Peaking" = "Focus Peaking";
+"Operator Overview…" = "Operator Overview…";
 "Connection Health…" = "Connection Health…";
 "Window" = "Window";
 "Minimize" = "Minimize";

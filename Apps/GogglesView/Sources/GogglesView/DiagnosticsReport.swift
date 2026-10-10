@@ -54,7 +54,7 @@ enum DiagnosticsReport {
         OSDPrefs.enabledKey, OSDPrefs.showFpsKey, OSDPrefs.showBitrateKey, OSDPrefs.showResolutionKey,
         OSDPrefs.showDropsKey, OSDPrefs.showLatencyKey, OSDPrefs.showBatteryKey,
         ReplayPrefs.enabledKey, ReplayPrefs.secondsKey,
-        NetStreamPrefs.hostKey, NetStreamPrefs.portKey, NetStreamPrefs.autoStartKey,
+        NetStreamPrefs.hostKey, NetStreamPrefs.portKey, NetStreamPrefs.autoStartKey, SRTPrefs.autoStartKey,
         CaptureWindowPrefs.enabledKey, CaptureWindowPrefs.onTopKey,
         SessionLogPrefs.enabledKey, SessionLogPrefs.retentionDaysKey,
         AutomationPrefs.enabledKey, AutomationPrefs.urlEnabledKey,

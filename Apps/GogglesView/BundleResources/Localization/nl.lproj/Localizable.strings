@@ -828,3 +828,13 @@
 "Re-encode at 30 fps (lighter, for several goggles)" = "Opnieuw coderen op 30 fps (lichter, voor meerdere brillen)";
 
 "Each goggles window with a recording or stream uses its own hardware encoder, and a Mac can only encode a limited number of frames per second in total (about 150 on an M1 Pro). At 30 fps, recordings and streams are half as smooth, but twice as many goggles fit. The live view stays at full frame rate." = "Elk brilvenster met een opname of stream gebruikt zijn eigen hardware-encoder, en een Mac kan in totaal maar een beperkt aantal beelden per seconde coderen (ongeveer 150 op een M1 Pro). Op 30 fps zijn opnames en streams half zo vloeiend, maar passen er twee keer zoveel brillen. Het livebeeld blijft op volle framerate.";
+
+"Operator overview" = "Operatoroverzicht";
+"Record all" = "Alles opnemen";
+"Stop all" = "Alles stoppen";
+"Record" = "Opnemen";
+"%@ free in %@" = "%@ vrij in %@";
+"About %lld h of recording left at this rate" = "Nog ongeveer %lld u opname over in dit tempo";
+"Event" = "Evenement";
+"Several goggles for hours: auto-record in 30-minute files, signal-lost alert on, clean video, no replay." = "Meerdere brillen urenlang: automatisch opnemen in bestanden van 30 minuten, signaalverliesmelding aan, schoon beeld, geen replay.";
+"Operator Overview…" = "Operatoroverzicht…";

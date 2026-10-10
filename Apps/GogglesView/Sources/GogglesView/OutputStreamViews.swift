@@ -19,7 +19,10 @@ struct SRTStreamControl: View {
         .accessibilityValue(AccessibilityLabels.streamState(isStreaming: out.isStreaming, connected: out.connected, error: out.lastError))
         .help(!available ? L("libsrt not found (brew install srt, or set the path in Settings > Streaming)")
               : out.lastError ?? (out.isStreaming ? (out.connected ? L("SRT connected") : L("SRT waiting for peer")) : L("Start SRT stream")))
-        .onAppear { available = SRTOutput.isAvailable() }
+        .onAppear {
+            available = SRTOutput.isAvailable()
+            if available, UserDefaults.standard.bool(forKey: SRTPrefs.autoStartKey), !out.isStreaming { start() }
+        }
         .onDisappear { stop() }
     }
 
@@ -44,6 +47,7 @@ struct SRTSettingsSection: View {
     @AppStorage(SRTPrefs.latencyKey) private var latency = SRTPrefs.defaultLatency
     @KeychainSecret(SRTPrefs.passphraseKey) private var passphrase
     @AppStorage(SRTPrefs.libraryPathKey) private var libPath = ""
+    @AppStorage(SRTPrefs.autoStartKey) private var autoStart = false
 
     var body: some View {
         let found = OutputLibrary.resolveSRT(userPath: libPath)
@@ -61,6 +65,7 @@ struct SRTSettingsSection: View {
             TextField("Port", value: $port, format: .number.grouping(.never))
             TextField("Latency (ms, 20-8000)", value: $latency, format: .number.grouping(.never))
             SecureField("Passphrase (10-79 chars, optional)", text: $passphrase)
+            Toggle("Start automatically", isOn: $autoStart)
             if !SRTPrefs.passphraseValid(passphrase) {
                 Text("Passphrase must be 10-79 characters.").font(.caption).foregroundStyle(.orange)
             }
