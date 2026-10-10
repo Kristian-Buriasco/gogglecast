@@ -18,7 +18,7 @@ enum SettingsPreset: String, CaseIterable, Identifiable {
         switch self {
         case .streaming: return L("Stats overlay on, network stream auto-starts, no recording/replay.")
         case .recording: return L("Auto-record on connect, instant replay (60 s), clean video.")
-        case .event: return L("Several goggles for hours: auto-record in 30-minute files, signal-lost alert on, clean video, no replay.")
+        case .event: return L("Several goggles for hours: signal-lost alert on, clean video, no recording, no replay.")
         case .minimal: return L("Everything optional off; framing reset.")
         }
     }
@@ -55,9 +55,7 @@ enum SettingsPreset: String, CaseIterable, Identifiable {
             v[ReplayPrefs.secondsKey] = 60
         case .event:
             v[OSDPrefs.enabledKey] = false
-            v[RecordingPrefs.autoStartKey] = true
-            v[RecordingPrefs.containerKey] = RecordingPrefs.Container.mov.rawValue
-            v[RecordingExtras.splitMinutesKey] = 30
+            v[RecordingPrefs.autoStartKey] = false
             v[SignalAlertPrefs.enabledKey] = true
             v[ReplayPrefs.enabledKey] = false
         case .minimal:

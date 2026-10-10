@@ -901,11 +901,11 @@
 "Each goggles window with a recording or stream uses its own hardware encoder, and a Mac can only encode a limited number of frames per second in total (about 150 on an M1 Pro). At 30 fps, recordings and streams are half as smooth, but twice as many goggles fit. The live view stays at full frame rate." = "Ogni finestra dei visori con una registrazione o uno streaming usa il proprio encoder hardware, e un Mac può codificare solo un numero limitato di fotogrammi al secondo in totale (circa 150 su un M1 Pro). A 30 fps registrazioni e streaming sono meno fluidi, ma entrano il doppio dei visori. La vista live resta a piena frequenza.";
 
 "Operator overview" = "Panoramica operatore";
-"Record all" = "Registra tutto";
-"Stop all" = "Ferma tutto";
 "Record" = "Registra";
 "%@ free in %@" = "%@ liberi in %@";
 "About %lld h of recording left at this rate" = "Circa %lld h di registrazione rimasti a questo ritmo";
 "Event" = "Evento";
-"Several goggles for hours: auto-record in 30-minute files, signal-lost alert on, clean video, no replay." = "Più visori per ore: registrazione automatica in file da 30 minuti, avviso di segnale perso attivo, video pulito, nessun replay.";
 "Operator Overview…" = "Panoramica operatore…";
+
+"Stop all recordings" = "Ferma tutte le registrazioni";
+"Several goggles for hours: signal-lost alert on, clean video, no recording, no replay." = "Più visori per ore: avviso di segnale perso attivo, video pulito, nessuna registrazione, nessun replay.";

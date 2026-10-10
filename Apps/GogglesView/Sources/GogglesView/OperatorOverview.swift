@@ -2,7 +2,8 @@ import Foundation
 
 // Operator overview: one window with a row per open goggles (name, state, fps, battery, recording)
 // and Record all / Stop all, plus how much disk is left for the recordings. For events with several
-// goggles, where walking through every window to see who is live is too slow.
+// goggles, where walking through every window to see who is live is too slow. Recording controls
+// only appear while something records.
 
 struct OverviewRow: Equatable, Identifiable {
     enum Health: Equatable { case good, warning, bad }
@@ -27,8 +28,6 @@ enum OverviewLogic {
         }
     }
 
-    /// Windows to toggle for "Record all": live ones that are not recording yet.
-    static func toStartRecording(_ rows: [OverviewRow]) -> [String] { rows.filter { $0.isLive && !$0.isRecording }.map(\.id) }
     /// Windows to toggle for "Stop all": everything that is recording.
     static func toStopRecording(_ rows: [OverviewRow]) -> [String] { rows.filter(\.isRecording).map(\.id) }
 
@@ -108,7 +107,6 @@ final class OperatorOverviewModel: ObservableObject {
         }
     }
 
-    func recordAll() { toggleRecording(OverviewLogic.toStartRecording(rows)) }
     func stopAll() { toggleRecording(OverviewLogic.toStopRecording(rows)) }
     func toggle(_ id: String) { toggleRecording([id]) }
     func focus(_ id: String) { sessions().first { $0.deviceId == id }?.focus() }
@@ -126,10 +124,8 @@ struct OperatorOverviewView: View {
             HStack {
                 Text("Operator overview").font(.title3.bold())
                 Spacer()
-                Button("Record all") { model.recordAll() }
-                    .disabled(OverviewLogic.toStartRecording(model.rows).isEmpty)
-                Button("Stop all") { model.stopAll() }
-                    .disabled(OverviewLogic.toStopRecording(model.rows).isEmpty)
+                // Recording is optional for events: the header only shows it while something records.
+                if model.recordingCount > 0 { Button("Stop all recordings") { model.stopAll() } }
             }
             if model.rows.isEmpty {
                 Text("No goggles are open").foregroundStyle(.secondary).padding(.vertical, 20)
@@ -163,7 +159,7 @@ struct OperatorOverviewView: View {
     }
 
     @ViewBuilder private var diskLine: some View {
-        if let free = model.freeBytes {
+        if let free = model.freeBytes, model.recordingCount > 0 {
             let level = model.diskLevel
             let hours = OverviewLogic.hoursLeft(freeBytes: free, recordings: model.recordingCount)
             HStack(spacing: 6) {

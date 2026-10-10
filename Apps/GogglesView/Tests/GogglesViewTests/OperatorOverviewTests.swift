@@ -7,12 +7,6 @@ import Testing
         OverviewRow(id: id, name: id, status: "", health: live ? .good : .bad, isLive: live, fps: nil, battery: nil, isRecording: rec, elapsed: 0)
     }
 
-    @Test func recordAllStartsOnlyLiveWindowsThatAreNotRecording() {
-        let rows = [row("a", live: true, rec: false), row("b", live: true, rec: true),
-                    row("c", live: false, rec: false), row("d", live: true, rec: false)]
-        #expect(OverviewLogic.toStartRecording(rows) == ["a", "d"])
-    }
-
     @Test func stopAllStopsEveryRecordingEvenWithoutSignal() {
         let rows = [row("a", live: true, rec: true), row("b", live: false, rec: true), row("c", live: true, rec: false)]
         #expect(OverviewLogic.toStopRecording(rows) == ["a", "b"])
@@ -48,15 +42,15 @@ import Testing
         #expect(OverviewLogic.formatElapsed(86_400 + 61) == "24:01:01")
     }
 
-    @Test func eventPresetSetsAutoRecordSplitAndAlert() {
+    @Test func eventPresetHasNoRecordingButTheSignalAlert() {
         let d = UserDefaults(suiteName: "event-\(UUID().uuidString)")!
+        d.set(true, forKey: RecordingPrefs.autoStartKey)
         SettingsPreset.event.apply(to: d)
-        #expect(d.bool(forKey: RecordingPrefs.autoStartKey))
-        #expect(d.integer(forKey: RecordingExtras.splitMinutesKey) == 30)
+        #expect(!d.bool(forKey: RecordingPrefs.autoStartKey))
         #expect(d.bool(forKey: SignalAlertPrefs.enabledKey))
         #expect(d.object(forKey: ReplayPrefs.enabledKey) as? Bool == false)
         SettingsPreset.minimal.apply(to: d)
-        #expect(d.object(forKey: RecordingExtras.splitMinutesKey) == nil, "the next preset clears what event set")
+        #expect(d.object(forKey: SignalAlertPrefs.enabledKey) == nil, "the next preset clears what event set")
     }
 
     @Test func srtAutoStartIsInTheSettingsBackup() {
