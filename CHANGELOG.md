@@ -4,6 +4,8 @@ All notable changes to this project are documented here. Format based on [Keep a
 
 ## [Unreleased]
 
+## [0.8.2] - 2026-10-10
+
 ### Added
 - Several goggles at once: a separate SRT/UDP port per goggles window (window 1 keeps the configured port, the next windows add 1, 2, ...), and NDI source names with a number. On by default, switchable in Settings > Streaming > OBS Studio.
 - "Add all feeds to OBS" (Settings > Streaming > OBS Studio): creates one Media Source per open goggles over the OBS WebSocket connection, pointing at that window's SRT or UDP output. Existing sources are updated, never deleted. Not checked against a real OBS yet.
