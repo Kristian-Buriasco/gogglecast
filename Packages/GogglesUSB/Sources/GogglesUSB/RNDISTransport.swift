@@ -708,9 +708,39 @@ public final class RNDISTransport: GogglesTransport {
         }
     }
 
+    /// Research aid: sees every inbound Ethernet frame (before filtering) and can send raw ones. Not used by the app.
+    public var rawInboundHandler: (@Sendable (Data) -> Void)?
+
+    public func sendRawEthernet(_ frame: Data) throws { try writeEthernetFrame(frame) }
+
+    /// Research aid: `GOGGLES_SNIFF=1` logs a one-line summary of every inbound Ethernet frame to stderr.
+    private static let sniff = ProcessInfo.processInfo.environment["GOGGLES_SNIFF"] == "1"
+
+    private static func logSniffed(_ f: Data) {
+        let b = [UInt8](f)
+        guard b.count >= 14 else { return }
+        func mac(_ o: Int) -> String { b[o..<o + 6].map { String(format: "%02x", $0) }.joined(separator: ":") }
+        let type = Int(b[12]) << 8 | Int(b[13])
+        var line = "[sniff] len=\(b.count) \(mac(6))>\(mac(0)) type=0x\(String(type, radix: 16))"
+        if type == 0x0800, b.count >= 34 {
+            let proto = b[23]
+            let ihl = Int(b[14] & 0x0f) * 4
+            let src = b[26..<30].map(String.init).joined(separator: "."), dst = b[30..<34].map(String.init).joined(separator: ".")
+            line += " ip \(src)>\(dst) proto=\(proto)"
+            if (proto == 17 || proto == 6), b.count >= 14 + ihl + 4 {
+                let o = 14 + ihl
+                line += " ports \(Int(b[o]) << 8 | Int(b[o + 1]))>\(Int(b[o + 2]) << 8 | Int(b[o + 3]))"
+            }
+        }
+        line += " hex=" + b.prefix(64).map { String(format: "%02x", $0) }.joined()
+        FileHandle.standardError.write(Data((line + "\n").utf8))
+    }
+
     /// One inbound Ethernet frame's worth of filtering (design §5.2). See
     /// `handleBulkInCompletion`'s doc comment for the full rationale.
     private func handleInboundEthernetFrame(_ frame: Data) {
+        if Self.sniff { Self.logSniffed(frame) }
+        rawInboundHandler?(frame)
         if let arp = RawNet.parseARP(frame) {
             if arp.senderIp == ARPResolver.gogglesIp {
                 updateGogglesMac(arp.senderMac)

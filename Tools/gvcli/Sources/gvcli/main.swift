@@ -65,6 +65,8 @@ do {
         try await runInfoCommand()
     case "stream":
         try await runStreamCommand(args: rest)
+    case "scan":
+        try await runScanCommand(args: rest)
     case "replay":
         try await runReplayCommand(args: rest)
     case "-h", "--help", "help":
