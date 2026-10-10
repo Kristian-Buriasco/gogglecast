@@ -849,6 +849,7 @@
 "Update's code signature is invalid" = "Update's code signature is invalid";
 "Update has a different app identity" = "Update has a different app identity";
 "Update version doesn't match the release" = "Update version doesn't match the release";
+"macOS refused to restart it on %lld launches in a row, so the app stopped trying." = "macOS refused to restart it on %lld launches in a row, so the app stopped trying.";
 "The update installed, but the background service didn't restart: %@ Try Re-register under Background service in Settings." = "The update installed, but the background service didn't restart: %@ Try Re-register under Background service in Settings.";
 /* ViewFraming.swift */
 "Fit" = "Fit";

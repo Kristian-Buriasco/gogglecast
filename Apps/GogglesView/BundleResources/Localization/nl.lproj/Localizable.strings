@@ -850,3 +850,6 @@
 
 /* TODO: translate (English placeholder) */
 "Open the program outputs when the app starts" = "Programma-uitgangen openen bij het starten van de app";
+
+/* TODO: translate (English placeholder) */
+"macOS refused to restart it on %lld launches in a row, so the app stopped trying." = "macOS weigerde het %lld keer na elkaar te herstarten, dus de app stopte met proberen.";

@@ -921,3 +921,6 @@
 
 /* TODO: translate (English placeholder) */
 "Open the program outputs when the app starts" = "Apri le uscite programma all'avvio dell'app";
+
+/* TODO: translate (English placeholder) */
+"macOS refused to restart it on %lld launches in a row, so the app stopped trying." = "macOS ha rifiutato di riavviarlo per %lld avvii di fila, quindi l'app ha smesso di provare.";

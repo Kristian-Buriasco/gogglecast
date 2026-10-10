@@ -160,9 +160,36 @@ final class HelperUpdateTests: XCTestCase {
         let d = defaults(pending: "2.0")
         let r = UpdateInstaller.finishPendingHelperUpdate(
             defaults: d, currentVersion: "2.0",
-            unregister: { .notRegistered }, register: { throw Boom() })
+            pause: { _ in }, unregister: { .notRegistered }, register: { throw Boom() })
         XCTAssertEqual(r, .failed("boom"))
         XCTAssertEqual(d.string(forKey: UpdatePrefs2.helperChangedKey), "2.0", "retried on the next launch")
+    }
+
+    func testRegisterIsRetriedWithinTheSameLaunch() {
+        let d = defaults(pending: "2.0")
+        var tries = 0
+        let r = UpdateInstaller.finishPendingHelperUpdate(
+            defaults: d, currentVersion: "2.0", pause: { _ in },
+            unregister: { .notRegistered },
+            register: { tries += 1; if tries < 3 { throw Boom() }; return .enabled })
+        XCTAssertEqual(r, .reRegistered)
+        XCTAssertEqual(tries, 3)
+        XCTAssertNil(d.string(forKey: UpdatePrefs2.helperChangedKey))
+        XCTAssertEqual(d.integer(forKey: UpdatePrefs2.helperAttemptsKey), 0)
+    }
+
+    func testGivesUpAfterTwoFailedLaunchesInsteadOfStoppingTheHelperEveryStart() {
+        let d = defaults(pending: "2.0")
+        var unregisterCalls = 0
+        func launch() -> UpdateInstaller.HelperUpdateResult {
+            UpdateInstaller.finishPendingHelperUpdate(
+                defaults: d, currentVersion: "2.0", pause: { _ in },
+                unregister: { unregisterCalls += 1; return .notRegistered }, register: { throw Boom() })
+        }
+        XCTAssertEqual(launch(), .failed("boom"))
+        XCTAssertEqual(launch(), .failed("boom"))
+        guard case .failed = launch() else { return XCTFail("third launch should still report a failure") }
+        XCTAssertEqual(unregisterCalls, 2, "the third launch must leave the running helper alone")
     }
 
     func testRequiresApprovalIsAFailureWithAGuide() {

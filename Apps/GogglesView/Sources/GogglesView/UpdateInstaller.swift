@@ -66,6 +66,8 @@ enum UpdateInstallScript {
 enum UpdatePrefs2 {
     static let autoInstallKey = "updateAutoInstall"
     static let helperChangedKey = "updateHelperChanged"
+    /// How many launches have already tried (and failed) to restart the background service for the pending update.
+    static let helperAttemptsKey = "updateHelperAttempts"
 }
 
 /// What the staged update must be signed by, derived from the running app.
@@ -349,37 +351,55 @@ final class UpdateInstaller: ObservableObject {
 
     /// Launch hook: if the last update replaced the helper, re-register so launchd runs the new binary.
     /// Run it before anything starts streaming: unregistering stops the running helper.
-    /// The pending marker is kept after a failure, so the next launch tries again.
+    /// A failed attempt keeps the marker so the next launch can try again, but only `maxLaunchAttempts` launches
+    /// do: every attempt stops the running helper, so retrying forever made every start slow (the helper had to
+    /// be started again and the app reconnected for ~15 s) while the real problem stayed unfixed.
     @discardableResult
     static func finishPendingHelperUpdate(
         defaults d: UserDefaults = .standard,
         currentVersion: String = UpdateChecker.currentVersion,
+        maxLaunchAttempts: Int = 2,
+        registerTries: Int = 3,
+        pause: (TimeInterval) -> Void = { Thread.sleep(forTimeInterval: $0) },
         unregister: () throws -> SMAppService.Status = { try HelperRegistration.unregister() },
         register: () throws -> SMAppService.Status = { try HelperRegistration.register() }
     ) -> HelperUpdateResult {
         // The marker is written from the release tag ("v0.6.0") while the bundle version has no "v".
         func bare(_ v: String) -> String { v.hasPrefix("v") ? String(v.dropFirst()) : v }
         guard let v = d.string(forKey: UpdatePrefs2.helperChangedKey), bare(v) == bare(currentVersion) else { return .notNeeded }
+        let attempts = d.integer(forKey: UpdatePrefs2.helperAttemptsKey)
+        if attempts >= maxLaunchAttempts {
+            return .failed(L("macOS refused to restart it on %lld launches in a row, so the app stopped trying.", attempts))
+        }
         // Unregistering a service that is not registered can throw; that is not a failure here.
         do { _ = try unregister() } catch {
             Logging.xpc.info("helper unregister before re-register: \(String(describing: error), privacy: .public)")
         }
-        do {
-            let status = try register()
-            switch status {
-            case .enabled:
-                d.removeObject(forKey: UpdatePrefs2.helperChangedKey)
-                return .reRegistered
-            case .requiresApproval:
-                return .failed(L("macOS is waiting for your approval. In System Settings > General > Login Items & Extensions, switch on GogglesView."))
-            default:
-                return .failed(HelperRegistration.plainDescription(status))
+        var lastFailure: HelperUpdateResult = .failed(HelperRegistration.plainDescription(.notFound))
+        for attempt in 1...max(registerTries, 1) {
+            do {
+                let status = try register()
+                switch status {
+                case .enabled:
+                    d.removeObject(forKey: UpdatePrefs2.helperChangedKey)
+                    d.removeObject(forKey: UpdatePrefs2.helperAttemptsKey)
+                    return .reRegistered
+                case .requiresApproval:
+                    // Waiting for the user, not a transient refusal: retrying here changes nothing.
+                    d.set(attempts + 1, forKey: UpdatePrefs2.helperAttemptsKey)
+                    return .failed(L("macOS is waiting for your approval. In System Settings > General > Login Items & Extensions, switch on GogglesView."))
+                default:
+                    lastFailure = .failed(HelperRegistration.plainDescription(status))
+                }
+            } catch {
+                Logging.xpc.error("helper re-register after update failed (try \(attempt, privacy: .public)): \(String(describing: error), privacy: .public)")
+                ConnectionTrace.shared.record("helper re-register after update failed: \(error)")
+                lastFailure = .failed(error.localizedDescription)
             }
-        } catch {
-            Logging.xpc.error("helper re-register after update failed: \(String(describing: error), privacy: .public)")
-            ConnectionTrace.shared.record("helper re-register after update failed: \(error)")
-            return .failed(error.localizedDescription)
+            if attempt < registerTries { pause(0.5) }
         }
+        d.set(attempts + 1, forKey: UpdatePrefs2.helperAttemptsKey)
+        return lastFailure
     }
 
     /// Why the background service could not be restarted after the last update (nil when fine).
