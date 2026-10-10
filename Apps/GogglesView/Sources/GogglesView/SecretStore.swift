@@ -46,7 +46,25 @@ enum SecretStore {
         func remove(_ key: String) { SecItemDelete(query(key) as CFDictionary) }
     }
 
-    nonisolated(unsafe) static var backend: Backend = KeychainBackend()
+    /// Keeps secrets in memory only. Used by tests: a test process touching the real Keychain makes macOS ask for
+    /// the login keychain password, because the test runner is not the app that created the items.
+    final class MemoryBackend: Backend, @unchecked Sendable {
+        private let lock = NSLock()
+        private var items: [String: String] = [:]
+        func read(_ key: String) -> String? { lock.lock(); defer { lock.unlock() }; return items[key] }
+        func write(_ value: String, _ key: String) -> Bool { lock.lock(); items[key] = value; lock.unlock(); return true }
+        func remove(_ key: String) { lock.lock(); items[key] = nil; lock.unlock() }
+    }
+
+    static var runningUnderTests: Bool {
+        let env = ProcessInfo.processInfo.environment
+        return env["XCTestConfigurationFilePath"] != nil || env["XCTestSessionIdentifier"] != nil
+            || NSClassFromString("XCTestCase") != nil
+            || ProcessInfo.processInfo.processName.contains("swiftpm-testing-helper")
+            || ProcessInfo.processInfo.processName.hasSuffix("PackageTests")
+    }
+
+    nonisolated(unsafe) static var backend: Backend = runningUnderTests ? MemoryBackend() : KeychainBackend()
     nonisolated(unsafe) static var defaults: UserDefaults = .standard
 
     static func get(_ key: String) -> String {

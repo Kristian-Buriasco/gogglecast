@@ -16,3 +16,10 @@ import Testing
         #expect(VideoVisibility.opacity(kind: .claiming, hadPicture: true) == 0)
     }
 }
+
+@Suite struct SecretStoreTestIsolationTests {
+    @Test func testsNeverUseTheRealKeychain() {
+        #expect(SecretStore.runningUnderTests)
+        #expect(SecretStore.backend is SecretStore.MemoryBackend, "a test touching the login keychain prompts for its password")
+    }
+}
