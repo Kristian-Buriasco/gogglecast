@@ -32,3 +32,6 @@ dist/
 
 # Local tooling
 dist/
+
+# graphify
+graphify-out/
