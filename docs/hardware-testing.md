@@ -63,3 +63,16 @@ The goggles send about 10 packets per second of DUML telemetry next to the video
 1. Quit GogglesView and wait 6 seconds so the helper releases the goggles.
 2. In a terminal (needs root): `cd Tools/gvcli && swift build && sudo .build/debug/gvcli stream --out /tmp/goggles.h264 --dump-telemetry /tmp/telemetry.jsonl --stats` and stop it with Ctrl-C after 60 seconds.
 3. Keep `/tmp/telemetry.jsonl`. It contains the goggles serial and possibly GPS positions: do not post it publicly. See docs/telemetry-research.md for how to read it.
+
+## 10. Several goggles (event preparation)
+
+Needs 2 or 3 goggles on one Mac (powered USB hub if the ports are shared). Write down the Mac model and chip. Settings > Streaming > Keyframes: leave re-encode on, 30 fps off, for the first pass.
+
+- [ ] Open every goggles (Add Goggles… / the picker). Each gets its own window, all pictures live, no cross-talk. Note fps per window (stats overlay).
+- [ ] Program output (Settings > Display): with a second display or HDMI adapter attached, a grid shows every feed with names; rename a feed ("Runner 1"); unplug one goggles: its tile shows NO SIGNAL and returns when replugged. Try One feed, and a second output on a second display.
+- [ ] Settings > Streaming > OBS Studio: connect, pick a scene, SRT (or UDP if libsrt is missing), Add all feeds to OBS. Check one source's URL and port in OBS (Properties). Press the SRT/UDP button in every window: each source shows its own goggles in OBS, none shows another's picture. Press Add all feeds again: no duplicates.
+- [ ] With everything sending and recording, fps per window for 10 minutes (re-encode on). Then turn on "Re-encode at 30 fps" and compare. Note the numbers against docs/events.md.
+- [ ] Unplug and replug one goggles: only its window and OBS source drop and recover; the others do not hiccup.
+- [ ] Sleep/wake or lock the Mac for a minute: all feeds come back.
+- [ ] Leave it for 30 to 60 minutes recording all windows. Activity Monitor: GogglesView memory flat, no growth per minute, no thermal throttling; recordings play; disk space as expected.
+- [ ] Report: Mac, chip, number of goggles, fps with and without 30 fps, anything grey, black, or frozen (Connection Health > Copy report for each window).
