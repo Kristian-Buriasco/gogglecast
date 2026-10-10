@@ -408,6 +408,13 @@ final class UpdateInstaller: ObservableObject {
     /// Runs the pending helper update and remembers a failure for the Settings status line and the
     /// setup assistant.
     func runPendingHelperUpdate() {
+        // A helper from before this app copy was installed: restart it ourselves (no marker is written when the
+        // bundle is replaced by hand, a DMG drag or Homebrew).
+        let d = UserDefaults.standard
+        if d.string(forKey: UpdatePrefs2.helperChangedKey) == nil, StaleHelperCheck.helperIsStale() {
+            Logging.xpc.info("running helper is older than the installed one: restarting it")
+            d.set(UpdateChecker.currentVersion, forKey: UpdatePrefs2.helperChangedKey)
+        }
         if case .failed(let reason) = Self.finishPendingHelperUpdate() {
             helperUpdateError = L("The update installed, but the background service didn't restart: %@ Try Re-register under Background service in Settings.", reason.hasSuffix(".") ? reason : reason + ".")
         } else {
