@@ -24,6 +24,8 @@ private let soakReencode = env["GOGGLES_SOAK_REENCODE"] != "0"
 /// GOGGLES_SOAK_HALF=1 re-encodes at 30 fps (Settings > Streaming).
 private let soakHalf = env["GOGGLES_SOAK_HALF"] == "1"
 private let soakShared = env["GOGGLES_SOAK_SHARED"] != "0"
+/// GOGGLES_SOAK_ENHANCE=denoise|upscale|both|stabilize|all turns on the picture stages for every feed.
+private let soakEnhance = env["GOGGLES_SOAK_ENHANCE"] ?? ""
 
 /// Pure pass/fail rules, tested separately so the soak thresholds are not a mystery.
 enum SoakVerdict {
@@ -75,6 +77,11 @@ struct MultiFeedSoakTests {
         UserDefaults.standard.set(soakReencode, forKey: ReencodePrefs.enabledKey)
         UserDefaults.standard.set(soakHalf, forKey: ReencodePrefs.halfRateKey)
         defer { UserDefaults.standard.removeObject(forKey: ReencodePrefs.halfRateKey) }
+        let enhanceKeys = [EnhancePrefs.denoiseKey, EnhancePrefs.upscaleKey, StabilizerPrefs.enabledKey]
+        UserDefaults.standard.set(["denoise", "both", "all"].contains(soakEnhance), forKey: EnhancePrefs.denoiseKey)
+        UserDefaults.standard.set(["upscale", "both", "all"].contains(soakEnhance), forKey: EnhancePrefs.upscaleKey)
+        UserDefaults.standard.set(["stabilize", "all"].contains(soakEnhance), forKey: StabilizerPrefs.enabledKey)
+        defer { enhanceKeys.forEach { UserDefaults.standard.removeObject(forKey: $0) } }
         defer {
             if let savedReencode { UserDefaults.standard.set(savedReencode, forKey: ReencodePrefs.enabledKey) }
             else { UserDefaults.standard.removeObject(forKey: ReencodePrefs.enabledKey) }

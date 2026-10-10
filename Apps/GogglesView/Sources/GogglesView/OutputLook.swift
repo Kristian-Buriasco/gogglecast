@@ -244,7 +244,7 @@ final class OutputProcessor {
 
     /// True when recordings and outputs must come from the re-encoded stream: the output crop or look is
     /// on, or the stabilizer is (it only exists in the decoded picture, never in the raw goggles stream).
-    static var needsReencodedStream: Bool { needsReencodedStream(outputActive: isActive, stabilizerOn: StabilizerPrefs.enabled) }
+    static var needsReencodedStream: Bool { needsReencodedStream(outputActive: isActive, stabilizerOn: StabilizerPrefs.enabled || EnhancePrefs.anyEnabled) }
     static func needsReencodedStream(outputActive: Bool, stabilizerOn: Bool) -> Bool { outputActive || stabilizerOn }
 
     private let lock = NSLock()

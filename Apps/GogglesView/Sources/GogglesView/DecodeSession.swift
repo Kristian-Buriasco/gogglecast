@@ -80,6 +80,7 @@ final class DecodeSession: ObservableObject {
     private var latestDecoded: CVPixelBuffer?
     private var decodedCount: UInt64 = 0
     private let stabilizer = Stabilizer()
+    private let enhancer = VideoEnhancer()
     private(set) var teardownCount = 0
     private var lastPictureAt: UInt64 = 0
 
@@ -130,6 +131,9 @@ final class DecodeSession: ObservableObject {
     /// The stabilizer's own state (cost, bypass), for the Settings caption and tests.
     var stabilizerBypassed: Bool { stabilizer.isBypassed }
     var stabilizerStats: StabilizerStats { stabilizer.stats }
+    var enhanceStats: EnhanceStats { enhancer.stats }
+    func resetEnhanceStats() { enhancer.resetStats() }
+    var enhanceLastError: String? { enhancer.lastError }
     func resetStabilizerStats() { stabilizer.resetStats() }
     func takeStabilizerMotionLog() -> [CGPoint] { stabilizer.takeMotionLog() }
 
@@ -390,6 +394,7 @@ final class DecodeSession: ObservableObject {
         releaseDecoder()
         // The next picture is unrelated to the old session's frames.
         stabilizer.reset()
+        enhancer.reset()
         setWaitingForKeyframe(true)
     }
 
@@ -401,7 +406,13 @@ final class DecodeSession: ObservableObject {
         }
         if CFGetTypeID(image) == CVPixelBufferGetTypeID() {
             stabilizer.noteTimestamp(pts.value)
-            image = stabilizer.process(image as! CVPixelBuffer)
+            enhancer.noteTimestamp(pts.value)
+            // denoise first (cleaner motion measurement), upscale last (also recovers detail the stabilizer's zoom softened)
+            var picture = image as! CVPixelBuffer
+            picture = enhancer.denoise(picture, pts: pts)
+            picture = stabilizer.process(picture)
+            picture = enhancer.upscale(picture, pts: pts)
+            image = picture
         }
         frameLock.lock(); latestDecoded = image; decodedCount &+= 1; lastPictureAt = DispatchTime.now().uptimeNanoseconds; frameLock.unlock()
         updateExposureAids(image)

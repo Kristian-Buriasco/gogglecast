@@ -851,6 +851,13 @@
 "Update version doesn't match the release" = "Update version doesn't match the release";
 "macOS refused to restart it on %lld launches in a row, so the app stopped trying." = "macOS refused to restart it on %lld launches in a row, so the app stopped trying.";
 "The update installed, but the background service didn't restart: %@ Try Re-register under Background service in Settings." = "The update installed, but the background service didn't restart: %@ Try Re-register under Background service in Settings.";
+/* VideoEnhancer.swift */
+"Picture enhancement" = "Picture enhancement";
+"Upscaling needs a Mac with Apple silicon." = "Upscaling needs a Mac with Apple silicon.";
+"Reduce noise (low light, high ISO)" = "Reduce noise (low light, high ISO)";
+"Upscale the picture" = "Upscale the picture";
+"Scale" = "Scale";
+"Reducing noise blends each picture with the ones before it, so a moving subject can leave a faint trail at high strength. Upscaling makes the picture larger and sharper with Apple's MetalFX scaler. The goggles still send 1080p, so it helps most for recordings and large displays; it does not add detail that was never captured. Both run on the GPU, add no frames of delay, switch themselves off when the Mac cannot keep up, and are off in race mode. They apply to the preview, recordings and streams." = "Reducing noise blends each picture with the ones before it, so a moving subject can leave a faint trail at high strength. Upscaling makes the picture larger and sharper with Apple's MetalFX scaler. The goggles still send 1080p, so it helps most for recordings and large displays; it does not add detail that was never captured. Both run on the GPU, add no frames of delay, switch themselves off when the Mac cannot keep up, and are off in race mode. They apply to the preview, recordings and streams.";
 /* ViewFraming.swift */
 "Fit" = "Fit";
 "Fill" = "Fill";
