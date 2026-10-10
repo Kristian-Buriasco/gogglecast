@@ -2,7 +2,7 @@
 
 All notable changes to this project are documented here. Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.9.0] - 2026-10-10
 
 ### Added
 - Operator overview (Goggles menu): one window with a row per open goggles (state, outputs sending, fps, battery, warnings), a Record button each, Start all / Stop all outputs, a big-tile view and full screen. While something records it also shows Stop all recordings and a free-disk line that warns when fewer than 3 hours are left.
@@ -10,6 +10,11 @@ All notable changes to this project are documented here. Format based on [Keep a
 - Status page for a phone (`/status` on the web viewer): one tile per goggles, read-only, no serial numbers.
 - "Event" preset for several goggles over many hours: signal-lost alert on, clean video, no recording, no replay.
 - SRT output can start automatically, like the UDP stream.
+
+### Fixed
+- When the signal drops (for example the air unit disconnects), the last picture now stays on screen, dimmed, under the "reconnecting" card. Before, it disappeared after 5 seconds.
+- Program output no longer reopens its full screen windows at launch (they hid the normal window). Turn on "Open the program outputs when the app starts" in Settings > Display to get the old behaviour.
+- Slow start after an update: when macOS refused to restart the background service, the app stopped and retried it on every launch. It now retries a few times within one launch and gives up after two launches, with a message in Settings. Run `defaults delete com.kburiasco.gogglesview updateHelperChanged` to clear an old stuck marker.
 
 ## [0.8.2] - 2026-10-10
 
