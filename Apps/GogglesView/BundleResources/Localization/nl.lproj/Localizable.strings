@@ -838,3 +838,12 @@
 
 "Stop all recordings" = "Alle opnames stoppen";
 "Several goggles for hours: signal-lost alert on, clean video, no recording, no replay." = "Meerdere brillen urenlang: signaalverliesmelding aan, schoon beeld, geen opname, geen replay.";
+
+"Picture not changing" = "Beeld staat stil";
+"Black picture" = "Zwart beeld";
+"UDP" = "UDP";
+"Start all outputs" = "Alle uitvoeren starten";
+"Stop all outputs" = "Alle uitvoeren stoppen";
+"List" = "Lijst";
+"Big view" = "Grote weergave";
+"Full screen" = "Volledig scherm";

@@ -21,7 +21,14 @@ struct SRTStreamControl: View {
               : out.lastError ?? (out.isStreaming ? (out.connected ? L("SRT connected") : L("SRT waiting for peer")) : L("Start SRT stream")))
         .onAppear {
             available = SRTOutput.isAvailable()
+            SessionControlBoard.shared.register(srt: out, for: session)
             if available, UserDefaults.standard.bool(forKey: SRTPrefs.autoStartKey), !out.isStreaming { start() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .gogglesStartAllOutputs)) { _ in
+            if available, EventOutputKind.enabled(.srt), !out.isStreaming { start() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .gogglesStopAllOutputs)) { _ in
+            if out.isStreaming { stop() }
         }
         .onDisappear { stop() }
     }
@@ -93,7 +100,16 @@ struct NDIStreamControl: View {
         .accessibilityValue(AccessibilityLabels.streamState(isStreaming: out.isStreaming, connected: out.isStreaming, error: out.lastError))
         .help(!available ? L("NDI runtime not found (install NDI Tools or the NDI SDK)")
               : out.lastError ?? (out.isStreaming ? L("Sending NDI source %@", NDIPrefs.sourceName) : L("Start NDI output (experimental)")))
-        .onAppear { available = NDIOutput.isAvailable() }
+        .onAppear {
+            available = NDIOutput.isAvailable()
+            SessionControlBoard.shared.register(ndi: out, for: session)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .gogglesStartAllOutputs)) { _ in
+            if available, EventOutputKind.enabled(.ndi), !out.isStreaming { start() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .gogglesStopAllOutputs)) { _ in
+            if out.isStreaming { stop() }
+        }
         .onDisappear { stop() }
     }
 

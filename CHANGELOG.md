@@ -5,8 +5,10 @@ All notable changes to this project are documented here. Format based on [Keep a
 ## [Unreleased]
 
 ### Added
-- Operator overview (Goggles menu): one window with a row per open goggles (state, fps, battery, recording time), Record all / Stop all, and a free-disk line that warns when fewer than 3 hours of recording are left.
-- "Event" preset for several goggles over many hours: auto-record, 30-minute files, signal-lost alert on, no replay.
+- Operator overview (Goggles menu): one window with a row per open goggles (state, outputs sending, fps, battery, warnings), a Record button each, Start all / Stop all outputs, a big-tile view and full screen. While something records it also shows Stop all recordings and a free-disk line that warns when fewer than 3 hours are left.
+- Warnings per feed: battery under 25% / 10%, a black picture for 10 s, a picture not changing for 15 s. They show on the overview, the program output tiles, the menu-bar icon and the web status page. Lost feeds pulse red on the program output, and the signal-lost alert names the feed.
+- Status page for a phone (`/status` on the web viewer): one tile per goggles, read-only, no serial numbers.
+- "Event" preset for several goggles over many hours: signal-lost alert on, clean video, no recording, no replay.
 - SRT output can start automatically, like the UDP stream.
 
 ## [0.8.2] - 2026-10-10

@@ -30,6 +30,12 @@ struct NetworkStreamControl: View {
             SessionControlBoard.shared.register(streamer: streamer, for: session)
             if autoStart { start() }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .gogglesStartAllOutputs)) { _ in
+            if EventOutputKind.enabled(.udp), !streamer.isStreaming { start() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .gogglesStopAllOutputs)) { _ in
+            if streamer.isStreaming { stop() }
+        }
         .onReceive(NotificationCenter.default.publisher(for: .gogglesToggleNetworkStream)) { n in
             guard GlobalHotkeyRouting.shouldHandle(n, session: session) else { return }
             toggle()

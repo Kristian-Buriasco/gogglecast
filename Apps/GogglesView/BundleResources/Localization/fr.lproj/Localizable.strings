@@ -840,3 +840,12 @@
 
 "Stop all recordings" = "Arrêter tous les enregistrements";
 "Several goggles for hours: signal-lost alert on, clean video, no recording, no replay." = "Plusieurs lunettes pendant des heures : alerte de perte de signal activée, vidéo propre, pas d’enregistrement, pas de replay.";
+
+"Picture not changing" = "Image figée";
+"Black picture" = "Image noire";
+"UDP" = "UDP";
+"Start all outputs" = "Démarrer toutes les sorties";
+"Stop all outputs" = "Arrêter toutes les sorties";
+"List" = "Liste";
+"Big view" = "Grande vue";
+"Full screen" = "Plein écran";

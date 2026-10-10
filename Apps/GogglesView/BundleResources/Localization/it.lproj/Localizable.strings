@@ -909,3 +909,12 @@
 
 "Stop all recordings" = "Ferma tutte le registrazioni";
 "Several goggles for hours: signal-lost alert on, clean video, no recording, no replay." = "Più visori per ore: avviso di segnale perso attivo, video pulito, nessuna registrazione, nessun replay.";
+
+"Picture not changing" = "Immagine ferma";
+"Black picture" = "Immagine nera";
+"UDP" = "UDP";
+"Start all outputs" = "Avvia tutte le uscite";
+"Stop all outputs" = "Ferma tutte le uscite";
+"List" = "Elenco";
+"Big view" = "Vista grande";
+"Full screen" = "Schermo intero";

@@ -115,6 +115,12 @@ enum ProgramDisplayChoice {
 }
 
 enum ProgramFeedNaming {
+    /// The name the crew gave this feed, or `fallback` (the window title) when there is none.
+    static func displayName(deviceId: String, fallback: String, custom: [String: String] = ProgramOutputPrefs.feedNames()) -> String {
+        let c = custom[deviceId].map(ProgramOutputPrefs.sanitizeName) ?? ""
+        return c.isEmpty ? fallback : c
+    }
+
     /// "Feed 1", "Feed 2", ... in open order, unless the crew named the feed.
     static func names(deviceIds: [String], custom: [String: String]) -> [String] {
         deviceIds.enumerated().map { i, id in
@@ -156,6 +162,13 @@ private struct ProgramTile: View {
     let showName: Bool
     let showSignal: Bool
     @ObservedObject var coordinator: GogglesConnectionCoordinator
+    @ObservedObject private var status = EventStatus.shared
+    @State private var pulse = false
+
+    private var lost: Bool { showSignal && coordinator.uiState.kind != .live }
+    private var issueText: String {
+        status.rows.first { $0.id == feed.id }?.issues.map(\.text).joined(separator: " · ") ?? ""
+    }
 
     init(feed: ProgramFeed, showName: Bool, showSignal: Bool) {
         self.feed = feed; self.showName = showName; self.showSignal = showSignal
@@ -171,12 +184,27 @@ private struct ProgramTile: View {
                 Text(verbatim: L("NO SIGNAL")).font(.system(size: 28, weight: .bold)).foregroundStyle(.red)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
+            if showSignal && !lost && !issueText.isEmpty {
+                Text(verbatim: issueText)
+                    .font(.system(size: 20, weight: .bold)).foregroundStyle(.black)
+                    .padding(.horizontal, 10).padding(.vertical, 4)
+                    .background(Color.orange, in: RoundedRectangle(cornerRadius: 6))
+                    .padding(12)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+            }
             if showName {
                 Text(verbatim: feed.name)
                     .font(.system(size: 22, weight: .semibold)).foregroundStyle(.white)
                     .padding(.horizontal, 10).padding(.vertical, 4)
                     .background(Color.black.opacity(0.55), in: RoundedRectangle(cornerRadius: 6))
                     .padding(12)
+            }
+        }
+        .overlay {
+            if lost {
+                Rectangle().stroke(Color.red, lineWidth: 8).opacity(pulse ? 1 : 0.15)
+                    .onAppear { withAnimation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true)) { pulse = true } }
+                    .onDisappear { pulse = false }
             }
         }
         .clipped()

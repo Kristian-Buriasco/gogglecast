@@ -4,7 +4,7 @@ import Testing
 
 @Suite struct OperatorOverviewTests {
     private func row(_ id: String, live: Bool, rec: Bool) -> OverviewRow {
-        OverviewRow(id: id, name: id, status: "", health: live ? .good : .bad, isLive: live, fps: nil, battery: nil, isRecording: rec, elapsed: 0)
+        OverviewRow(id: id, name: id, status: "", health: live ? FeedHealth.good : FeedHealth.bad, isLive: live, fps: nil, battery: nil, isRecording: rec, elapsed: 0)
     }
 
     @Test func stopAllStopsEveryRecordingEvenWithoutSignal() {

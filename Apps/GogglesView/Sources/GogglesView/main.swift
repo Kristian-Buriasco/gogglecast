@@ -459,7 +459,7 @@ if args.contains("--run") || !args.dropFirst().contains(where: { $0.hasPrefix("-
     }
     syncExposureMenu()
     NotificationCenter.default.addObserver(forName: UserDefaults.didChangeNotification, object: nil, queue: .main) { _ in syncExposureMenu() }
-    OperatorOverviewWindow.sessions = { registry.all }
+    EventStatus.shared.install(sessions: { registry.all })
     let overviewMenuTarget = MenuActionTarget { OperatorOverviewWindow.show() }
     let overviewMenuItem = NSMenuItem(title: L("Operator Overview…"), action: #selector(MenuActionTarget.invoke), keyEquivalent: "")
     overviewMenuItem.target = overviewMenuTarget

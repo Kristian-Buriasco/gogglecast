@@ -143,7 +143,10 @@ final class GogglesSession: NSObject, RegistrableSession, NSWindowDelegate {
         cursorAutoHider = CursorAutoHider(window: window)
 
         EventHookInstaller.install(coordinator: coordinator)
-        signalAlert = SignalAlertController(coordinator: coordinator, deviceLabel: { [weak self] in self?.window.title ?? L("Goggles") })
+        signalAlert = SignalAlertController(coordinator: coordinator, deviceLabel: { [weak self] in
+            guard let self else { return L("Goggles") }
+            return ProgramFeedNaming.displayName(deviceId: self.deviceId, fallback: self.window.title)
+        })
         SessionLogger.attach(coordinator: coordinator, decodeSession: decodeSession).store(in: &cancellables)
         autoMarkers = AutoMarkerController(
             deviceId: deviceId, session: decodeSession,
