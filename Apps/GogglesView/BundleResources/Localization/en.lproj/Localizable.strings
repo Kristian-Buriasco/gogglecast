@@ -584,6 +584,7 @@
 "NO SIGNAL" = "NO SIGNAL";
 "Program output (HDMI)" = "Program output (HDMI)";
 "Show the program outputs" = "Show the program outputs";
+"Open the program outputs when the app starts" = "Open the program outputs when the app starts";
 "Add output" = "Add output";
 "Feed names" = "Feed names";
 "A clean full screen picture on each chosen display, for a vision mixer, projector or TV: one output per HDMI connection. A grid shows every open goggles window and marks a feed with no signal; one feed shows just that picture. Names never include the goggles serial number. Zebra stripes and peaking are not drawn here." = "A clean full screen picture on each chosen display, for a vision mixer, projector or TV: one output per HDMI connection. A grid shows every open goggles window and marks a feed with no signal; one feed shows just that picture. Names never include the goggles serial number. Zebra stripes and peaking are not drawn here.";

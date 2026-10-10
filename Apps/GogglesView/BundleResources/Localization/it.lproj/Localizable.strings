@@ -918,3 +918,6 @@
 "List" = "Elenco";
 "Big view" = "Vista grande";
 "Full screen" = "Schermo intero";
+
+/* TODO: translate (English placeholder) */
+"Open the program outputs when the app starts" = "Apri le uscite programma all'avvio dell'app";

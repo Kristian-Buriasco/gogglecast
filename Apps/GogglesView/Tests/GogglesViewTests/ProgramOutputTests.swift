@@ -4,6 +4,18 @@ import CoreGraphics
 @testable import GogglesView
 
 @Suite struct ProgramOutputTests {
+    @Test func outputsStartOffUnlessAskedFor() {
+        let d = UserDefaults(suiteName: "ProgramOutputLaunchTests")!
+        d.removePersistentDomain(forName: "ProgramOutputLaunchTests")
+        d.set(true, forKey: ProgramOutputPrefs.enabledKey)
+        ProgramOutputPrefs.resetAtLaunch(d)
+        #expect(!ProgramOutputPrefs.enabled(d), "saved on state must not reopen full-screen windows by default")
+        d.set(true, forKey: ProgramOutputPrefs.enabledKey)
+        d.set(true, forKey: ProgramOutputPrefs.openAtLaunchKey)
+        ProgramOutputPrefs.resetAtLaunch(d)
+        #expect(ProgramOutputPrefs.enabled(d))
+    }
+
     @Test func gridDimensions() {
         let expected: [(Int, Int, Int)] = [(1, 1, 1), (2, 2, 1), (3, 2, 2), (4, 2, 2), (5, 3, 2), (6, 3, 2),
                                            (7, 3, 3), (9, 3, 3), (10, 4, 3), (12, 4, 3), (13, 4, 4), (16, 4, 4)]

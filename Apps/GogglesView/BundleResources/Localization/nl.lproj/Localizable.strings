@@ -847,3 +847,6 @@
 "List" = "Lijst";
 "Big view" = "Grote weergave";
 "Full screen" = "Volledig scherm";
+
+/* TODO: translate (English placeholder) */
+"Open the program outputs when the app starts" = "Programma-uitgangen openen bij het starten van de app";

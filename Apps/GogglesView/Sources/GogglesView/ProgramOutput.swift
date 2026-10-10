@@ -29,7 +29,14 @@ enum ProgramOutputPrefs {
     static let enabledKey = "programOutputEnabled"
     static let outputsKey = "programOutputList"          // JSON [ProgramOutputConfig]
     static let feedNamesKey = "programOutputFeedNames"  // [deviceId: custom name]
+    static let openAtLaunchKey = "programOutputOpenAtLaunch"
     static let maxOutputs = 4
+
+    /// The program outputs are full-screen windows. Unless the user asked for them at launch, start with them off,
+    /// so a Mac that quit with them on does not come back hidden behind a full-screen picture.
+    static func resetAtLaunch(_ d: UserDefaults = .standard) {
+        if !d.bool(forKey: openAtLaunchKey) { d.set(false, forKey: enabledKey) }
+    }
 
     static func enabled(_ d: UserDefaults = .standard) -> Bool { d.bool(forKey: enabledKey) }
 
@@ -249,6 +256,7 @@ final class ProgramOutputController: ObservableObject {
     func install(sessions: @escaping () -> [GogglesSession], active: @escaping () -> GogglesSession?) {
         self.sessions = sessions
         self.active = active
+        ProgramOutputPrefs.resetAtLaunch()
         observers = [
             NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)
                 .sink { [weak self] _ in self?.scheduleRefresh() },
@@ -339,6 +347,7 @@ final class ProgramOutputController: ObservableObject {
 struct ProgramOutputSettingsSection: View {
     @ObservedObject private var controller = ProgramOutputController.shared
     @AppStorage(ProgramOutputPrefs.enabledKey) private var enabled = false
+    @AppStorage(ProgramOutputPrefs.openAtLaunchKey) private var openAtLaunch = false
     @State private var outputs = ProgramOutputPrefs.outputs()
     @State private var screens = ProgramOutputController.screenInfos()
 
@@ -346,6 +355,7 @@ struct ProgramOutputSettingsSection: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Program output (HDMI)").font(.headline)
             Toggle("Show the program outputs", isOn: $enabled)
+            Toggle("Open the program outputs when the app starts", isOn: $openAtLaunch)
             ForEach($outputs) { $o in
                 OutputRow(output: $o, screens: screens, feeds: controller.available,
                           canRemove: outputs.count > 1) { outputs.removeAll { $0.id == o.id } }
