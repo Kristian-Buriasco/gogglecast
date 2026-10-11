@@ -647,3 +647,78 @@ struct FakeGogglesIntegrationTests {
         return total / Double(n)
     }
 }
+
+// MARK: - Stale keyframe seeding (measurement)
+
+private final class NALBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _idr: Data?, _sps: Data?
+    func record(_ data: Data, type: UInt8) {
+        lock.lock(); defer { lock.unlock() }
+        if type == 5, _idr == nil { _idr = data }
+        if type == 7, _sps == nil { _sps = data }
+    }
+    var idr: Data? { lock.lock(); defer { lock.unlock() }; return _idr }
+    var sps: Data? { lock.lock(); defer { lock.unlock() }; return _sps }
+}
+
+/// Mean absolute luma difference of two pictures of the same size, sampling every 3rd pixel.
+private func meanAbsLumaDiff(_ a: CVPixelBuffer, _ b: CVPixelBuffer) -> Double? {
+    guard CVPixelBufferGetWidth(a) == CVPixelBufferGetWidth(b), CVPixelBufferGetHeight(a) == CVPixelBufferGetHeight(b),
+          CVPixelBufferGetPlaneCount(a) > 0, CVPixelBufferGetPlaneCount(b) > 0 else { return nil }
+    CVPixelBufferLockBaseAddress(a, .readOnly); CVPixelBufferLockBaseAddress(b, .readOnly)
+    defer { CVPixelBufferUnlockBaseAddress(a, .readOnly); CVPixelBufferUnlockBaseAddress(b, .readOnly) }
+    guard let pa = CVPixelBufferGetBaseAddressOfPlane(a, 0), let pb = CVPixelBufferGetBaseAddressOfPlane(b, 0) else { return nil }
+    let w = CVPixelBufferGetWidthOfPlane(a, 0), h = CVPixelBufferGetHeightOfPlane(a, 0)
+    let ra = CVPixelBufferGetBytesPerRowOfPlane(a, 0), rb = CVPixelBufferGetBytesPerRowOfPlane(b, 0)
+    let tenBit = CVPixelBufferGetPixelFormatType(a) == kCVPixelFormatType_420YpCbCr10BiPlanarVideoRange
+    var sum = 0.0, n = 0
+    for y in stride(from: 0, to: h, by: 3) {
+        for x in stride(from: 0, to: w, by: 3) {
+            let va: Double, vb: Double
+            if tenBit {
+                va = Double(pa.advanced(by: y * ra + x * 2).assumingMemoryBound(to: UInt16.self).pointee >> 8)
+                vb = Double(pb.advanced(by: y * rb + x * 2).assumingMemoryBound(to: UInt16.self).pointee >> 8)
+            } else {
+                va = Double(pa.advanced(by: y * ra + x).assumingMemoryBound(to: UInt8.self).pointee)
+                vb = Double(pb.advanced(by: y * rb + x).assumingMemoryBound(to: UInt8.self).pointee)
+            }
+            sum += abs(va - vb); n += 1
+        }
+    }
+    return n > 0 ? sum / Double(n) : nil
+}
+
+extension FakeGogglesIntegrationTests {
+    /// What a window sees when its decoder starts from a keyframe from 3 s ago (the helper's cached one) and then
+    /// follows the live P-frames: the luma error against a reference decoder that saw everything, over time.
+    /// Prints the numbers; asserts only that the seeded decoder keeps producing pictures.
+    @Test(.tags(.slow), .enabled(if: !skipSlow)) func staleKeyframeSeedingQuality() async throws {
+        for (label, shapes) in [("moving shapes", true), ("static texture", false)] {
+            try await withRig(.init(width: 960, height: 540, shapes: shapes)) { rig in
+                let box = NALBox()
+                rig.session.onRawNAL = { data, type, _, _ in box.record(data, type: type) }
+                try await startAndWaitForPicture(rig)
+                await sleep(3)
+                let sps = try #require(box.sps), idr = try #require(box.idr)
+                let seeded = DecodeSession()
+                seeded.handle(nalData: sps, nalType: 7, isParameterSet: true, hostTime: 0)
+                seeded.handle(nalData: idr, nalType: 5, isParameterSet: false, hostTime: 0)
+                rig.fake.joinLate(seeded)
+                var line = "[stale-keyframe] \(label):"
+                for wait in [1.0, 2.0, 4.0, 8.0] {
+                    await sleep(wait)
+                    if let a = rig.session.latestDecodedFrame(), let b = seeded.latestDecodedFrame(), let d = meanAbsLumaDiff(a, b) {
+                        line += String(format: " +%.0fs err %.1f", wait, d)
+                    } else { line += " (no picture)" }
+                }
+                if let a1 = rig.session.latestDecodedFrame() {
+                    await sleep(0.03)
+                    if let a2 = rig.session.latestDecodedFrame(), let d = meanAbsLumaDiff(a1, a2) { line += String(format: " | frame-to-frame motion %.1f", d) }
+                }
+                print(line)
+                #expect(seeded.hasRecentPicture(within: 1), "the seeded decoder stopped producing pictures")
+            }
+        }
+    }
+}
