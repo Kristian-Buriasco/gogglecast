@@ -521,7 +521,7 @@ struct MenuBarControllerTests {
         #expect(MenuBarController.displayText(for: .resolving) == "Connecting…")
         #expect(MenuBarController.displayText(for: .handshaking(elapsedSeconds: 4)) == "Connecting…")
         #expect(MenuBarController.displayText(for: .claimFailed(reason: "x")) == "Can't connect, open GogglesView")
-        #expect(MenuBarController.displayText(for: .waitingForKeyframe) == "Waiting for video, check goggles live view")
+        #expect(MenuBarController.displayText(for: .waitingForKeyframe) == "No picture: turn Share Liveview off and on on the goggles")
         #expect(MenuBarController.displayText(for: .live) == "Live")
         #expect(MenuBarController.displayText(for: .stalled) == "No video, reconnecting…")
     }

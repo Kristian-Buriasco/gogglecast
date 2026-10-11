@@ -226,7 +226,6 @@
 "No goggles connected" = "Aucune paire de lunettes connectée";
 "Connecting…" = "Connexion…";
 "Can't connect, open GogglesView" = "Connexion impossible, ouvrez GogglesView";
-"Waiting for video, check goggles live view" = "En attente de vidéo, vérifiez la vue en direct des lunettes";
 "Live" = "En direct";
 "No video, reconnecting…" = "Pas de vidéo, reconnexion…";
 "Drop a marker in the data log" = "Poser un marqueur dans le journal de données";
@@ -766,7 +765,6 @@
 "Connection Health…" = "Santé de la connexion…";
 "Window" = "Fenêtre";
 "Minimize" = "Placer dans le Dock";
-"Enter Full Screen" = "Passer en plein écran";
 "Bring All to Front" = "Tout ramener au premier plan";
 "Help" = "Aide";
 
@@ -860,3 +858,6 @@
 
 /* TODO: translate (English placeholder) */
 "Back to the list" = "Retour à la liste";
+
+/* TODO: translate (English placeholder) */
+"No picture: turn Share Liveview off and on on the goggles" = "Pas d'image : désactivez puis réactivez Share Liveview sur les goggles";

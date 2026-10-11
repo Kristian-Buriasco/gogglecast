@@ -246,7 +246,7 @@
 "No goggles connected" = "No goggles connected";
 "Connecting…" = "Connecting…";
 "Can't connect, open GogglesView" = "Can't connect, open GogglesView";
-"Waiting for video, check goggles live view" = "Waiting for video, check goggles live view";
+"No picture: turn Share Liveview off and on on the goggles" = "No picture: turn Share Liveview off and on on the goggles";
 "Live" = "Live";
 "No video, reconnecting…" = "No video, reconnecting…";
 /* DataCollector.swift */
@@ -913,6 +913,5 @@
 "Connection Health…" = "Connection Health…";
 "Window" = "Window";
 "Minimize" = "Minimize";
-"Enter Full Screen" = "Enter Full Screen";
 "Bring All to Front" = "Bring All to Front";
 "Help" = "Help";

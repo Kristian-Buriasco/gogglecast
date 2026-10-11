@@ -232,7 +232,6 @@
 "No goggles connected" = "Geen bril verbonden";
 "Connecting…" = "Verbinden…";
 "Can't connect, open GogglesView" = "Kan niet verbinden, open GogglesView";
-"Waiting for video, check goggles live view" = "Wachten op video, controleer live view op de bril";
 "Live" = "Live";
 "No video, reconnecting…" = "Geen video, opnieuw verbinden…";
 "Drop a marker in the data log" = "Een markering in het datalogboek plaatsen";
@@ -788,7 +787,6 @@
 "Connection Health…" = "Verbindingsstatus…";
 "Window" = "Venster";
 "Minimize" = "Zet in Dock";
-"Enter Full Screen" = "Open in volledig scherm";
 "Bring All to Front" = "Alles naar voren";
 "Help" = "Help";
 
@@ -858,3 +856,6 @@
 
 /* TODO: translate (English placeholder) */
 "Back to the list" = "Terug naar de lijst";
+
+/* TODO: translate (English placeholder) */
+"No picture: turn Share Liveview off and on on the goggles" = "Geen beeld: zet Share Liveview op de goggles uit en weer aan";

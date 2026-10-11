@@ -74,7 +74,7 @@ enum ConnectionMessages {
         case .noDevice: return L("No goggles connected")
         case .claiming, .resolving, .handshaking: return L("Connecting…")
         case .claimFailed: return L("Can't connect, open GogglesView")
-        case .waitingForKeyframe: return L("Waiting for video, check goggles live view")
+        case .waitingForKeyframe: return L("No picture: turn Share Liveview off and on on the goggles")
         case .live: return L("Live")
         case .stalled: return L("No video, reconnecting…")
         }

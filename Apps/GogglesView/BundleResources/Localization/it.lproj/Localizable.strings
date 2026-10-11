@@ -240,7 +240,6 @@
 "No goggles connected" = "Nessun goggles collegato";
 "Connecting…" = "Connessione in corso…";
 "Can't connect, open GogglesView" = "Connessione impossibile, apri GogglesView";
-"Waiting for video, check goggles live view" = "In attesa del video, controlla la vista live dei goggles";
 "Live" = "Live";
 "No video, reconnecting…" = "Nessun video, riconnessione in corso…";
 /* DataCollector.swift */
@@ -835,7 +834,6 @@
 "Connection Health…" = "Stato della connessione…";
 "Window" = "Finestra";
 "Minimize" = "Riduci";
-"Enter Full Screen" = "Attiva schermo intero";
 "Bring All to Front" = "Porta tutto in primo piano";
 "Help" = "Aiuto";
 
@@ -929,3 +927,6 @@
 
 /* TODO: translate (English placeholder) */
 "Back to the list" = "Torna alla lista";
+
+/* TODO: translate (English placeholder) */
+"No picture: turn Share Liveview off and on on the goggles" = "Nessuna immagine: spegni e riaccendi Share Liveview sui goggles";

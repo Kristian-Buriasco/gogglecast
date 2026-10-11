@@ -10,6 +10,9 @@ All notable changes to this project are documented here. Format based on [Keep a
 ### Changed
 - The overlay notice (first stream, capture window), the README and the site no longer suggest the display-scale trick. They now say to turn the goggles' overlay off at its source: Settings > Camera > Advanced camera settings > Camera View Recording > off.
 
+### Changed
+- A goggles window that has lost its picture now says what actually fixes it: "No picture: turn Share Liveview off and on on the goggles" (menu bar, status pill, Operator Overview, phone status page). The goggles send a keyframe only when sharing starts, and nothing the app can send makes them send another.
+
 ### Fixed
 - The app now waits 8 s (was 3 s) before reconnecting while it waits for a keyframe, so its reconnect no longer cuts off the stream the pipeline resumed on its own after 2.5 s.
 - After a reconnect the goggles resume the video without a keyframe (they send one only when Share Liveview starts), so the picture stayed gone. If video has been arriving for 2.5 s with the parameter sets known but no keyframe, the pipeline now opens its gate anyway. A decoder that still holds the previous picture carries on from the next frames (possibly with artifacts); one that does not ignores them until a real keyframe. Seen on live goggles: the helper goes live 2.85 s after the first video packet. Not yet seen on screen with a live decoder.
