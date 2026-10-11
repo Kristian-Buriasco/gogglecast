@@ -284,6 +284,7 @@ public final class GogglesConnectionCoordinator: ObservableObject {
             waitingForKeyframeEnteredAt = now()
         }
         uiState = mapped
+        silenceEscalated = false
         if case .handshaking = mapped {
             handshakingEnteredAt = now()
         }
@@ -306,6 +307,7 @@ public final class GogglesConnectionCoordinator: ObservableObject {
         if isVideoSlice, case .handshaking = uiState {
             uiState = .live
         }
+        if isVideoSlice { silenceEscalated = false }
     }
 
     // MARK: - Watchdog
@@ -331,8 +333,13 @@ public final class GogglesConnectionCoordinator: ObservableObject {
     /// waits for one (it re-armed its gate after dropped frames). The second case used to wait forever, because
     /// the goggles send a keyframe only when sharing restarts and the app's recovery ran in the first case only.
     var needsKeyframeRecovery: Bool {
-        (decoderWaitingForKeyframe && uiState.kind == .live) || uiState.kind == .waitingForKeyframe
+        (decoderWaitingForKeyframe && uiState.kind == .live) || uiState.kind == .waitingForKeyframe || silenceEscalated
     }
+
+    /// The silence watchdog gave up on a stream that was live (no picture for 5 s). Without this the window showed
+    /// "reconnecting" forever and never did anything: the goggles drop the session after a long silence (12 s was
+    /// enough) and only a fresh handshake brings the video back.
+    private var silenceEscalated = false
 
     func tick(currentTime: Date? = nil) {
         let t = currentTime ?? now()
@@ -349,9 +356,11 @@ public final class GogglesConnectionCoordinator: ObservableObject {
         let elapsed = t.timeIntervalSince(lastActivityAt)
         let updated = GogglesUIStateMachine.applySilenceWatchdog(current: uiState, secondsSinceLastActivity: elapsed)
         if updated != uiState {
+            let wasPicture = uiState.kind == .live || uiState.kind == .stalled
             uiState = updated
             if case .handshaking = updated {
                 handshakingEnteredAt = t
+                if wasPicture { silenceEscalated = true }
             }
         }
         if case .handshaking(let currentElapsed) = uiState, let enteredAt = handshakingEnteredAt {

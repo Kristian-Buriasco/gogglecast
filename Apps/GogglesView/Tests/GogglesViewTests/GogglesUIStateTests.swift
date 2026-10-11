@@ -413,6 +413,18 @@ struct GogglesConnectionCoordinatorTests {
         #expect(actions.contains(.reconnect), "no escalation: the goggles only send a keyframe when sharing restarts")
     }
 
+    @Test("a live stream that goes silent for good reconnects instead of showing 'reconnecting' forever")
+    func silentLiveStreamReconnects() {
+        let (client, coordinator, clock) = makeCoordinator()
+        var actions: [KeyframeRecoveryPolicy.Action] = []
+        coordinator.onRecoveryAction = { actions.append($0) }
+        client.sendConnectionState(.connected)
+        client.sendHelperState("test-device", GogglesXPC.GogglesState.live.rawValue, nil)
+        for _ in 0..<80 { clock.advance(0.25); coordinator.tick() }   // 20 s without a single frame
+        #expect(coordinator.uiState.kind == .handshaking, "the watchdog escalated")
+        #expect(actions.contains(.reconnect), "and the app reconnects by itself")
+    }
+
     @Test("a waiting decoder does not trigger recovery while the helper is not live")
     func noRecoveryWithoutLive() {
         let (client, coordinator, clock) = makeCoordinator()
