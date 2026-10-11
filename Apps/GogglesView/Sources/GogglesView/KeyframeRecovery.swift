@@ -19,7 +19,10 @@ struct KeyframeRecoveryPolicy {
     private var lastReconnectAt: Date?
     private var reconnectInterval: TimeInterval
 
-    init(escalateAfter: TimeInterval = 3, requestInterval: TimeInterval = 1.5, maxReconnectInterval: TimeInterval = 24) {
+    /// `escalateAfter` is 12 s: the pipeline opens its keyframe gate on its own after 2.5 s without one, the helper
+    /// restarts the goggles' share session after 3.5 s of requests, and a reconnect before either has had time to
+    /// show a picture only throws the stream away again.
+    init(escalateAfter: TimeInterval = 12, requestInterval: TimeInterval = 1.5, maxReconnectInterval: TimeInterval = 32) {
         self.escalateAfter = escalateAfter
         self.requestInterval = requestInterval
         self.maxReconnectInterval = maxReconnectInterval

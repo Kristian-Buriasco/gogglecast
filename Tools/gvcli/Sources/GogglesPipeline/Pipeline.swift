@@ -73,6 +73,27 @@ public final class PipelineHandle {
         set { lock.lock(); _sink = newValue; lock.unlock() }
     }
 
+    private var _handshakeBurstUntil = Date.distantPast
+    private var _sessionId: UInt16 = 0
+    private var _pendingMB = Data()
+    /// Developer hook: DUML frames to append to the next video acknowledgement (the ack tail's MB channel).
+    public func queueMBFrames(_ frames: Data) { lock.lock(); _pendingMB.append(frames); lock.unlock() }
+    func takePendingMB() -> Data { lock.lock(); defer { lock.unlock() }; let d = _pendingMB; _pendingMB = Data(); return d }
+    /// The session id this pipeline handshakes with (0 until it runs); lets a developer hook send extra requests
+    /// inside the same session.
+    public var sessionId: UInt16 {
+        get { lock.lock(); defer { lock.unlock() }; return _sessionId }
+        set { lock.lock(); _sessionId = newValue; lock.unlock() }
+    }
+
+    /// Asks the pipeline to send its handshake every 200 ms for `seconds`, instead of every 2 s of silence. Used
+    /// around a share-session restart: the goggles send their one keyframe the moment the service comes back, to
+    /// whoever is registered by then.
+    public func startHandshakeBurst(for seconds: TimeInterval) {
+        lock.lock(); _handshakeBurstUntil = Date().addingTimeInterval(seconds); lock.unlock()
+    }
+    var handshakeBurstUntil: Date { lock.lock(); defer { lock.unlock() }; return _handshakeBurstUntil }
+
     public init() {}
 
     /// Synchronously releases this handle's transport/sink (closes the
@@ -220,6 +241,7 @@ public func runPipeline(
     }
 
     let sessionId = WireProtocol.randomSessionId()
+    handle.sessionId = sessionId
     FileHandle.standardError.write(Data(String(format: "[gvcli] Session ID: 0x%04X\n", sessionId).utf8))
     FileHandle.standardError.write(Data("[gvcli] Ack mode: \(ackMode.rawValue)\(ackMode == .cumulativeWindow ? " (EXPERIMENTAL cumulative receive-window acks)" : "")\n".utf8))
 
@@ -262,7 +284,7 @@ public func runPipeline(
 
     func sendWindowAck(_ ackSeq: UInt16) async {
         let seq = await state.nextSeq()
-        send(WireProtocol.buildAck(startSeq: ackSeq, endSeq: ackSeq, seq: seq, sessionId: sessionId))
+        send(WireProtocol.buildAck(startSeq: ackSeq, endSeq: ackSeq, seq: seq, sessionId: sessionId, mbFrames: handle.takePendingMB()))
         await state.recordWindowAck(ackSeq)
     }
 
@@ -308,7 +330,7 @@ public func runPipeline(
                 // `FrameBoundaryAckTracker.swift`.
                 if ackMode == .frameRange, let range = ackTracker.recordPacket(frameNum: frameNum, seq: outer.seq) {
                     let ackSeq = await state.nextSeq()
-                    send(WireProtocol.buildAck(startSeq: range.first, endSeq: range.last, seq: ackSeq, sessionId: sessionId))
+                    send(WireProtocol.buildAck(startSeq: range.first, endSeq: range.last, seq: ackSeq, sessionId: sessionId, mbFrames: handle.takePendingMB()))
                     await state.recordWindowAck(range.first)
                 }
 
@@ -332,7 +354,7 @@ public func runPipeline(
                 if ackMode == .frameRange {
                     if let range = ackTracker.recordCompletion(frameNum: frameNum) {
                         let ackSeq = await state.nextSeq()
-                        send(WireProtocol.buildAck(startSeq: range.first, endSeq: range.last, seq: ackSeq, sessionId: sessionId))
+                        send(WireProtocol.buildAck(startSeq: range.first, endSeq: range.last, seq: ackSeq, sessionId: sessionId, mbFrames: handle.takePendingMB()))
                         await state.recordWindowAck(range.first)
                     }
                 } else if let ackSeq = windowAckTracker.flush() {
@@ -391,7 +413,10 @@ public func runPipeline(
                         await sendWindowAck(last)
                     }
                 }
-                if now.timeIntervalSince(timers.lastRx) > 2.0 {
+                if now < handle.handshakeBurstUntil {
+                    let seq = await state.nextSeq()
+                    send(WireProtocol.buildHandshake(seq: seq, sessionId: sessionId))
+                } else if now.timeIntervalSince(timers.lastRx) > 2.0 {
                     let seq = await state.nextSeq()
                     send(WireProtocol.buildHandshake(seq: seq, sessionId: sessionId))
                     FileHandle.standardError.write(Data("[gvcli] No data for 2s, resending handshake.\n".utf8))
@@ -408,7 +433,7 @@ public func runPipeline(
                 let startedNow = await state.snapshotTimers().started
                 // Video has been arriving for a while but no keyframe has: the goggles will not send one on their
                 // own, so open the gate anyway (see `KeyframeGate.forceStart`).
-                if startedNow || !sawFirstVideoPacket.value {
+                if startedNow || !sawFirstVideoPacket.value || FileManager.default.fileExists(atPath: "/tmp/gogglesview-no-force") {
                     forceWaitSince = nil
                 } else if let since = forceWaitSince {
                     if now.timeIntervalSince(since) >= 2.5, gate.forceStart() {

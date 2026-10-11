@@ -122,6 +122,9 @@ final class HelperService: NSObject, GogglesHelperProtocol {
         var claimRetryBackoff = RetryBackoff()
 
         var batteryPoller: BatteryPoller?
+        /// When the current run of keyframe requests began, and the last one (a gap over 5 s starts a new run).
+        var iframeRunStart: Date?
+        var lastIframeRequest: Date?
         /// Last polled goggles battery %, -1 = unknown.
         var batteryPercent = -1
 
@@ -328,6 +331,19 @@ final class HelperService: NSObject, GogglesHelperProtocol {
                 let sessionId = WireProtocol.randomSessionId()
                 try? transport.send(WireProtocol.requestIFrameTelemetry(seq: seq, sessionId: sessionId))
                 Logging.pipeline.info("requestIFrame(\(deviceId, privacy: .public)): sent best-effort DUML 02:B3 nudge")
+                // The 02:B3 nudge does nothing on a Goggles 3. What does work is restarting the share session
+                // through the Wi-Fi module (what switching Share Liveview off and on does): after 3.5 s of
+                // asking in vain, do that.
+                if let device = self.devices[deviceId] {
+                    let now = Date()
+                    if let last = device.lastIframeRequest, now.timeIntervalSince(last) > 5 { device.iframeRunStart = nil }
+                    if device.iframeRunStart == nil { device.iframeRunStart = now }
+                    device.lastIframeRequest = now
+                    if let start = device.iframeRunStart, now.timeIntervalSince(start) >= 3.5, device.batteryPoller?.restartShare() == true {
+                        device.handle.startHandshakeBurst(for: 8)
+                        device.iframeRunStart = nil
+                    }
+                }
             } else {
                 Logging.pipeline.info("requestIFrame(\(deviceId, privacy: .public)): no active transport, ignoring")
             }
@@ -405,7 +421,11 @@ final class HelperService: NSObject, GogglesHelperProtocol {
                 let adapter = DevicePipelineDelegateAdapter(service: self, deviceId: deviceId)
                 let task = Task {
                     do {
-                        try await runPipeline(transport: transport, sink: nil, stats: false, delegate: adapter, handle: newHandle)
+                        // Developer aid: `touch /tmp/gogglesview-telemetry-sniff` records every non-video packet the goggles send
+                        // over the UDP link (decoded DUML) to /tmp/gogglesview-telemetry.jsonl.
+                        let telemetry: TelemetryDumpWriter? = FileManager.default.fileExists(atPath: "/tmp/gogglesview-telemetry-sniff")
+                            ? try? TelemetryDumpWriter(path: "/tmp/gogglesview-telemetry.jsonl") : nil
+                        try await runPipeline(transport: transport, sink: nil, stats: false, delegate: adapter, handle: newHandle, telemetryDump: telemetry)
                         Logging.pipeline.info("[\(deviceId, privacy: .public)] runPipeline returned (transport released, e.g. unplug or teardown)")
                     } catch {
                         Logging.pipeline.error("[\(deviceId, privacy: .public)] runPipeline ended with error: \(String(describing: error))")
@@ -633,6 +653,8 @@ final class HelperService: NSObject, GogglesHelperProtocol {
                 self.fanOut(deviceId: deviceId) { $0.batteryChanged(deviceId, percent: percent) }
             }
         }
+        poller.sessionIdProvider = { [weak device] in device?.handle.sessionId ?? 0 }
+        poller.mbQueue = { [weak device] in device?.handle.queueMBFrames($0) }
         device.batteryPoller = poller
         poller.start()
     }
@@ -697,6 +719,7 @@ final class HelperService: NSObject, GogglesHelperProtocol {
     }
 
     fileprivate func pipelineDidStart(deviceId: String) {
+        Logging.pipeline.info("[\(deviceId, privacy: .public)] keyframe gate opened (a real keyframe unless 'gate opened anyway' was logged just before)")
         stateQueue.async { self.setState(self.deviceState(deviceId), .live) }
     }
 

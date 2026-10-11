@@ -196,14 +196,32 @@ public enum WireProtocol {
     /// Builds a full ack packet: an 8-byte outer header (type 0x04)
     /// wrapping the 22-byte ack body (4-byte start/end sequence range +
     /// the 18-byte `ackTail` constant). Matches Python `stream.build_ack`.
-    public static func buildAck(startSeq: UInt16, endSeq: UInt16, seq: UInt16, sessionId: UInt16) -> Data {
+    public static func buildAck(startSeq: UInt16, endSeq: UInt16, seq: UInt16, sessionId: UInt16, mbFrames: Data = Data()) -> Data {
         var body = Data()
         body.append(UInt8(startSeq & 0xFF))
         body.append(UInt8((startSeq >> 8) & 0xFF))
         body.append(UInt8(endSeq & 0xFF))
         body.append(UInt8((endSeq >> 8) & 0xFF))
-        body.append(ackTail)
+        var tail = ackTail
+        if !mbFrames.isEmpty {
+            // The tail ends in a u16 "MB payload length", followed by that many bytes of DUML frames (the app-to-goggles
+            // control channel the official app used; see docs/telemetry-research.md).
+            tail[tail.count - 2] = UInt8(mbFrames.count & 0xFF)
+            tail[tail.count - 1] = UInt8((mbFrames.count >> 8) & 0xFF)
+        }
+        body.append(tail)
+        body.append(mbFrames)
         return buildOuter(pktType: packetTypeAck, seq: seq, body: body, sessionId: sessionId)
+    }
+
+    /// Builds a type-0x05 packet (app-to-goggles DUML channel): an 8-byte type-5 window, a counter, `01 00 00`, then
+    /// one DUML frame. `seq` is the type-5 sequence number (the goggles seed it with 0xE9D0 in their handshake reply).
+    public static func buildType5(dumlFrame: Data, seq: UInt16, counter: UInt8, sessionId: UInt16) -> Data {
+        var body = Data([UInt8(seq & 0xFF), UInt8(seq >> 8), UInt8((seq &+ 1) & 0xFF), UInt8((seq &+ 1) >> 8), 0, 0, 0, 0])
+        body.append(counter)
+        body.append(contentsOf: [0x01, 0x00, 0x00])
+        body.append(dumlFrame)
+        return buildOuter(pktType: 0x05, seq: seq, body: body, sessionId: sessionId)
     }
 
     /// Builds a type-0x01 telemetry packet wrapping a pre-built DUML

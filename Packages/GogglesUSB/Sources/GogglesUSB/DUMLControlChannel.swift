@@ -80,4 +80,70 @@ public final class DUMLControlChannel {
         }
         return nil
     }
+
+    /// Developer aid (reverse engineering): registers as an app with the goggles, as DJI Fly does, then reads the
+    /// channel for `duration` seconds, answers the requests that ask for an answer, and hands every other packet to
+    /// `onPacket` (the once-a-second heartbeats are filtered out). Only used while the sniff marker file exists.
+    public func sniff(duration: TimeInterval, register: Bool, onPacket: (DUML.DumlPacket) -> Void) {
+        if register {
+            for payload in [Data([0x17, 0x00, 0x00, 0x23, 0x00, 0x41, 0x50, 0x50, 0, 0, 0, 0, 0, 0x02]),
+                            Data([0x1D, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01, 0x07, 0x00]) + Data("1.21.1".utf8)] {
+                seq &+= 1
+                _ = write(DUML.build(sender: Self.senderApp, receiver: 0x3C, seq: seq, cmdType: Self.cmdTypeRequest,
+                                     cmdSet: 0x00, cmdId: 0x88, payload: payload))
+                Thread.sleep(forTimeInterval: 0.3)
+            }
+        }
+        let deadline = Date().addingTimeInterval(duration)
+        while Date() < deadline {
+            guard let chunk = read(UInt32(max(1, min(150, deadline.timeIntervalSinceNow * 1000)))) else { return }
+            if chunk.isEmpty { continue }
+            pending.append(chunk)
+            let (packets, tail) = DUML.parseStream(pending, onMalformedFrame: { _, _ in })
+            pending = tail
+            if pending.count > 4096 { pending.removeAll() }
+            for packet in packets {
+                let isRequest = packet.cmdType & 0x80 == 0
+                let wantsReply = (packet.cmdType >> 5) & 0x03 != 0
+                if isRequest && wantsReply {
+                    var reply = Data([0x00])
+                    if packet.cmdSet == 0x00 && packet.cmdId == 0x81 {
+                        reply = (Data([0x00]) + Data("APP".utf8) + Data(repeating: 0, count: 29) + Data([0x00, 0x02])
+                                 + Data(repeating: 0, count: 6) + Data([0x05, 0x1C]) + Data(repeating: 0, count: 6))
+                        reply = reply.prefix(64) + Data(repeating: 0, count: max(0, 64 - reply.count))
+                    } else if packet.cmdSet == 0x00 && packet.cmdId == 0x88 && packet.payload.first == 0x19 {
+                        reply = Data([0x1A, 0x00, 0x00, 0x00, 0x00])
+                    }
+                    _ = write(DUML.build(sender: packet.receiver, receiver: packet.sender, seq: packet.seq,
+                                         cmdType: 0x80 | (packet.cmdType & 0x1F), cmdSet: packet.cmdSet, cmdId: packet.cmdId, payload: reply))
+                }
+                let isHeartbeat = (packet.cmdSet == 0x00 && (packet.cmdId == 0x81 || packet.cmdId == 0x82 || packet.cmdId == 0x88))
+                if !isHeartbeat { onPacket(packet) }
+            }
+        }
+    }
+
+    /// Developer aid (reverse engineering): sends one request frame from the app address.
+    @discardableResult
+    public func sendDeveloperRequest(receiver: UInt8, cmdSet: UInt8, cmdId: UInt8, payload: Data) -> Bool {
+        seq &+= 1
+        return write(DUML.build(sender: Self.senderApp, receiver: receiver, seq: seq, cmdType: Self.cmdTypeRequest,
+                                cmdSet: cmdSet, cmdId: cmdId, payload: payload))
+    }
+
+    /// Restarts the goggles' share session, which makes them send a fresh keyframe (the same thing as switching
+    /// "Share Liveview" off and on in the goggles' menu). Found by reverse engineering: the Wi-Fi module (DUML address
+    /// 0x1B) accepts `07:42 stop_ground_wifi` and `07:41 start_ground_wifi` from an app and acknowledges both with
+    /// status 0; the video stops and comes back, with a keyframe, about two seconds after the start. The goggles
+    /// ignore these unless an app has registered first, so this registers (once) and keeps answering the goggles'
+    /// requests while it waits.
+    public func restartShare(register: Bool) {
+        sniff(duration: 0.1, register: register) { _ in }
+        seq &+= 1
+        _ = write(DUML.build(sender: Self.senderApp, receiver: 0x1B, seq: seq, cmdType: Self.cmdTypeRequest, cmdSet: 0x07, cmdId: 0x42))
+        sniff(duration: 1.2, register: false) { _ in }
+        seq &+= 1
+        _ = write(DUML.build(sender: Self.senderApp, receiver: 0x1B, seq: seq, cmdType: Self.cmdTypeRequest, cmdSet: 0x07, cmdId: 0x41))
+        sniff(duration: 0.8, register: false) { _ in }
+    }
 }

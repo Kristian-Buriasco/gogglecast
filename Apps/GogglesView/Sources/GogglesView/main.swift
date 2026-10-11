@@ -801,6 +801,26 @@ if args.contains("--force-state") {
 }
 #endif
 
+if args.contains("--reconnect-probe") {
+    // Dev probe: ask the helper for a full reconnect of the first goggles (what the app does after a long silence),
+    // without sudo. Run it while a goggles window shows a live picture to see whether the picture survives.
+    let client = HelperClient()
+    client.connect()
+    var finished = false
+    DispatchQueue.global().asyncAfter(deadline: .now() + 1.0) {
+        pollFirstAvailableDeviceId(client: client) { deviceId in
+            guard let deviceId else { print("[reconnect-probe] no device"); finished = true; return }
+            print("[reconnect-probe] reconnecting \(deviceId) at \(Date())")
+            client.reconnectHelper(deviceId: deviceId)
+            DispatchQueue.global().asyncAfter(deadline: .now() + 1.0) { finished = true }
+        }
+    }
+    let end = Date().addingTimeInterval(8)
+    while !finished, Date() < end { RunLoop.main.run(mode: .default, before: Date().addingTimeInterval(0.05)) }
+    print("--reconnect-probe: done")
+    exit(0)
+}
+
 if args.contains("--stab-probe") {
     // Dev probe: run the real helper stream through the stabilizer for a few seconds (forced on, in this process
     // only) and print per second how much motion it measured and how much it corrected. Hold the camera still,

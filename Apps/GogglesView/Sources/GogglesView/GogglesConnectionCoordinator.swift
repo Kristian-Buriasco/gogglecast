@@ -333,7 +333,9 @@ public final class GogglesConnectionCoordinator: ObservableObject {
     /// waits for one (it re-armed its gate after dropped frames). The second case used to wait forever, because
     /// the goggles send a keyframe only when sharing restarts and the app's recovery ran in the first case only.
     var needsKeyframeRecovery: Bool {
-        (decoderWaitingForKeyframe && uiState.kind == .live) || uiState.kind == .waitingForKeyframe || silenceEscalated
+        // Developer aid: while this file exists the app does not reconnect on its own (reverse-engineering experiments).
+        if FileManager.default.fileExists(atPath: "/tmp/gogglesview-no-recovery") { return false }
+        return (decoderWaitingForKeyframe && uiState.kind == .live) || uiState.kind == .waitingForKeyframe || silenceEscalated
     }
 
     /// The silence watchdog gave up on a stream that was live (no picture for 5 s). Without this the window showed
