@@ -212,7 +212,9 @@ final class DenoiseStage {
 /// frames) unless it differs from it by more than a noise-sized amount, which means real motion: those pixels
 /// are taken from the current picture unchanged, so moving subjects do not smear.
 final class CITemporalDenoiser {
-    private let ci = CIContext(options: [.cacheIntermediates: false])
+    /// One context for every feed: a context per feed kept its own Core Image caches, which grew with the feed count.
+    private static let sharedContext = CIContext(options: [.cacheIntermediates: false])
+    private var ci: CIContext { Self.sharedContext }
     private var pool: CVPixelBufferPool?
     private var previous: CVPixelBuffer?
     private var key: (w: Int, h: Int, fmt: OSType)?
