@@ -136,7 +136,7 @@ final class GogglesSession: NSObject, RegistrableSession, NSWindowDelegate {
         window.styleMask = [.titled, .closable, .resizable, .miniaturizable]
         applyCustomTitleBarChrome(to: window)
         window.contentAspectRatio = NSSize(width: 16, height: 9)
-        window.collectionBehavior.insert(.fullScreenPrimary)
+        window.collectionBehavior.insert(.fullScreenNone)   // full screen is switched off for goggles windows
         window.isReleasedWhenClosed = false
         self.window = window
 

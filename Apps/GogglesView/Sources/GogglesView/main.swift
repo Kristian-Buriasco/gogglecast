@@ -475,8 +475,7 @@ if args.contains("--run") || !args.dropFirst().contains(where: { $0.hasPrefix("-
     let windowMenu = NSMenu(title: L("Window"))
     windowMenu.addItem(withTitle: L("Minimize"), action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
     windowMenu.addItem(withTitle: L("Zoom"), action: #selector(NSWindow.performZoom(_:)), keyEquivalent: "")
-    let fullScreenItem = windowMenu.addItem(withTitle: L("Enter Full Screen"), action: #selector(NSWindow.toggleFullScreen(_:)), keyEquivalent: "f")
-    fullScreenItem.keyEquivalentModifierMask = [.control, .command]
+    // No "Enter Full Screen": goggles windows do not go full screen (see GogglesSession); use Program output for a clean full screen picture.
     windowMenu.addItem(.separator())
     windowMenu.addItem(withTitle: L("Bring All to Front"), action: #selector(NSApplication.arrangeInFront(_:)), keyEquivalent: "")
     windowMenuItem.submenu = windowMenu

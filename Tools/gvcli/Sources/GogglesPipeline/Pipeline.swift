@@ -392,17 +392,13 @@ public func runPipeline(
                     FileHandle.standardError.write(Data("[gvcli] No data for 2s, resending handshake.\n".utf8))
                     await state.markRx()
                     delegate?.pipelineWentSilent()
-                    // The decoder's reference chain can't be trusted after
-                    // a gap: re-arm so only the next SPS+IDR resumes output,
-                    // and let the `!started` branch below request one every
-                    // 1.5s (the request often goes unanswered on Goggles 3;
-                    // the helper's `.waitingForKeyframe` state is what shows
-                    // the user the manual instruction).
-                    if gate.rearm() {
-                        await state.markStopped()
-                        sawFirstVideoPacket.reset()
-                        FileHandle.standardError.write(Data("[gvcli] Re-armed started-gate, waiting for next SPS+IDR.\n".utf8))
-                    }
+                    // A silence alone does NOT re-arm the keyframe gate. It used to, on the theory that the
+                    // decoder's reference chain can't be trusted after a gap, but the goggles send one keyframe
+                    // when sharing starts and never again: after a 2 s silence (a brief radio dropout, caught
+                    // unattended after 9.5 minutes) every frame was thrown away waiting for a keyframe that
+                    // never comes, and the picture stayed gone until someone toggled Share Liveview. A pause
+                    // loses no frames; real loss is still caught by the drop-burst detector below, which
+                    // does re-arm. Frames that arrive after the pause continue the stream the decoder holds.
                 }
                 let startedNow = await state.snapshotTimers().started
                 if !startedNow, now.timeIntervalSince(timers.lastIframe) > 1.5 {
