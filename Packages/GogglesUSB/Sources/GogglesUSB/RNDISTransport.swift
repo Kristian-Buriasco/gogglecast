@@ -732,9 +732,31 @@ public final class RNDISTransport: GogglesTransport {
         }
     }
 
+    /// Research aid: with `/tmp/gogglesview-eth-sniff` present, every inbound frame that is not the video UDP stream is
+    /// logged (one line, NSLog) so a share-toggle's network side effects become visible.
+    private static var ethSniffMarker: Bool { FileManager.default.fileExists(atPath: "/tmp/gogglesview-eth-sniff") }
+
+    private static func logEthernet(_ f: Data) {
+        let b = [UInt8](f)
+        guard b.count >= 14 else { return }
+        let type = Int(b[12]) << 8 | Int(b[13])
+        var desc = "type=0x\(String(type, radix: 16)) len=\(b.count)"
+        if type == 0x0800, b.count >= 34 {
+            let ihl = Int(b[14] & 0x0f) * 4
+            desc += " ip proto=\(b[23]) \(b[26]).\(b[27]).\(b[28]).\(b[29])>\(b[30]).\(b[31]).\(b[32]).\(b[33])"
+            if (b[23] == 17 || b[23] == 6), b.count >= 14 + ihl + 4 {
+                let o = 14 + ihl
+                desc += " ports \(Int(b[o]) << 8 | Int(b[o + 1]))>\(Int(b[o + 2]) << 8 | Int(b[o + 3]))"
+            }
+        }
+        desc += " hex=" + b.prefix(48).map { String(format: "%02x", $0) }.joined()
+        NSLog("[eth-sniff] %@", desc)
+    }
+
     /// One inbound Ethernet frame's worth of filtering (design §5.2). See
     /// `handleBulkInCompletion`'s doc comment for the full rationale.
     private func handleInboundEthernetFrame(_ frame: Data) {
+        if Self.ethSniffMarker, !(RawNet.parseUDP(frame).map { $0.srcPort == Self.expectedInboundSrcPort } ?? false) { Self.logEthernet(frame) }
         if let arp = RawNet.parseARP(frame) {
             if arp.senderIp == ARPResolver.gogglesIp {
                 updateGogglesMac(arp.senderMac)
