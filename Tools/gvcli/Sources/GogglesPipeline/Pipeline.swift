@@ -225,6 +225,7 @@ public func runPipeline(
 
     let state = PipelineState()
     let reassembler = FrameReassembler()
+    let nalDebug = ProcessInfo.processInfo.environment["GVCLI_NALDEBUG"] == "1"
 
     func send(_ frame: Data) {
         do {
@@ -344,6 +345,9 @@ public func runPipeline(
                 // always prepends.
                 let nalType = KeyframeGate.nalType(of: nal)
                 let wasStarted = gate.started
+                if nalDebug, nalType != 1 {
+                    FileHandle.standardError.write(Data(String(format: "[nal] %.2f type=%d len=%d gateOpen=%@\n", Date().timeIntervalSince1970.truncatingRemainder(dividingBy: 1000), nalType, nal.count, wasStarted ? "yes" : "no").utf8))
+                }
                 let out = gate.process(nal)
                 if out.didStart {
                     await state.markStarted()
@@ -369,6 +373,7 @@ public func runPipeline(
 
         // MARK: periodic handshake-resend / I-frame-retry timer
         group.addTask {
+            var forceWaitSince: Date?
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 200_000_000)
                 if Task.isCancelled { break }
@@ -401,6 +406,19 @@ public func runPipeline(
                     // does re-arm. Frames that arrive after the pause continue the stream the decoder holds.
                 }
                 let startedNow = await state.snapshotTimers().started
+                // Video has been arriving for a while but no keyframe has: the goggles will not send one on their
+                // own, so open the gate anyway (see `KeyframeGate.forceStart`).
+                if startedNow || !sawFirstVideoPacket.value {
+                    forceWaitSince = nil
+                } else if let since = forceWaitSince {
+                    if now.timeIntervalSince(since) >= 2.5, gate.forceStart() {
+                        forceWaitSince = nil
+                        delegate?.pipelineDidForceStart()
+                        FileHandle.standardError.write(Data("[gvcli] No keyframe after 2.5 s of video: opening the gate on the next frame anyway.\n".utf8))
+                    }
+                } else {
+                    forceWaitSince = now
+                }
                 if !startedNow, now.timeIntervalSince(timers.lastIframe) > 1.5 {
                     let seq = await state.nextSeq()
                     send(WireProtocol.requestIFrameTelemetry(seq: seq, sessionId: sessionId))
@@ -478,4 +496,5 @@ private final class LockedFlag: @unchecked Sendable {
         return true
     }
     func reset() { lock.lock(); isSet = false; lock.unlock() }
+    var value: Bool { lock.lock(); defer { lock.unlock() }; return isSet }
 }

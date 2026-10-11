@@ -764,6 +764,10 @@ private final class DevicePipelineDelegateAdapter: PipelineDelegate {
         service?.pipelineWentSilent(deviceId: deviceId)
     }
 
+    func pipelineDidForceStart() {
+        Logging.pipeline.info("[\(self.deviceId, privacy: .public)] no keyframe after 2.5 s of video: gate opened anyway")
+    }
+
     func pipelineDidUpdateStats(_ stats: PipelineStats) {
         service?.pipelineDidUpdateStats(deviceId: deviceId, stats)
     }

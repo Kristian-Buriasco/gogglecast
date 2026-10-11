@@ -21,6 +21,8 @@ public struct KeyframeGate: Sendable {
     public private(set) var started = false
     private var sps: Data?
     private var pps: Data?
+    /// Set by `forceStart()`: the next NAL is emitted behind the cached parameter sets, like a normal start.
+    private var forcedStartPending = false
 
     public init() {}
 
@@ -31,6 +33,10 @@ public struct KeyframeGate: Sendable {
 
     public mutating func process(_ nal: Data) -> GateOutput {
         if started {
+            if forcedStartPending {
+                forcedStartPending = false
+                return GateOutput(nals: [sps, pps].compactMap { $0 } + [nal], didStart: true)
+            }
             return GateOutput(nals: [nal], didStart: false)
         }
         switch Self.nalType(of: nal) {
@@ -46,6 +52,20 @@ public struct KeyframeGate: Sendable {
         }
         // Waiting for a parameter set and/or an IDR: drop.
         return GateOutput()
+    }
+
+    /// Opens the gate without an IDR, when parameter sets are known. The goggles send one keyframe when sharing
+    /// starts and none afterwards, so after a reconnect the gate would otherwise wait forever. A decoder that
+    /// still holds the previous picture carries on from the next frames (possibly with artifacts); one that does
+    /// not simply ignores them until a real keyframe. The goggles send SPS and PPS together as one type-7 blob (about
+    /// five times a second, keyframe or not), so the SPS alone is enough. Returns false when it cannot (already open,
+    /// or no parameter set seen yet).
+    @discardableResult
+    public mutating func forceStart() -> Bool {
+        guard !started, sps != nil else { return false }
+        started = true
+        forcedStartPending = true
+        return true
     }
 
     /// Drops the cached parameter sets and waits for the next SPS+IDR.
@@ -81,6 +101,12 @@ public final class SharedKeyframeGate: @unchecked Sendable {
     public var started: Bool {
         lock.lock(); defer { lock.unlock() }
         return gate.started
+    }
+
+    @discardableResult
+    public func forceStart() -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        return gate.forceStart()
     }
 }
 
