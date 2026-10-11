@@ -226,7 +226,13 @@ final class CITemporalDenoiser {
         return (weight: 0.2 + 0.7 * s, threshold: 0.04 + 0.08 * s)
     }
 
+    /// The Core Image graph of every picture creates autoreleased objects; the decoder's thread does not drain them
+    /// often enough, so they piled up at several feeds (22 MB/min in the soak test). Drain after each picture.
     func process(_ input: CVPixelBuffer, strength: Double) -> CVPixelBuffer? {
+        autoreleasepool { processUnpooled(input, strength: strength) }
+    }
+
+    private func processUnpooled(_ input: CVPixelBuffer, strength: Double) -> CVPixelBuffer? {
         let w = CVPixelBufferGetWidth(input), h = CVPixelBufferGetHeight(input)
         let fmt = CVPixelBufferGetPixelFormatType(input)
         if key?.w != w || key?.h != h || key?.fmt != fmt {
@@ -295,6 +301,10 @@ final class MetalFXUpscaler {
     }
 
     func process(_ input: CVPixelBuffer, factor: Double) -> CVPixelBuffer? {
+        autoreleasepool { processUnpooled(input, factor: factor) }
+    }
+
+    private func processUnpooled(_ input: CVPixelBuffer, factor: Double) -> CVPixelBuffer? {
         guard let device, let queue else { lastError = "upscale: no Metal device"; return nil }
         var src = input
         if CVPixelBufferGetPixelFormatType(input) != kCVPixelFormatType_32BGRA {
