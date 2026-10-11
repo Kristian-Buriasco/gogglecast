@@ -6,6 +6,11 @@ import Foundation
 /// description and a first picture instead of waiting for the next IDR.
 /// Holds at most one IDR (~100-300 KB). Pure value type; owned and mutated
 /// only on `HelperService.stateQueue`.
+///
+/// The goggles send ONE keyframe, when Share Liveview starts, and none after a reconnect, a replug or a window
+/// reopening. So this cache is never dropped for those events any more: the last real keyframe seeds a decoder that
+/// has nothing, and the live frames then update it (artifacts are possible where the scene changed since, but a
+/// picture beats black). A new keyframe replaces it, so it is only ever stale when nothing fresher exists.
 struct StreamHeadCache {
     struct Entry: Equatable {
         let data: Data

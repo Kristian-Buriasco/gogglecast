@@ -849,6 +849,26 @@ if args.contains("--stab-probe") {
     exit(0)
 }
 
+if args.contains("--reconnect-probe") {
+    // Dev probe: ask the helper for a full reconnect of the first goggles (what the app does after a long silence),
+    // without sudo. Run it while a goggles window shows a live picture to see whether the picture survives.
+    let client = HelperClient()
+    client.connect()
+    var finished = false
+    DispatchQueue.global().asyncAfter(deadline: .now() + 1.0) {
+        pollFirstAvailableDeviceId(client: client) { deviceId in
+            guard let deviceId else { print("[reconnect-probe] no device"); finished = true; return }
+            print("[reconnect-probe] reconnecting \(deviceId) at \(Date())")
+            client.reconnectHelper(deviceId: deviceId)
+            DispatchQueue.global().asyncAfter(deadline: .now() + 1.0) { finished = true }
+        }
+    }
+    let end = Date().addingTimeInterval(8)
+    while !finished, Date() < end { RunLoop.main.run(mode: .default, before: Date().addingTimeInterval(0.05)) }
+    print("--reconnect-probe: done")
+    exit(0)
+}
+
 if args.contains("--test-client") {
     // Task 3.1's hardware-verification harness (brief point 3): connect via
     // `HelperClient`, call `startStreaming`, log fps for a few seconds, exit.
