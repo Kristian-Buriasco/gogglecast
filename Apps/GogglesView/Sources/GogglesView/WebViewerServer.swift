@@ -361,24 +361,41 @@ final class WebViewerServer: ObservableObject, SampleBufferRendering {
         }
     }
 
+    private var cachedLiveToken: (value: String, at: Date)?
+
+    /// The token in Settings right now. The server used to keep the token it was started with, so a token changed
+    /// or regenerated afterwards (Settings and the window that runs the server are different views) made the link
+    /// shown in Settings answer "Missing or wrong token". Read from the store at most once a second; an empty
+    /// stored token keeps the one the server started with, so access is never opened by accident.
+    private func currentToken() -> String {
+        let now = Date()
+        let live: String
+        if let c = cachedLiveToken, now.timeIntervalSince(c.at) < 1 { live = c.value } else {
+            live = WebViewerPrefs.token
+            cachedLiveToken = (live, now)
+        }
+        return live.isEmpty ? token : live
+    }
+
     private func respond(_ c: NWConnection, to req: WebRequest?) {
         guard let req else { return reply(c, 400, "Bad Request", "text/plain", Data("Bad request".utf8)) }
         guard hostAllowed(req.host) else {
             return reply(c, 421, "Misdirected Request", "text/plain", Data("Unexpected Host header".utf8))
         }
-        switch WebRequest.route(req, token: token) {
-        case .page: reply(c, 200, "OK", "text/html; charset=utf-8", Data(WebViewerPage.html(token: token).utf8))
-        case .statusPage: reply(c, 200, "OK", "text/html; charset=utf-8", Data(WebStatusPage.html(token: token).utf8))
+        let tok = currentToken()
+        switch WebRequest.route(req, token: tok) {
+        case .page: reply(c, 200, "OK", "text/html; charset=utf-8", Data(WebViewerPage.html(token: tok).utf8))
+        case .statusPage: reply(c, 200, "OK", "text/html; charset=utf-8", Data(WebStatusPage.html(token: tok).utf8))
         case .statusJSON: reply(c, 200, "OK", "application/json", WebStatusStore.latest)
         case .playlist:
-            if let pl = segmenter.window.playlist(token: token) {
+            if let pl = segmenter.window.playlist(token: tok) {
                 reply(c, 200, "OK", "application/vnd.apple.mpegurl", Data(pl.utf8))
             } else { reply(c, 404, "Not Found", "text/plain", Data("No segments yet".utf8)) }
         case .segment(let n):
             if let d = segmenter.window.data(forSequence: n) { reply(c, 200, "OK", "video/mp2t", d) }
             else { reply(c, 404, "Not Found", "text/plain", Data("Gone".utf8)) }
         case .manifest:
-            reply(c, 200, "OK", "application/manifest+json", Data(WebViewerPage.manifest(token: token).utf8))
+            reply(c, 200, "OK", "application/manifest+json", Data(WebViewerPage.manifest(token: tok).utf8))
         case .icon(let size):
             if let png = WebViewerIcon.png(size: size) { reply(c, 200, "OK", "image/png", png) }
             else { reply(c, 404, "Not Found", "text/plain", Data("Not found".utf8)) }
