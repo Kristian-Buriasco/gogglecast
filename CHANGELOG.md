@@ -4,6 +4,9 @@ All notable changes to this project are documented here. Format based on [Keep a
 
 ## [Unreleased]
 
+### Added
+- A "Back to the list" button appears in the goggles window when the goggles have not been found (or could not be claimed) for 8 seconds, so you can pick again without looking for the menu.
+
 ### Changed
 - The overlay notice (first stream, capture window), the README and the site no longer suggest the display-scale trick. They now say to turn the goggles' overlay off at its source: Settings > Camera > Advanced camera settings > Camera View Recording > off.
 

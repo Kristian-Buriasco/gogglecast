@@ -461,7 +461,9 @@ struct GogglesConnectionView: View {
         }
         .onChange(of: coordinator.displayState.kind) { _, kind in
             if kind == .live { hadPicture = true }
+            trouble.note(kind: kind, at: Date())
         }
+        .onAppear { trouble.note(kind: coordinator.displayState.kind, at: Date()) }
     }
 
     private var videoOpacity: Double {
@@ -470,6 +472,8 @@ struct GogglesConnectionView: View {
 
     /// True once this window has shown live video, so the last picture can stay up (dimmed) when the signal drops.
     @State private var hadPicture = false
+    /// When the window last entered a state where the goggles are missing or refusing (see `BackToList`).
+    @State private var trouble = TroubleClock()
 
     @State private var helperSetupError: String?
 
@@ -507,6 +511,17 @@ struct GogglesConnectionView: View {
                 if ConnectionMessages.offersRecoveryActions(state.kind) {
                     RecoveryActionsRow(onRetry: { coordinator.retry() })
                 }
+                if let onDisconnect {
+                    // Not found for a while: a way out to the list of goggles, without hunting for the menu.
+                    TimelineView(.periodic(from: .now, by: 1)) { context in
+                        if BackToList.shouldOffer(kind: state.kind, since: trouble.since, now: context.date) {
+                            Button(action: onDisconnect) {
+                                Label("Back to the list", systemImage: "chevron.backward")
+                            }
+                            .accessibilityIdentifier("backToListButton")
+                        }
+                    }
+                }
             }
             .frame(maxWidth: 460)
             .padding(8)
@@ -526,5 +541,42 @@ enum VideoVisibility {
         case .handshaking, .waitingForKeyframe: return hadPicture ? 0.4 : 0
         default: return 0
         }
+    }
+}
+
+/// How long the window has been in a "goggles not available" state.
+struct TroubleClock: Equatable {
+    private(set) var since: Date?
+    mutating func note(kind: GogglesUIStateKind, at now: Date) {
+        if BackToList.isTrouble(kind) {
+            if since == nil { since = now }
+        } else if !BackToList.isSearching(kind) {
+            since = nil   // a picture is coming (or there is one): the search is over
+        }
+    }
+}
+
+/// When the window offers a way back to the list of goggles.
+enum BackToList {
+    static let afterSeconds: TimeInterval = 8
+
+    static func isTrouble(_ kind: GogglesUIStateKind) -> Bool {
+        switch kind {
+        case .noDevice, .claimFailed: return true
+        default: return false
+        }
+    }
+
+    /// Connecting between two "not found" answers: the same search, so the clock keeps running.
+    static func isSearching(_ kind: GogglesUIStateKind) -> Bool {
+        switch kind {
+        case .claiming, .resolving, .handshaking: return true
+        default: return false
+        }
+    }
+
+    static func shouldOffer(kind: GogglesUIStateKind, since: Date?, now: Date) -> Bool {
+        guard isTrouble(kind), let since else { return false }
+        return now.timeIntervalSince(since) >= afterSeconds
     }
 }
