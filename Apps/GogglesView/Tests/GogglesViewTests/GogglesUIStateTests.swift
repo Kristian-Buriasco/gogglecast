@@ -382,7 +382,7 @@ struct GogglesConnectionCoordinatorTests {
         #expect(coordinator.displayState == .live)
     }
 
-    @Test("stuck decoder: asks for a keyframe, then reconnects after 3s")
+    @Test("stuck decoder: asks for a keyframe, then reconnects after 8s")
     func stuckDecoderRequestsThenReconnects() {
         let (client, coordinator, clock) = makeCoordinator()
         var actions: [KeyframeRecoveryPolicy.Action] = []
@@ -392,7 +392,7 @@ struct GogglesConnectionCoordinatorTests {
         coordinator.setDecoderWaitingForKeyframe(true)
         coordinator.tick()
         #expect(actions == [.requestKeyframe])
-        for _ in 0..<12 {
+        for _ in 0..<36 {
             clock.advance(0.25)
             client.sendNAL("test-device", Data([0, 0, 0, 1, 0x41]), 1, false, 0)
             coordinator.tick()
@@ -409,7 +409,7 @@ struct GogglesConnectionCoordinatorTests {
         client.sendHelperState("test-device", GogglesXPC.GogglesState.waitingForKeyframe.rawValue, "dropped frames, waiting for keyframe")
         coordinator.tick()
         #expect(actions == [.requestKeyframe])
-        for _ in 0..<16 { clock.advance(0.25); coordinator.tick() }
+        for _ in 0..<40 { clock.advance(0.25); coordinator.tick() }
         #expect(actions.contains(.reconnect), "no escalation: the goggles only send a keyframe when sharing restarts")
     }
 

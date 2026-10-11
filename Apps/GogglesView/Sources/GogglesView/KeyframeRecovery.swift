@@ -19,7 +19,10 @@ struct KeyframeRecoveryPolicy {
     private var lastReconnectAt: Date?
     private var reconnectInterval: TimeInterval
 
-    init(escalateAfter: TimeInterval = 3, requestInterval: TimeInterval = 1.5, maxReconnectInterval: TimeInterval = 24) {
+    /// `escalateAfter` is 8 s: the pipeline opens its keyframe gate on its own after 2.5 s without one, and a reconnect
+    /// before that has had time to show a picture only throws the resumed stream away again (seen on live goggles:
+    /// live at 47.468, reconnect at 47.852).
+    init(escalateAfter: TimeInterval = 8, requestInterval: TimeInterval = 1.5, maxReconnectInterval: TimeInterval = 32) {
         self.escalateAfter = escalateAfter
         self.requestInterval = requestInterval
         self.maxReconnectInterval = maxReconnectInterval

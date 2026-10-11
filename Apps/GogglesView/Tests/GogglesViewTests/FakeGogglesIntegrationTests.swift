@@ -536,7 +536,7 @@ struct FakeGogglesIntegrationTests {
             #expect(session.hasRecentPicture(within: 1) == false)
 
             // The recovery policy, driven with the decoder's real state, asks for a keyframe and then a reconnect.
-            var policy = KeyframeRecoveryPolicy()
+            var policy = KeyframeRecoveryPolicy(escalateAfter: 3, requestInterval: 1.5, maxReconnectInterval: 24)
             let t0 = Date()
             #expect(policy.update(waiting: session.isWaitingForKeyframe, now: t0) == .requestKeyframe)
             #expect(policy.update(waiting: session.isWaitingForKeyframe, now: t0.addingTimeInterval(0.5)) == .none)
