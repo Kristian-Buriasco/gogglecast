@@ -15,6 +15,36 @@ private func rec(_ d: inout DropBurstDetector, _ total: Int, _ now: Date) -> Boo
 }
 
 @Suite struct KeyframeGateTests {
+    @Test func forcedStartOpensWithoutAnIdrAndEmitsTheParameterSetsFirst() {
+        var g = KeyframeGate()
+        let early = g.forceStart()
+        #expect(!early, "nothing to open with: no parameter sets yet")
+        _ = feed(&g, nal(0x67, 1))   // the goggles send SPS+PPS as one type-7 blob; no separate PPS
+        #expect(feed(&g, nal(0x41, 3)).nals.isEmpty, "a P-frame is still dropped before the gate is forced")
+        let forced = g.forceStart()
+        #expect(forced)
+        #expect(g.started)
+        let first = feed(&g, nal(0x41, 4))
+        #expect(first.didStart)
+        #expect(first.nals == [nal(0x67, 1), nal(0x41, 4)], "the parameter set, then the frame")
+        let second = feed(&g, nal(0x41, 5))
+        #expect(!second.didStart)
+        #expect(second.nals == [nal(0x41, 5)])
+        let again = g.forceStart()
+        #expect(!again, "already open")
+    }
+
+    @Test func rearmAfterAForcedStartWaitsForARealKeyframeAgain() {
+        var g = KeyframeGate()
+        _ = feed(&g, nal(0x67))
+        g.forceStart()
+        g.rearm()
+        #expect(!g.started)
+        #expect(feed(&g, nal(0x41)).nals.isEmpty)
+        let afterRearm = g.forceStart()
+        #expect(!afterRearm, "parameter sets were dropped by rearm")
+    }
+
     @Test func initialPassThroughSpsThenIdrThenP() {
         var g = KeyframeGate()
         #expect(feed(&g, nal(0x67)).nals.isEmpty)

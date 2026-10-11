@@ -226,7 +226,6 @@
 "No goggles connected" = "Aucune paire de lunettes connectée";
 "Connecting…" = "Connexion…";
 "Can't connect, open GogglesView" = "Connexion impossible, ouvrez GogglesView";
-"Waiting for video, check goggles live view" = "En attente de vidéo, vérifiez la vue en direct des lunettes";
 "Live" = "En direct";
 "No video, reconnecting…" = "Pas de vidéo, reconnexion…";
 "Drop a marker in the data log" = "Poser un marqueur dans le journal de données";
@@ -766,7 +765,6 @@
 "Connection Health…" = "Santé de la connexion…";
 "Window" = "Fenêtre";
 "Minimize" = "Placer dans le Dock";
-"Enter Full Screen" = "Passer en plein écran";
 "Bring All to Front" = "Tout ramener au premier plan";
 "Help" = "Aide";
 
@@ -865,3 +863,7 @@
 "Upscale the picture" = "Agrandir l'image";
 "Scale" = "Échelle";
 "Reducing noise blends each picture with the ones before it, so a moving subject can leave a faint trail at high strength. Upscaling makes the picture larger and sharper with Apple's MetalFX scaler. The goggles still send 1080p, so it helps most for recordings and large displays; it does not add detail that was never captured. Both run on the GPU, add no frames of delay, switch themselves off when the Mac cannot keep up, and are off in race mode. They apply to the preview, recordings and streams." = "La réduction du bruit mélange chaque image avec les précédentes : un sujet en mouvement peut donc laisser une légère traînée à forte intensité. L'upscaling agrandit l'image et la rend plus nette avec le scaler MetalFX d'Apple. Les goggles envoient toujours du 1080p, il aide donc surtout pour les enregistrements et les grands écrans ; il n'ajoute pas de détails qui n'ont jamais été captés. Les deux utilisent le GPU, n'ajoutent aucune image de retard, se coupent d'eux-mêmes quand le Mac ne suit pas et sont désactivés en mode course. Ils s'appliquent à l'aperçu, aux enregistrements et aux streams.";
+"Back to the list" = "Retour à la liste";
+
+/* TODO: translate (English placeholder) */
+"No picture: turn Share Liveview off and on on the goggles" = "Pas d'image : désactivez puis réactivez Share Liveview sur les goggles";

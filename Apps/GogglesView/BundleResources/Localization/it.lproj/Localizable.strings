@@ -240,7 +240,6 @@
 "No goggles connected" = "Nessun goggles collegato";
 "Connecting…" = "Connessione in corso…";
 "Can't connect, open GogglesView" = "Connessione impossibile, apri GogglesView";
-"Waiting for video, check goggles live view" = "In attesa del video, controlla la vista live dei goggles";
 "Live" = "Live";
 "No video, reconnecting…" = "Nessun video, riconnessione in corso…";
 /* DataCollector.swift */
@@ -835,7 +834,6 @@
 "Connection Health…" = "Stato della connessione…";
 "Window" = "Finestra";
 "Minimize" = "Riduci";
-"Enter Full Screen" = "Attiva schermo intero";
 "Bring All to Front" = "Porta tutto in primo piano";
 "Help" = "Aiuto";
 
@@ -934,3 +932,7 @@
 "Upscale the picture" = "Ingrandisci l'immagine";
 "Scale" = "Scala";
 "Reducing noise blends each picture with the ones before it, so a moving subject can leave a faint trail at high strength. Upscaling makes the picture larger and sharper with Apple's MetalFX scaler. The goggles still send 1080p, so it helps most for recordings and large displays; it does not add detail that was never captured. Both run on the GPU, add no frames of delay, switch themselves off when the Mac cannot keep up, and are off in race mode. They apply to the preview, recordings and streams." = "La riduzione del rumore fonde ogni immagine con le precedenti, quindi un soggetto in movimento può lasciare una scia leggera a intensità alta. L'upscaling ingrandisce l'immagine e la rende più nitida con lo scaler MetalFX di Apple. I goggles inviano ancora 1080p, quindi aiuta soprattutto per registrazioni e schermi grandi; non aggiunge dettagli che non sono mai stati catturati. Entrambi usano la GPU, non aggiungono fotogrammi di ritardo, si spengono da soli quando il Mac non regge e sono disattivati in modalità gara. Valgono per l'anteprima, le registrazioni e gli stream.";
+"Back to the list" = "Torna alla lista";
+
+/* TODO: translate (English placeholder) */
+"No picture: turn Share Liveview off and on on the goggles" = "Nessuna immagine: spegni e riaccendi Share Liveview sui goggles";

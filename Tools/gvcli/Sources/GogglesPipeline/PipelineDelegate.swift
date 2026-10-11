@@ -31,6 +31,8 @@ public protocol PipelineDelegate: AnyObject {
     /// already ran once (the caller, which knows whether it has reached
     /// `.live` before, decides which).
     func pipelineWentSilent()
+    /// The gate was opened without a keyframe (video had been arriving for a while with none; see `KeyframeGate.forceStart`).
+    func pipelineDidForceStart()
     /// Once-per-second stats snapshot -- fires whenever `runPipeline` is
     /// given a non-nil delegate, independent of gvcli's own `--stats` flag
     /// (which only controls the separate stderr `[stats]` line). Mirrors
@@ -51,6 +53,7 @@ public extension PipelineDelegate {
     func pipelineDidBeginReceivingVideo() {}
     func pipelineDidStart() {}
     func pipelineWentSilent() {}
+    func pipelineDidForceStart() {}
     func pipelineDidUpdateStats(_ stats: PipelineStats) {}
     func pipelineDidRequireKeyframe() {}
 }

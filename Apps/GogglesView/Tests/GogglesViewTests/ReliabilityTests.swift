@@ -8,21 +8,41 @@ private func at(_ s: TimeInterval) -> Date { t0.addingTimeInterval(s) }
 
 final class KeyframeRecoveryPolicyTests: XCTestCase {
     func testNothingWhileNotWaiting() {
-        var p = KeyframeRecoveryPolicy()
+        var p = KeyframeRecoveryPolicy(escalateAfter: 3, requestInterval: 1.5, maxReconnectInterval: 24)
         XCTAssertEqual(p.update(waiting: false, now: at(0)), .none)
         XCTAssertEqual(p.update(waiting: false, now: at(100)), .none)
     }
 
     func testRequestsKeyframeImmediatelyThenRepeats() {
-        var p = KeyframeRecoveryPolicy()
+        var p = KeyframeRecoveryPolicy(escalateAfter: 3, requestInterval: 1.5, maxReconnectInterval: 24)
         XCTAssertEqual(p.update(waiting: true, now: at(0)), .requestKeyframe)
         XCTAssertEqual(p.update(waiting: true, now: at(1.0)), .none)
         XCTAssertEqual(p.update(waiting: true, now: at(1.5)), .requestKeyframe)
         XCTAssertEqual(p.update(waiting: true, now: at(2.0)), .none)
     }
 
-    func testEscalatesToReconnectAfterThreeSeconds() {
+    func testDefaultWaitsLongEnoughForTheForcedKeyframeGate() {
         var p = KeyframeRecoveryPolicy()
+        _ = p.update(waiting: true, now: at(0))
+        XCTAssertNotEqual(p.update(waiting: true, now: at(7.9)), .reconnect)
+        XCTAssertEqual(p.update(waiting: true, now: at(8.0)), .reconnect)
+    }
+
+    func testBackoffSurvivesTheGapAReconnectCreates() {
+        var p = KeyframeRecoveryPolicy(escalateAfter: 3, requestInterval: 1.5, maxReconnectInterval: 24)
+        _ = p.update(waiting: true, now: at(0))
+        XCTAssertEqual(p.update(waiting: true, now: at(3)), .reconnect)
+        _ = p.update(waiting: false, now: at(3.5))          // reconnecting: not waiting for a moment
+        _ = p.update(waiting: true, now: at(8))
+        XCTAssertNotEqual(p.update(waiting: true, now: at(13.9)), .reconnect)
+        XCTAssertEqual(p.update(waiting: true, now: at(14)), .reconnect)   // 6 s, not 3 s again
+        p.pictureShown()
+        _ = p.update(waiting: true, now: at(30))
+        XCTAssertEqual(p.update(waiting: true, now: at(33)), .reconnect)
+    }
+
+    func testEscalatesToReconnectAfterThreeSeconds() {
+        var p = KeyframeRecoveryPolicy(escalateAfter: 3, requestInterval: 1.5, maxReconnectInterval: 24)
         _ = p.update(waiting: true, now: at(0))
         XCTAssertNotEqual(p.update(waiting: true, now: at(2.9)), .reconnect)
         XCTAssertEqual(p.update(waiting: true, now: at(3.0)), .reconnect)
@@ -30,7 +50,7 @@ final class KeyframeRecoveryPolicyTests: XCTestCase {
     }
 
     func testReconnectsBackOff() {
-        var p = KeyframeRecoveryPolicy()
+        var p = KeyframeRecoveryPolicy(escalateAfter: 3, requestInterval: 1.5, maxReconnectInterval: 24)
         _ = p.update(waiting: true, now: at(0))
         XCTAssertEqual(p.update(waiting: true, now: at(3)), .reconnect)
         // Next reconnect only after 6 s more, not 3.
@@ -42,10 +62,11 @@ final class KeyframeRecoveryPolicyTests: XCTestCase {
     }
 
     func testGettingAKeyframeResetsEverything() {
-        var p = KeyframeRecoveryPolicy()
+        var p = KeyframeRecoveryPolicy(escalateAfter: 3, requestInterval: 1.5, maxReconnectInterval: 24)
         _ = p.update(waiting: true, now: at(0))
         _ = p.update(waiting: true, now: at(3))
         XCTAssertEqual(p.update(waiting: false, now: at(4)), .none)
+        p.pictureShown()
         XCTAssertNil(p.waitingSince)
         XCTAssertEqual(p.update(waiting: true, now: at(10)), .requestKeyframe)
         XCTAssertEqual(p.update(waiting: true, now: at(13)), .reconnect, "back to the first 3 s interval")

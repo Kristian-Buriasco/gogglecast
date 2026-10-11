@@ -19,19 +19,29 @@ struct KeyframeRecoveryPolicy {
     private var lastReconnectAt: Date?
     private var reconnectInterval: TimeInterval
 
-    init(escalateAfter: TimeInterval = 3, requestInterval: TimeInterval = 1.5, maxReconnectInterval: TimeInterval = 24) {
+    /// `escalateAfter` is 8 s: the pipeline opens its keyframe gate on its own after 2.5 s without one, and a reconnect
+    /// before that has had time to show a picture only throws the resumed stream away again (seen on live goggles:
+    /// live at 47.468, reconnect at 47.852).
+    init(escalateAfter: TimeInterval = 8, requestInterval: TimeInterval = 1.5, maxReconnectInterval: TimeInterval = 32) {
         self.escalateAfter = escalateAfter
         self.requestInterval = requestInterval
         self.maxReconnectInterval = maxReconnectInterval
         self.reconnectInterval = escalateAfter
     }
 
+    /// A real picture is on screen again: the next stall starts with the short interval.
+    mutating func pictureShown() {
+        waitingSince = nil; lastRequestAt = nil; lastReconnectAt = nil
+        reconnectInterval = escalateAfter
+    }
+
     /// `waiting` is true only while there is a reason to expect video (the helper reports live)
     /// and the decoder still has no keyframe.
     mutating func update(waiting: Bool, now: Date) -> Action {
         guard waiting else {
+            // Keep the backoff: a reconnect itself ends the "waiting" state for a moment, and resetting here made a
+            // stream without keyframe reconnect every 8 s forever (seen on live goggles). `pictureShown()` resets it.
             waitingSince = nil; lastRequestAt = nil; lastReconnectAt = nil
-            reconnectInterval = escalateAfter
             return .none
         }
         guard let since = waitingSince else {

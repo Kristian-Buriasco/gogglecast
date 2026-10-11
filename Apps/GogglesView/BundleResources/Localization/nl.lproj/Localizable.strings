@@ -232,7 +232,6 @@
 "No goggles connected" = "Geen bril verbonden";
 "Connecting…" = "Verbinden…";
 "Can't connect, open GogglesView" = "Kan niet verbinden, open GogglesView";
-"Waiting for video, check goggles live view" = "Wachten op video, controleer live view op de bril";
 "Live" = "Live";
 "No video, reconnecting…" = "Geen video, opnieuw verbinden…";
 "Drop a marker in the data log" = "Een markering in het datalogboek plaatsen";
@@ -788,7 +787,6 @@
 "Connection Health…" = "Verbindingsstatus…";
 "Window" = "Venster";
 "Minimize" = "Zet in Dock";
-"Enter Full Screen" = "Open in volledig scherm";
 "Bring All to Front" = "Alles naar voren";
 "Help" = "Help";
 
@@ -863,3 +861,7 @@
 "Upscale the picture" = "Beeld opschalen";
 "Scale" = "Schaal";
 "Reducing noise blends each picture with the ones before it, so a moving subject can leave a faint trail at high strength. Upscaling makes the picture larger and sharper with Apple's MetalFX scaler. The goggles still send 1080p, so it helps most for recordings and large displays; it does not add detail that was never captured. Both run on the GPU, add no frames of delay, switch themselves off when the Mac cannot keep up, and are off in race mode. They apply to the preview, recordings and streams." = "Ruisonderdrukking mengt elk beeld met de vorige, dus een bewegend onderwerp kan bij hoge sterkte een lichte spoor achterlaten. Opschalen maakt het beeld groter en scherper met Apple's MetalFX-scaler. De goggles sturen nog steeds 1080p, dus het helpt vooral bij opnames en grote schermen; het voegt geen details toe die nooit zijn vastgelegd. Beide draaien op de GPU, voegen geen beelden vertraging toe, schakelen zichzelf uit als de Mac het niet bijhoudt en staan uit in racemodus. Ze gelden voor de preview, opnames en streams.";
+"Back to the list" = "Terug naar de lijst";
+
+/* TODO: translate (English placeholder) */
+"No picture: turn Share Liveview off and on on the goggles" = "Geen beeld: zet Share Liveview op de goggles uit en weer aan";

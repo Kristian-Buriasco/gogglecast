@@ -214,7 +214,9 @@ public final class GogglesConnectionCoordinator: ObservableObject {
             onStats: { [weak self] stats in
                 // Stats tick every second whether or not video flows, so they
                 // must not count as activity (that would blind the watchdog).
+                // They do prove the helper is alive; see `linkAlive`.
                 self?.stats = stats
+                self?.lastStatsAt = self?.now()
             },
             onBatteryChanged: { [weak self] percent in
                 self?.batteryPercent = percent
@@ -284,6 +286,8 @@ public final class GogglesConnectionCoordinator: ObservableObject {
             waitingForKeyframeEnteredAt = now()
         }
         uiState = mapped
+        helperReportsLive = GogglesXPC.GogglesState(rawValue: raw) == .live
+        silenceEscalated = false
         if case .handshaking = mapped {
             handshakingEnteredAt = now()
         }
@@ -306,6 +310,7 @@ public final class GogglesConnectionCoordinator: ObservableObject {
         if isVideoSlice, case .handshaking = uiState {
             uiState = .live
         }
+        if isVideoSlice { silenceEscalated = false }
     }
 
     // MARK: - Watchdog
@@ -324,6 +329,7 @@ public final class GogglesConnectionCoordinator: ObservableObject {
     public func setDecoderWaitingForKeyframe(_ waiting: Bool) {
         guard waiting != decoderWaitingForKeyframe else { return }
         if waiting, uiState.kind == .live { waitingForKeyframeEnteredAt = now() }
+        if !waiting, uiState.kind == .live { keyframeRecovery.pictureShown() }
         decoderWaitingForKeyframe = waiting
     }
 
@@ -331,8 +337,19 @@ public final class GogglesConnectionCoordinator: ObservableObject {
     /// waits for one (it re-armed its gate after dropped frames). The second case used to wait forever, because
     /// the goggles send a keyframe only when sharing restarts and the app's recovery ran in the first case only.
     var needsKeyframeRecovery: Bool {
-        (decoderWaitingForKeyframe && uiState.kind == .live) || uiState.kind == .waitingForKeyframe
+        (decoderWaitingForKeyframe && uiState.kind == .live) || uiState.kind == .waitingForKeyframe || silenceEscalated
     }
+
+    /// The silence watchdog gave up on a stream that was live (no picture for 5 s). Without this the window showed
+    /// "reconnecting" forever and never did anything: the goggles drop the session after a long silence (12 s was
+    /// enough) and only a fresh handshake brings the video back.
+    private var silenceEscalated = false
+
+    /// The helper says live and its stats keep arriving, so packets still come from the goggles (the helper drops
+    /// to stalled after 2 s without ANY packet). A static goggles display sends one keyframe and then no video at
+    /// all; judging that as a dead stream made the watchdog reconnect after 13 s and lose the picture for good.
+    private var helperReportsLive = false
+    private var lastStatsAt: Date?
 
     func tick(currentTime: Date? = nil) {
         let t = currentTime ?? now()
@@ -346,12 +363,15 @@ public final class GogglesConnectionCoordinator: ObservableObject {
             ConnectionTrace.shared.record("[\(deviceId)] no keyframe after \(keyframeRecovery.escalateAfter)s, reconnecting")
             reconnect()
         }
-        let elapsed = t.timeIntervalSince(lastActivityAt)
+        let linkAlive = helperReportsLive && lastStatsAt.map { t.timeIntervalSince($0) < 2.5 } ?? false
+        let elapsed = linkAlive ? 0 : t.timeIntervalSince(lastActivityAt)
         let updated = GogglesUIStateMachine.applySilenceWatchdog(current: uiState, secondsSinceLastActivity: elapsed)
         if updated != uiState {
+            let wasPicture = uiState.kind == .live || uiState.kind == .stalled
             uiState = updated
             if case .handshaking = updated {
                 handshakingEnteredAt = t
+                if wasPicture { silenceEscalated = true }
             }
         }
         if case .handshaking(let currentElapsed) = uiState, let enteredAt = handshakingEnteredAt {

@@ -475,8 +475,7 @@ if args.contains("--run") || !args.dropFirst().contains(where: { $0.hasPrefix("-
     let windowMenu = NSMenu(title: L("Window"))
     windowMenu.addItem(withTitle: L("Minimize"), action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
     windowMenu.addItem(withTitle: L("Zoom"), action: #selector(NSWindow.performZoom(_:)), keyEquivalent: "")
-    let fullScreenItem = windowMenu.addItem(withTitle: L("Enter Full Screen"), action: #selector(NSWindow.toggleFullScreen(_:)), keyEquivalent: "f")
-    fullScreenItem.keyEquivalentModifierMask = [.control, .command]
+    // No "Enter Full Screen": goggles windows do not go full screen (see GogglesSession); use Program output for a clean full screen picture.
     windowMenu.addItem(.separator())
     windowMenu.addItem(withTitle: L("Bring All to Front"), action: #selector(NSApplication.arrangeInFront(_:)), keyEquivalent: "")
     windowMenuItem.submenu = windowMenu
@@ -895,6 +894,26 @@ if args.contains("--stab-probe") {
     if let id = chosen { client.stopStreaming(deviceId: id) { client.disconnect() } }
     RunLoop.main.run(until: Date().addingTimeInterval(1))
     print("--stab-probe: done")
+    exit(0)
+}
+
+if args.contains("--reconnect-probe") {
+    // Dev probe: ask the helper for a full reconnect of the first goggles (what the app does after a long silence),
+    // without sudo. Run it while a goggles window shows a live picture to see whether the picture survives.
+    let client = HelperClient()
+    client.connect()
+    var finished = false
+    DispatchQueue.global().asyncAfter(deadline: .now() + 1.0) {
+        pollFirstAvailableDeviceId(client: client) { deviceId in
+            guard let deviceId else { print("[reconnect-probe] no device"); finished = true; return }
+            print("[reconnect-probe] reconnecting \(deviceId) at \(Date())")
+            client.reconnectHelper(deviceId: deviceId)
+            DispatchQueue.global().asyncAfter(deadline: .now() + 1.0) { finished = true }
+        }
+    }
+    let end = Date().addingTimeInterval(8)
+    while !finished, Date() < end { RunLoop.main.run(mode: .default, before: Date().addingTimeInterval(0.05)) }
+    print("--reconnect-probe: done")
     exit(0)
 }
 

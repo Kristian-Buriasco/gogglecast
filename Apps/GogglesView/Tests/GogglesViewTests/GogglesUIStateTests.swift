@@ -309,22 +309,6 @@ struct GogglesConnectionCoordinatorTests {
 
     private let sampleStats = StreamStats(fps: 30, bitrateKbps: 4000, drops: 0, cumulativeFrames: 100, cumulativeBytes: 100_000, cumulativeDrops: 0)
 
-    @Test("stats callbacks do NOT count as activity: the helper sends them every second even with no video")
-    func statsCallbackIsNotActivity() {
-        let (client, coordinator, clock) = makeCoordinator()
-        client.sendConnectionState(.connected)
-        client.sendHelperState("test-device", GogglesXPC.GogglesState.live.rawValue, nil)
-
-        clock.advance(1.9)
-        client.sendStats("test-device", sampleStats)
-        clock.advance(1.9) // 3.8s since the last real activity, stats in between
-        coordinator.tick()
-        #expect(coordinator.uiState == .stalled)
-        client.sendStats("test-device", sampleStats)
-        clock.advance(1.9) // 5.7s total
-        coordinator.tick()
-        #expect(coordinator.uiState.kind == .handshaking)
-    }
 
     @Test("stats never flip a silence-escalated handshaking back to live; only real video does")
     func statsDoNotFlipHandshakingToLive() {
@@ -343,6 +327,23 @@ struct GogglesConnectionCoordinatorTests {
         }
         client.sendNAL("test-device", Data([0, 0, 0, 1, 0x65]), 5, false, 0)
         #expect(coordinator.uiState == .live)
+    }
+
+    @Test("a static goggles display (live, stats ticking, no video) is not treated as a dead stream")
+    func staticDisplayStaysLive() {
+        let (client, coordinator, clock) = makeCoordinator()
+        client.sendConnectionState(.connected)
+        client.sendHelperState("test-device", GogglesXPC.GogglesState.live.rawValue, nil)
+        for _ in 0..<30 {
+            clock.advance(1)
+            client.sendStats("test-device", sampleStats)
+            coordinator.tick()
+            #expect(coordinator.uiState.kind == .live)
+        }
+        // The helper itself freezing (stats stop) is still caught.
+        clock.advance(6)
+        coordinator.tick()
+        #expect(coordinator.uiState.kind == .handshaking)
     }
 
     @Test("a lone parameter set resets the silence clock but does not claim live video")
@@ -382,7 +383,7 @@ struct GogglesConnectionCoordinatorTests {
         #expect(coordinator.displayState == .live)
     }
 
-    @Test("stuck decoder: asks for a keyframe, then reconnects after 3s")
+    @Test("stuck decoder: asks for a keyframe, then reconnects after 8s")
     func stuckDecoderRequestsThenReconnects() {
         let (client, coordinator, clock) = makeCoordinator()
         var actions: [KeyframeRecoveryPolicy.Action] = []
@@ -392,7 +393,7 @@ struct GogglesConnectionCoordinatorTests {
         coordinator.setDecoderWaitingForKeyframe(true)
         coordinator.tick()
         #expect(actions == [.requestKeyframe])
-        for _ in 0..<12 {
+        for _ in 0..<36 {
             clock.advance(0.25)
             client.sendNAL("test-device", Data([0, 0, 0, 1, 0x41]), 1, false, 0)
             coordinator.tick()
@@ -409,8 +410,20 @@ struct GogglesConnectionCoordinatorTests {
         client.sendHelperState("test-device", GogglesXPC.GogglesState.waitingForKeyframe.rawValue, "dropped frames, waiting for keyframe")
         coordinator.tick()
         #expect(actions == [.requestKeyframe])
-        for _ in 0..<16 { clock.advance(0.25); coordinator.tick() }
+        for _ in 0..<40 { clock.advance(0.25); coordinator.tick() }
         #expect(actions.contains(.reconnect), "no escalation: the goggles only send a keyframe when sharing restarts")
+    }
+
+    @Test("a live stream that goes silent for good reconnects instead of showing 'reconnecting' forever")
+    func silentLiveStreamReconnects() {
+        let (client, coordinator, clock) = makeCoordinator()
+        var actions: [KeyframeRecoveryPolicy.Action] = []
+        coordinator.onRecoveryAction = { actions.append($0) }
+        client.sendConnectionState(.connected)
+        client.sendHelperState("test-device", GogglesXPC.GogglesState.live.rawValue, nil)
+        for _ in 0..<80 { clock.advance(0.25); coordinator.tick() }   // 20 s without a single frame
+        #expect(coordinator.uiState.kind == .handshaking, "the watchdog escalated")
+        #expect(actions.contains(.reconnect), "and the app reconnects by itself")
     }
 
     @Test("a waiting decoder does not trigger recovery while the helper is not live")
@@ -509,7 +522,7 @@ struct MenuBarControllerTests {
         #expect(MenuBarController.displayText(for: .resolving) == "Connecting…")
         #expect(MenuBarController.displayText(for: .handshaking(elapsedSeconds: 4)) == "Connecting…")
         #expect(MenuBarController.displayText(for: .claimFailed(reason: "x")) == "Can't connect, open GogglesView")
-        #expect(MenuBarController.displayText(for: .waitingForKeyframe) == "Waiting for video, check goggles live view")
+        #expect(MenuBarController.displayText(for: .waitingForKeyframe) == "No picture: turn Share Liveview off and on on the goggles")
         #expect(MenuBarController.displayText(for: .live) == "Live")
         #expect(MenuBarController.displayText(for: .stalled) == "No video, reconnecting…")
     }

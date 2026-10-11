@@ -367,7 +367,7 @@ final class HelperService: NSObject, GogglesHelperProtocol {
             setState(device, .claiming)
         }
         device.pipelineGeneration += 1
-        device.headCache.invalidate()
+        // The cached keyframe is kept across reconnects (see `StreamHeadCache`).
         let myGeneration = device.pipelineGeneration
         let priorClose = device.pendingClose
         device.pendingClose = nil
@@ -428,7 +428,6 @@ final class HelperService: NSObject, GogglesHelperProtocol {
                         // generation guard is the real, meaningful gate.
                         device.activeTransport = nil
                         device.currentDeviceInfoValue = nil
-                        device.headCache.invalidate()
                         self.stopBatteryPolling(device)
                         self.setState(device, .noDevice)
                         // Task 3.7, design §9.3 scenario 1/2: the
@@ -606,7 +605,6 @@ final class HelperService: NSObject, GogglesHelperProtocol {
     /// references) is what actually stops the running pipeline `Task`.
     private func teardownHardware(_ device: DeviceState) {
         stopBatteryPolling(device)
-        device.headCache.invalidate()
         device.handle.releaseSynchronously()
         device.pipelineTask?.cancel()
         device.pipelineTask = nil
@@ -689,7 +687,6 @@ final class HelperService: NSObject, GogglesHelperProtocol {
     fileprivate func pipelineDidRequireKeyframe(deviceId: String) {
         stateQueue.async {
             let device = self.deviceState(deviceId)
-            device.headCache.invalidate()
             if device.currentStateValue != .waitingForKeyframe {
                 self.setState(device, .waitingForKeyframe, detail: "dropped frames, waiting for keyframe")
             }
@@ -703,9 +700,6 @@ final class HelperService: NSObject, GogglesHelperProtocol {
     fileprivate func pipelineWentSilent(deviceId: String) {
         stateQueue.async {
             let device = self.deviceState(deviceId)
-            // The pipeline re-arms its keyframe gate on silence, so the
-            // cached IDR no longer starts a valid chain.
-            device.headCache.invalidate()
             if device.everReachedLive, device.currentStateValue == .live {
                 self.setState(device, .stalled, detail: "no data for 2s")
             } else {
@@ -762,6 +756,10 @@ private final class DevicePipelineDelegateAdapter: PipelineDelegate {
 
     func pipelineWentSilent() {
         service?.pipelineWentSilent(deviceId: deviceId)
+    }
+
+    func pipelineDidForceStart() {
+        Logging.pipeline.info("[\(self.deviceId, privacy: .public)] no keyframe after 2.5 s of video: gate opened anyway")
     }
 
     func pipelineDidUpdateStats(_ stats: PipelineStats) {
