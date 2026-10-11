@@ -326,6 +326,7 @@ public final class GogglesConnectionCoordinator: ObservableObject {
     public func setDecoderWaitingForKeyframe(_ waiting: Bool) {
         guard waiting != decoderWaitingForKeyframe else { return }
         if waiting, uiState.kind == .live { waitingForKeyframeEnteredAt = now() }
+        if !waiting, uiState.kind == .live { keyframeRecovery.pictureShown() }
         decoderWaitingForKeyframe = waiting
     }
 
