@@ -4,6 +4,16 @@ All notable changes to this project are documented here. Format based on [Keep a
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-10-11
+
+Confirmed on real goggles (two units side by side, replug, 12 s helper freeze, Camera View Recording on, HDMI program output). Tested as a pre-release.
+
+### Fixed
+- A goggles window with no keyframe reconnected every 8 s forever: the reconnect itself ended the "waiting" state, which reset the back-off timer. The back-off (8, 16, 32 s) now survives that gap and resets only when a real picture shows.
+- A goggles display that shows nothing moving sends one keyframe and then no video at all. The app took that silence for a dead stream, reconnected 13 s later and lost the picture. A background service that still reports live with fresh stats now counts as an alive link.
+- Second goggles stayed black in a two-goggles setup: see Troubleshooting. The goggles pause Liveview sharing ("Goggles operating. Liveview sharing temporarily paused") while their menu is in use or when sharing was reset after a power cycle; toggle Share Liveview off and on once on that unit. Mixed firmware (1.0.0.8 and 1.0.0.15) was in use in the test: update all units to the same version before an event.
+
+
 ### Added
 - A "Back to the list" button appears in the goggles window when the goggles have not been found (or could not be claimed) for 8 seconds, so you can pick again without looking for the menu.
 
