@@ -11,6 +11,7 @@ All notable changes to this project are documented here. Format based on [Keep a
 - The overlay notice (first stream, capture window), the README and the site no longer suggest the display-scale trick. They now say to turn the goggles' overlay off at its source: Settings > Camera > Advanced camera settings > Camera View Recording > off.
 
 ### Changed
+- After a reconnect, a replug or a reopened window the picture no longer stays black. The background service keeps the last real keyframe the goggles sent (they send one only when Share Liveview starts) and starts every new window or decoder from it; the live frames then update it. Static content comes out exact (measured error 0.2 of 255 on a synthetic stream); with moving content ghosts of moving things stay (about 20 of 255) until you turn Share Liveview off and on, which sends a fresh keyframe and heals the picture. Not yet seen on real goggles.
 - A goggles window that has lost its picture now says what actually fixes it: "No picture: turn Share Liveview off and on on the goggles" (menu bar, status pill, Operator Overview, phone status page). The goggles send a keyframe only when sharing starts, and nothing the app can send makes them send another.
 
 ### Fixed
