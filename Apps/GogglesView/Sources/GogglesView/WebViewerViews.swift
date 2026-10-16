@@ -7,7 +7,7 @@ struct WebViewerControl: View {
     let session: DecodeSession
     @StateObject private var server = WebViewerServer()
     @AppStorage(WebViewerPrefs.enabledKey) private var enabled = false
-    @AppStorage(WebViewerPrefs.portKey) private var port = 8080
+    @AppStorage(WebViewerPrefs.portKey) private var port = WebViewerPrefs.defaultPort
     @AppStorage(WebViewerPrefs.lanKey) private var lan = false
     @KeychainSecret(WebViewerPrefs.tokenKey) private var token
 
@@ -48,11 +48,11 @@ struct WebViewerControl: View {
 
 struct WebViewerSettingsSection: View {
     @AppStorage(WebViewerPrefs.enabledKey) private var enabled = false
-    @AppStorage(WebViewerPrefs.portKey) private var port = 8080
+    @AppStorage(WebViewerPrefs.portKey) private var port = WebViewerPrefs.defaultPort
     @AppStorage(WebViewerPrefs.lanKey) private var lan = false
     @KeychainSecret(WebViewerPrefs.tokenKey) private var token
 
-    private var effectivePort: Int { (1...65535).contains(port) ? port : 8080 }
+    private var effectivePort: Int { (1...65535).contains(port) ? port : WebViewerPrefs.defaultPort }
 
     private var url: String {
         WebViewerPrefs.viewerURL(host: lan ? WebViewerPrefs.localHostname : "localhost", port: effectivePort, token: token)

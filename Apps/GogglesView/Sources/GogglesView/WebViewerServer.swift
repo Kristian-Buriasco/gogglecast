@@ -6,11 +6,12 @@ import Security
 enum WebViewerPrefs {
     static let enabledKey = "webViewerEnabled"
     static let portKey = "webViewerPort"
+    static let defaultPort = 8787
     static let lanKey = "webViewerLAN"
     static let tokenKey = "webViewerToken"
     static var port: Int {
         let p = UserDefaults.standard.integer(forKey: portKey)
-        return (1...65535).contains(p) ? p : 8080
+        return (1...65535).contains(p) ? p : defaultPort
     }
     static var lan: Bool { UserDefaults.standard.bool(forKey: lanKey) }
     static var token: String { SecretStore.get(tokenKey) }
