@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Format based on [Keep a
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-10-16
+
+Picture enhancement (off by default), a new web viewer port and the token fix. Builds on 0.9.1, which was a pre-release.
+
 ### Added
 - Picture enhancement (Settings, both off by default): a noise reducer (Apple's temporal noise filter where the Mac supports it, otherwise a motion-adaptive Core Image filter) and a MetalFX upscaler. They run per window after decoding, before the stabilizer and outputs, and are skipped in race mode. Measured on real goggles: about 2-4 ms (noise reducer) and 8-10 ms (upscaler) per frame; the upscaler holds about 225 MB per feed, so leave it off with many feeds.
 
