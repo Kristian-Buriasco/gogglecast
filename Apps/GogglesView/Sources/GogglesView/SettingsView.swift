@@ -73,6 +73,7 @@ struct SettingsView: View {
                     case .display:
                         card { osdSection }
                         card { StabilizerSettingsSection() }
+                        card { EnhanceSettingsSection() }
                         card { FramingSettingsSection() }
                         card { OutputFramingSettingsSection() }
                         card { LookSettingsSection() }

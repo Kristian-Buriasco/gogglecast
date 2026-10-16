@@ -801,6 +801,54 @@ if args.contains("--force-state") {
 }
 #endif
 
+if args.contains("--enhance-probe") {
+    // Dev probe: run the real helper stream through the noise reducer and upscaler (forced on, in this process only)
+    // and print per second what they cost, the output size and any error. `--enhance-probe <secs> [denoise|upscale|both]`.
+    var seconds: Double = 15
+    var mode = "both"
+    if let i = args.firstIndex(of: "--enhance-probe") {
+        if i + 1 < args.count, let v = Double(args[i + 1]) { seconds = v }
+        if i + 2 < args.count { mode = args[i + 2] }
+    }
+    UserDefaults.standard.setVolatileDomain([
+        EnhancePrefs.denoiseKey: mode != "upscale", EnhancePrefs.upscaleKey: mode != "denoise",
+        EnhancePrefs.denoiseStrengthKey: 0.5, EnhancePrefs.upscaleFactorKey: 2.0,
+    ], forName: UserDefaults.argumentDomain)
+    print("[enhance-probe] denoise supported: \(EnhanceSupport.denoise), upscale supported: \(EnhanceSupport.upscale), mode: \(mode)")
+    let session = DecodeSession()
+    let client = HelperClient()
+    client.onNALUnit = { data, nalType, isParameterSet, hostTime in
+        session.handle(nalData: data, nalType: nalType, isParameterSet: isParameterSet, hostTime: hostTime)
+    }
+    client.connect()
+    var finished = false
+    var chosen: String?
+    DispatchQueue.global().asyncAfter(deadline: .now() + 1.0) {
+        pollFirstAvailableDeviceId(client: client) { deviceId in
+            guard let deviceId else { print("[enhance-probe] no device"); finished = true; return }
+            chosen = deviceId
+            client.startStreaming(deviceId: deviceId) { ok, _ in print("[enhance-probe] startStreaming ok=\(ok)") }
+        }
+    }
+    var next = Date().addingTimeInterval(2)
+    let end = Date().addingTimeInterval(seconds + 3)
+    while !finished, Date() < end {
+        RunLoop.main.run(mode: .default, before: Date().addingTimeInterval(0.05))
+        if Date() >= next {
+            next = Date().addingTimeInterval(1)
+            let s = session.enhanceStats
+            session.resetEnhanceStats()
+            print(String(format: "[enhance-probe] frames=%3d denoised=%3d (%.1f ms) upscaled=%3d (%.1f ms) failures=%d out=%dx%d %@",
+                         s.frames, s.denoised, s.meanDenoiseMs, s.upscaled, s.meanUpscaleMs, s.failures, s.outputWidth, s.outputHeight,
+                         session.enhanceLastError ?? ""))
+        }
+    }
+    if let id = chosen { client.stopStreaming(deviceId: id) { client.disconnect() } }
+    RunLoop.main.run(until: Date().addingTimeInterval(1))
+    print("--enhance-probe: done")
+    exit(0)
+}
+
 if args.contains("--stab-probe") {
     // Dev probe: run the real helper stream through the stabilizer for a few seconds (forced on, in this process
     // only) and print per second how much motion it measured and how much it corrected. Hold the camera still,

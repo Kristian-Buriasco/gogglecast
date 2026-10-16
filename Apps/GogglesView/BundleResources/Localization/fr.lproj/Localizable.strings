@@ -857,6 +857,12 @@
 "The goggles draw their own on-screen display (flight data, battery, storage warnings) into the picture they send, so a Window Capture of this window shows it too.\n\nTo turn it off, open the goggles' Settings > Camera > Advanced camera settings > Camera View Recording and switch it off. Or zoom or crop it out with Framing, which also applies to this window." = "Les goggles dessinent leur propre affichage (données de vol, batterie, alertes de stockage) dans l'image qu'ils envoient, une Window Capture de cette fenêtre le montre donc aussi.\n\nPour le désactiver, sur les goggles ouvrez Réglages > Caméra > Réglages caméra avancés > Camera View Recording et désactivez-le. Ou zoomez ou recadrez avec Framing, qui s'applique aussi à cette fenêtre.";
 
 /* TODO: translate (English placeholder) */
+"Picture enhancement" = "Amélioration de l'image";
+"Upscaling needs a Mac with Apple silicon." = "L'upscaling nécessite un Mac avec Apple silicon.";
+"Reduce noise (low light, high ISO)" = "Réduire le bruit (faible lumière, ISO élevé)";
+"Upscale the picture" = "Agrandir l'image";
+"Scale" = "Échelle";
+"Reducing noise blends each picture with the ones before it, so a moving subject can leave a faint trail at high strength. Upscaling makes the picture larger and sharper with Apple's MetalFX scaler. The goggles still send 1080p, so it helps most for recordings and large displays; it does not add detail that was never captured. Both run on the GPU, add no frames of delay, switch themselves off when the Mac cannot keep up, and are off in race mode. They apply to the preview, recordings and streams." = "La réduction du bruit mélange chaque image avec les précédentes : un sujet en mouvement peut donc laisser une légère traînée à forte intensité. L'upscaling agrandit l'image et la rend plus nette avec le scaler MetalFX d'Apple. Les goggles envoient toujours du 1080p, il aide donc surtout pour les enregistrements et les grands écrans ; il n'ajoute pas de détails qui n'ont jamais été captés. Les deux utilisent le GPU, n'ajoutent aucune image de retard, se coupent d'eux-mêmes quand le Mac ne suit pas et sont désactivés en mode course. Ils s'appliquent à l'aperçu, aux enregistrements et aux streams.";
 "Back to the list" = "Retour à la liste";
 
 /* TODO: translate (English placeholder) */
