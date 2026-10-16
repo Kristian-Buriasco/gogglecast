@@ -4,6 +4,15 @@ All notable changes to this project are documented here. Format based on [Keep a
 
 ## [Unreleased]
 
+### Added
+- Picture enhancement (Settings, both off by default): a noise reducer (Apple's temporal noise filter where the Mac supports it, otherwise a motion-adaptive Core Image filter) and a MetalFX upscaler. They run per window after decoding, before the stabilizer and outputs, and are skipped in race mode. Measured on real goggles: about 2-4 ms (noise reducer) and 8-10 ms (upscaler) per frame; the upscaler holds about 225 MB per feed, so leave it off with many feeds.
+
+### Changed
+- The web viewer's default port is now 8787 instead of 8080. A port you set in Settings is kept; old links and QR codes on 8080 need refreshing.
+
+### Fixed
+- Web viewer: "Missing or wrong token" after changing the token in Settings. The server now reads the token on every request.
+
 ## [0.9.1] - 2026-10-11
 
 Confirmed on real goggles (two units side by side, replug, 12 s helper freeze, Camera View Recording on, HDMI program output). Tested as a pre-release.
