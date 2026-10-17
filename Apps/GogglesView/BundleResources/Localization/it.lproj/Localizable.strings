@@ -936,3 +936,9 @@
 
 /* TODO: translate (English placeholder) */
 "No picture: turn Share Liveview off and on on the goggles" = "Nessuna immagine: spegni e riaccendi Share Liveview sui goggles";
+
+/* TODO: translate (English placeholder) */
+"System" = "Sistema";
+"Light" = "Chiaro";
+"Dark" = "Scuro";
+"Appearance" = "Aspetto";

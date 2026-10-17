@@ -71,6 +71,7 @@ struct SettingsView: View {
                         card { UpdateSettingsSection() }
                         card { MenuBarItemSettingsToggle() }
                     case .display:
+                        card { appearanceSection }
                         card { osdSection }
                         card { StabilizerSettingsSection() }
                         card { EnhanceSettingsSection() }
@@ -114,7 +115,7 @@ struct SettingsView: View {
         }
         .frame(width: 780, height: Self.heightOverride ?? 580, alignment: .topLeading)
         .background(AppChrome.backgroundColor)
-        .foregroundStyle(.white)
+        .foregroundStyle(.primary)
         .onAppear { viewModel.refresh() }
         .onDisappear { viewModel.stopPolling() }
     }
@@ -130,7 +131,7 @@ struct SettingsView: View {
                     }
                     .padding(.horizontal, 10).padding(.vertical, 7)
                     .background(RoundedRectangle(cornerRadius: 8)
-                        .fill(tab.wrappedValue == t ? Color.white.opacity(0.12) : Color.clear))
+                        .fill(tab.wrappedValue == t ? AppChrome.selectedFill : Color.clear))
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -143,7 +144,7 @@ struct SettingsView: View {
         }
         .padding(.top, 40).padding(.horizontal, 12).padding(.bottom, 16)
         .frame(width: 180)
-        .background(Color.white.opacity(0.03))
+        .background(AppChrome.sidebarFill)
     }
 
     /// One settings group: a rounded card with generous padding.
@@ -151,8 +152,8 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 12) { content() }
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(RoundedRectangle(cornerRadius: 12).fill(Color.white.opacity(0.06)))
-            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.08)))
+            .background(RoundedRectangle(cornerRadius: 12).fill(AppChrome.cardFill))
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(AppChrome.cardStroke))
     }
 
     private var launchAtLoginSection: some View {
@@ -208,6 +209,20 @@ struct SettingsView: View {
     @AppStorage(OSDPrefs.showDropsKey) private var osdDrops = false
     @AppStorage(OSDPrefs.showLatencyKey) private var osdLatency = true
     @AppStorage(OSDPrefs.showBatteryKey) private var osdBattery = true
+
+    @AppStorage(AppearancePreference.key) private var appearanceRaw = AppearancePreference.system.rawValue
+
+    private var appearanceSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Appearance").font(.headline)
+            Picker("Appearance", selection: $appearanceRaw) {
+                ForEach(AppearancePreference.allCases) { Text($0.title).tag($0.rawValue) }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .onChange(of: appearanceRaw) { _, _ in AppearancePreference.applyStored() }
+        }
+    }
 
     private var osdSection: some View {
         VStack(alignment: .leading, spacing: 6) {

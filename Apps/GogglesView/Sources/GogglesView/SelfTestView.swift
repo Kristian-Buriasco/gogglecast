@@ -151,7 +151,7 @@ struct SelfTestView: View {
         .padding(22)
         .frame(width: 440, height: 400, alignment: .top)
         .background(AppChrome.backgroundColor)
-        .foregroundStyle(.white)
+        .foregroundStyle(.primary)
         .onAppear { model.runChecks() }
         .onDisappear { model.teardown() }
     }

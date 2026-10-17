@@ -176,7 +176,7 @@ struct OnboardingView: View {
         .padding(22)
         .frame(width: 520, height: 640, alignment: .top)
         .background(AppChrome.backgroundColor)
-        .foregroundStyle(.white)
+        .foregroundStyle(.primary)
         .onReceive(timer) { _ in model.refresh() }
         .onAppear { model.refresh() }
     }
@@ -224,7 +224,7 @@ private struct StepRow: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 10).fill(Color.white.opacity(0.06)))
+        .background(RoundedRectangle(cornerRadius: 10).fill(AppChrome.cardFill))
         .opacity(step.state == .pending ? 0.6 : 1)
         .accessibilityElement(children: .contain)
         .accessibilityLabel(AccessibilityLabels.setupStep(number: number, of: total, title: step.title, state: step.state, message: step.message))

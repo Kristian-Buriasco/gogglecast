@@ -136,7 +136,7 @@ struct BenchmarkView: View {
         .padding(22)
         .frame(width: 560, height: 600, alignment: .top)
         .background(AppChrome.backgroundColor)
-        .foregroundStyle(.white)
+        .foregroundStyle(.primary)
         .onAppear(perform: refresh)
         .onReceive(poll) { _ in refresh() }
         .onDisappear { recorder.cancel() }

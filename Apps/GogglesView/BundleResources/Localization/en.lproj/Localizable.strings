@@ -25,6 +25,9 @@
 "Scene when live, %@" = "Scene when live, %@";
 "Scene when lost, %@" = "Scene when lost, %@";
 /* AppChrome.swift */
+"System" = "System";
+"Light" = "Light";
+"Dark" = "Dark";
 "Status" = "Status";
 /* AutoMarkers.swift */
 "Signal lost" = "Signal lost";
@@ -722,6 +725,7 @@
 "Launch GogglesView at login" = "Launch GogglesView at login";
 "Background service" = "Background service";
 "Re-register" = "Re-register";
+"Appearance" = "Appearance";
 "On-screen display" = "On-screen display";
 "Show stats over the video" = "Show stats over the video";
 "Resolution" = "Resolution";

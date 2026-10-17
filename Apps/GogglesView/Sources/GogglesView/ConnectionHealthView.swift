@@ -144,7 +144,7 @@ struct ConnectionHealthView: View {
         }
         .frame(minWidth: 560, minHeight: 520)
         .background(AppChrome.backgroundColor)
-        .foregroundStyle(.white)
+        .foregroundStyle(.primary)
     }
 
     private func ms(_ v: Double?) -> String { v.map { String(format: "%.1f ms", $0) } ?? L("n/a") }
@@ -181,7 +181,7 @@ struct ConnectionHealthView: View {
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.08)))
+        .background(RoundedRectangle(cornerRadius: 8).fill(AppChrome.subtleFill))
     }
 
     private func chartCard(_ title: String, unit: String, color: Color, points: [(Int, Double)]) -> some View {

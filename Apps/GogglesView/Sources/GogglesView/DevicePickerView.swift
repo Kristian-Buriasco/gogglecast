@@ -65,7 +65,7 @@ struct DevicePickerView: View {
         switch picker.state {
         case .selected:
             Label(ConnectionMessages.noDevice, systemImage: "cable.connector")
-                .foregroundStyle(.white)
+                .foregroundStyle(.primary)
                 .accessibilityIdentifier("picker-discovering")
 
         case .discovering:
@@ -73,7 +73,7 @@ struct DevicePickerView: View {
             VStack(alignment: .leading, spacing: 12) {
                 Label(ConnectionMessages.noDevice, systemImage: "cable.connector")
                     .font(.title3.bold())
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                 SetupChecklistView(items: SetupChecklist.items(
                     registration: .init(HelperRegistration.status), reachability: .connected, devicesFound: 0))
                 RecoveryActionsRow(onRetry: nil)
@@ -90,7 +90,7 @@ struct DevicePickerView: View {
                 // rather than always saying "Multiple Goggles found".
                 Text(candidates.count == 1 ? L("Select your goggles") : L("Multiple goggles found. Choose one."))
                     .font(.title3.bold())
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                 ScrollView {
                     VStack(spacing: 10) {
                         ForEach(candidates) { candidate in
@@ -112,7 +112,7 @@ struct DevicePickerView: View {
             VStack(spacing: 8) {
                 Text(ConnectionMessages.noHelper)
                     .multilineTextAlignment(.center)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                 Text(reason == nil ? ConnectionMessages.noHelperDetail : ConnectionMessages.noHelperMismatchDetail)
                     .font(.callout)
                     .multilineTextAlignment(.center)
@@ -128,7 +128,7 @@ struct DevicePickerView: View {
                     registration: .init(HelperRegistration.status),
                     reachability: reason == nil ? .disconnected : .versionMismatch, devicesFound: nil))
                     .frame(maxWidth: 460, alignment: .leading)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
             }
             .accessibilityIdentifier("picker-connectionUnavailable")
         }
@@ -154,13 +154,13 @@ private struct DevicePickerCandidateRow: View {
                 // newer/rarer symbol name risks silently rendering nothing.
                 Image(systemName: "eyeglasses")
                     .font(.system(size: 28))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                     .frame(width: 40)
                     .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 3) {
                     if let nick = ProfileStore.shared.nickname(for: candidate.serial) {
-                        Text(nick).font(.headline).foregroundStyle(.white)
+                        Text(nick).font(.headline).foregroundStyle(.primary)
                     }
                     Text(candidate.product ?? "DJI Goggles 3")
                         .font(.headline)
