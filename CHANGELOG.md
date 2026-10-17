@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Format based on [Keep a
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-10-17
+
+A light theme, a clearer Record button and fewer keychain prompts.
+
 ### Added
 - Appearance setting (System / Light / Dark) in Settings > Display. The interface now supports a light theme.
 
