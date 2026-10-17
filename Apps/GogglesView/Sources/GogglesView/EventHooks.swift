@@ -99,22 +99,31 @@ enum EventHookConfig {
     /// Keychain refuses writes, i.e. unsigned dev builds, keep using the defaults fallback.)
     static func script(_ e: AppEvent) -> String {
         _ = migrationOnce
-        if SecretStore.backend.read(migratedKey) != nil { return SecretStore.backend.read(scriptKey(e)) ?? "" }
+        if SecretStore.read(migratedKey) != nil { return SecretStore.read(scriptKey(e)) ?? "" }
         return SecretStore.get(scriptKey(e))
     }
 
-    static func setScript(_ path: String, for e: AppEvent) { SecretStore.set(path, for: scriptKey(e)) }
+    static func setScript(_ path: String, for e: AppEvent) { SecretStore.set(path, for: scriptKey(e)); noteConfigured(!path.isEmpty || mayHaveHooks) }
+    static func setWebhook(_ url: String, for e: AppEvent) { SecretStore.set(url, for: webhookKey(e)); noteConfigured(!url.isEmpty || mayHaveHooks) }
+
+    /// Plain (non-secret) flag: false once we have seen that no script or webhook is configured, so posting an
+    /// event does not read the Keychain. Absent on first run after upgrade: read once, then remember the answer.
+    static let usedKey = "hooksConfigured"
+    static var mayHaveHooks: Bool { SecretStore.defaults.object(forKey: usedKey) as? Bool ?? true }
+    static func noteConfigured(_ any: Bool) {
+        if any || SecretStore.defaults.object(forKey: usedKey) == nil { SecretStore.defaults.set(any, forKey: usedKey) }
+    }
 
     /// One-time move of existing plain-text script paths into the Keychain. Safe to call repeatedly.
     static func migrateScriptPaths() {
-        guard SecretStore.backend.read(migratedKey) == nil else { return }
+        guard SecretStore.read(migratedKey) == nil else { return }
         var allMoved = true
         for e in AppEvent.allCases {
             let key = scriptKey(e)
             guard let v = SecretStore.defaults.string(forKey: key), !v.isEmpty else { continue }
             if SecretStore.backend.write(v, key) { SecretStore.defaults.removeObject(forKey: key) } else { allMoved = false }
         }
-        if allMoved { _ = SecretStore.backend.write("1", migratedKey) }
+        if allMoved { _ = SecretStore.backend.write("1", migratedKey); SecretStore.dropCache() }
     }
     static func webhook(_ e: AppEvent) -> String { SecretStore.get(webhookKey(e)) }
     static var batteryThreshold: Int {
@@ -152,8 +161,11 @@ final class EventBus {
     private let queue = DispatchQueue(label: "eventbus", qos: .utility, attributes: .concurrent)
 
     func post(_ event: AppEvent, payload: [String: Any] = [:]) {
+        guard EventHookConfig.mayHaveHooks else { return }
         let script = EventHookConfig.script(event)
         let hook = EventHookConfig.webhook(event)
+        if !script.isEmpty || !hook.isEmpty { EventHookConfig.noteConfigured(true) }
+        else if AppEvent.allCases.allSatisfy({ EventHookConfig.script($0).isEmpty && EventHookConfig.webhook($0).isEmpty }) { EventHookConfig.noteConfigured(false) }
         guard !script.isEmpty || !hook.isEmpty else { return }
         let json = EventHookLogic.payloadJSON(event: event, fields: payload)
         if !script.isEmpty { queue.async { Self.runScript(path: script, event: event, json: json) } }
