@@ -55,6 +55,7 @@ struct SRTSettingsSection: View {
     @KeychainSecret(SRTPrefs.passphraseKey) private var passphrase
     @AppStorage(SRTPrefs.libraryPathKey) private var libPath = ""
     @AppStorage(SRTPrefs.autoStartKey) private var autoStart = false
+    @FocusState private var passFocused: Bool
 
     var body: some View {
         let found = OutputLibrary.resolveSRT(userPath: libPath)
@@ -72,6 +73,8 @@ struct SRTSettingsSection: View {
             TextField("Port", value: $port, format: .number.grouping(.never))
             TextField("Latency (ms, 20-8000)", value: $latency, format: .number.grouping(.never))
             SecureField("Passphrase (10-79 chars, optional)", text: $passphrase)
+                .focused($passFocused)
+                .onChange(of: passFocused) { _, f in if f { _passphrase.load() } } // Keychain read waits for the click
             Toggle("Start automatically", isOn: $autoStart)
             if !SRTPrefs.passphraseValid(passphrase) {
                 Text("Passphrase must be 10-79 characters.").font(.caption).foregroundStyle(.orange)

@@ -27,7 +27,7 @@ struct EventHooksSettingsSection: View {
                     }
                     TextField("Webhook URL (https://…)", text: Binding(
                         get: { webhooks[event] ?? "" },
-                        set: { webhooks[event] = $0; SecretStore.set($0, for: EventHookConfig.webhookKey(event)) }
+                        set: { webhooks[event] = $0; EventHookConfig.setWebhook($0, for: event) }
                     )).textFieldStyle(.roundedBorder).font(.caption)
                     if let w = webhooks[event], !w.isEmpty, EventHookLogic.validWebhook(w) == nil {
                         Text("Must be an http(s) URL").font(.caption2).foregroundStyle(.red)
@@ -55,7 +55,9 @@ struct EventHooksSettingsSection: View {
             }
         }
         .onAppear {
+            guard EventHookConfig.mayHaveHooks else { return }
             for e in AppEvent.allCases { scripts[e] = EventHookConfig.script(e); webhooks[e] = EventHookConfig.webhook(e) }
+            EventHookConfig.noteConfigured(AppEvent.allCases.contains { !(scripts[$0] ?? "").isEmpty || !(webhooks[$0] ?? "").isEmpty })
         }
     }
 

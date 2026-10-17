@@ -12,6 +12,7 @@ All notable changes to this project are documented here. Format based on [Keep a
 
 ### Changed
 - The Record button is now a labelled pill at the start of the toolbar, with elapsed time while recording.
+- Saved stream keys and tokens are read from the keychain only when a feature that needs them is used, so plain live view no longer triggers a keychain prompt.
 
 ## [0.10.0] - 2026-10-16
 
