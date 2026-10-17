@@ -54,7 +54,9 @@ enum EnhanceSupport {
     static var denoise: Bool { true }
     /// Apple's hardware filter in use (macOS 26 and a supporting chip), rather than the Core Image fallback.
     static var denoiseUsesApple: Bool {
+#if compiler(>=6.2)
         if #available(macOS 26.0, *) { return VTTemporalNoiseFilterConfiguration.isSupported }
+#endif
         return false
     }
     static var upscale: Bool {
@@ -78,6 +80,7 @@ struct EnhanceStats: Equatable {
     var meanUpscaleMs: Double { upscaled > 0 ? upscaleMs / Double(upscaled) : 0 }
 }
 
+#if compiler(>=6.2) // needs the macOS 26 VideoToolbox SDK
 /// Runs a frame processor's async API to completion, with a timeout so a stuck GPU never stalls the decoder.
 /// Returns nil on success, else the reason.
 @available(macOS 26.0, *)
@@ -92,6 +95,7 @@ private func runSync(_ processor: VTFrameProcessor, _ parameters: VTFrameProcess
     if done.wait(timeout: .now() + timeout) != .success { return "timed out after \(Int(timeout * 1000)) ms" }
     return box.error
 }
+#endif
 
 /// Pixel buffer pool for a processor's destination: the processor's own attributes decide format and backing.
 private func makePool(attributes: [String: Any]) -> CVPixelBufferPool? {
@@ -131,6 +135,7 @@ private final class FormatConverter {
     deinit { if let transfer { VTPixelTransferSessionInvalidate(transfer) } }
 }
 
+#if compiler(>=6.2) // needs the macOS 26 VideoToolbox SDK
 @available(macOS 26.0, *)
 final class DenoiseStage {
     private let processor = VTFrameProcessor()
@@ -206,6 +211,7 @@ final class DenoiseStage {
         return dst
     }
 }
+#endif
 
 /// Motion-adaptive temporal noise reduction in Core Image, for Macs without Apple's hardware filter.
 /// Each pixel is blended with the previous OUTPUT picture (a recursive filter, so noise averages out over many
@@ -387,13 +393,18 @@ final class VideoEnhancer {
         let strength = EnhancePrefs.denoiseStrength
         var output: CVPixelBuffer?
         var failure: String?
+        var usedApple = false
+#if compiler(>=6.2) // VTTemporalNoiseFilter needs the macOS 26 SDK; older toolchains use the Core Image path
         if #available(macOS 26.0, *), EnhanceSupport.denoiseUsesApple {
             let stage = (appleDenoiser as? DenoiseStage) ?? DenoiseStage()
             appleDenoiser = stage
             if doReset { stage.reset() }
             output = stage.process(input, pts: pts, strength: Float(strength))
             failure = stage.lastError
-        } else {
+            usedApple = true
+        }
+#endif
+        if !usedApple {
             if doReset { softwareDenoiser.reset() }
             output = softwareDenoiser.process(input, strength: strength)
             failure = softwareDenoiser.lastError
