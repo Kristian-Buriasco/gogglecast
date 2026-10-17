@@ -4,8 +4,11 @@ All notable changes to this project are documented here. Format based on [Keep a
 
 ## [Unreleased]
 
+### Added
+- Appearance setting (System / Light / Dark) in Settings > Display. The interface now supports a light theme.
+
 ### Fixed
-- Settings: input values and placeholders were hard to read on a light macOS theme, because the window has a fixed dark background but its text fields followed the system appearance. The settings window is now always dark (#9).
+- Settings: input values and placeholders were hard to read on a light macOS theme, and the Settings button was invisible. The interface now follows the chosen appearance (#9).
 
 ## [0.10.0] - 2026-10-16
 
