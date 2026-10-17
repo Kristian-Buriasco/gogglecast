@@ -4,6 +4,9 @@ All notable changes to this project are documented here. Format based on [Keep a
 
 ## [Unreleased]
 
+### Fixed
+- Settings: input values and placeholders were hard to read on a light macOS theme, because the window has a fixed dark background but its text fields followed the system appearance. The settings window is now always dark (#9).
+
 ## [0.10.0] - 2026-10-16
 
 Picture enhancement (off by default), a new web viewer port and the token fix. Builds on 0.9.1, which was a pre-release.

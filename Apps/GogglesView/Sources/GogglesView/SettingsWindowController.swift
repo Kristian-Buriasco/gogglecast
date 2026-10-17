@@ -40,6 +40,10 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         hostingController.sizingOptions = []
         let window = NSWindow(contentViewController: hostingController)
         window.title = L("GogglesView Settings")
+        // The settings chrome is a fixed dark colour with white text
+        // (`AppChrome`), so pin the window dark: otherwise text fields and
+        // placeholders follow a light system theme and turn unreadable (#9).
+        window.appearance = NSAppearance(named: .darkAqua)
         // No `.resizable` -- this is a small, fixed-content settings panel,
         // not a resizable document window; matches the fixed
         // `.frame(width:height:)` `SettingsView` sets on itself.
