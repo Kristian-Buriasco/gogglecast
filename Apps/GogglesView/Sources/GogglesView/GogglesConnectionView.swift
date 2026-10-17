@@ -89,13 +89,42 @@ struct GogglesConnectionView: View {
         }
     }
 
+    // Labelled pill, first in the row so it is hard to miss. Dimmed (not hidden) when not live, with the reason in the help text.
+    private var recordButton: some View {
+        let recording = recorder.isRecording
+        return Button {
+            recording ? stopRecording(wait: false) : startRecording()
+        } label: {
+            HStack(spacing: 5) {
+                if recording {
+                    Image(systemName: "stop.fill").font(.caption2)
+                    Text("Stop")
+                    Text(Self.formatElapsed(recorder.elapsed)).font(.caption.monospacedDigit())
+                } else {
+                    Circle().fill(Color.red).frame(width: 8, height: 8)
+                    Text("Record")
+                }
+            }
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(recording ? Color.white : Color.primary)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .background(Capsule().fill(recording ? Color.red : Color.red.opacity(0.15)))
+            .overlay(Capsule().strokeBorder(Color.red.opacity(recording ? 0 : 0.5), lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+        .disabled(!isLive && !recording)
+        .opacity(!isLive && !recording ? 0.5 : 1)
+        .keyboardShortcut("r", modifiers: [.command, .shift])
+        .help(recording ? L("Stop recording (⇧⌘R)") : isLive ? L("Record to ~/Movies/GogglesView (⇧⌘R)") : L("Connect the goggles and turn on Share Liveview to record"))
+        .accessibilityLabel(recording ? L("Stop recording") : L("Start recording"))
+        .accessibilityValue(AccessibilityLabels.recordState(isRecording: recording, elapsed: recording ? Self.formatElapsed(recorder.elapsed) : nil))
+        .accessibilityIdentifier("recordButton")
+    }
+
     private var recordControl: some View {
         HStack(spacing: 6) {
-            if recorder.isRecording {
-                Text(Self.formatElapsed(recorder.elapsed))
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(.red)
-            }
+            recordButton
             if let err = recorder.lastError {
                 Text(err).font(.caption2).foregroundStyle(.red).lineLimit(1)
             } else if let note = recorder.diskNote {
@@ -142,19 +171,6 @@ struct GogglesConnectionView: View {
             }
             BurnInRecordControl(session: session, isLive: isLive, info: { BurnInInfo(fps: coordinator.stats?.fps, bitrateKbps: coordinator.stats?.bitrateKbps, resolution: resolutionText) })
             MarkerControl(recorder: recorder)
-            Button {
-                recorder.isRecording ? stopRecording(wait: false) : startRecording()
-            } label: {
-                Image(systemName: recorder.isRecording ? "stop.circle.fill" : "record.circle")
-                    .foregroundStyle(recorder.isRecording ? Color.red : Color.secondary)
-            }
-            .buttonStyle(.plain)
-            .disabled(!isLive && !recorder.isRecording)
-            .keyboardShortcut("r", modifiers: [.command, .shift])
-            .help(recorder.isRecording ? L("Stop recording (⇧⌘R)") : L("Record to ~/Movies/GogglesView (⇧⌘R)"))
-            .accessibilityLabel(recorder.isRecording ? L("Stop recording") : L("Start recording"))
-            .accessibilityValue(AccessibilityLabels.recordState(isRecording: recorder.isRecording, elapsed: recorder.isRecording ? Self.formatElapsed(recorder.elapsed) : nil))
-            .accessibilityIdentifier("recordButton")
         }
         .onAppear { SessionControlBoard.shared.register(recorder: recorder, for: session) }
         .onChange(of: isLive) { live in

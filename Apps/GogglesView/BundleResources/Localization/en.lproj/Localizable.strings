@@ -324,14 +324,17 @@
 "Screenshot failed" = "Screenshot failed";
 "Copied frame" = "Copied frame";
 "Copy failed" = "Copy failed";
+"Stop" = "Stop";
+"Record" = "Record";
+"Stop recording (⇧⌘R)" = "Stop recording (⇧⌘R)";
+"Record to ~/Movies/GogglesView (⇧⌘R)" = "Record to ~/Movies/GogglesView (⇧⌘R)";
+"Connect the goggles and turn on Share Liveview to record" = "Connect the goggles and turn on Share Liveview to record";
 "Open the recordings folder" = "Open the recordings folder";
 "Open recordings folder" = "Open recordings folder";
 "Show in Finder" = "Show in Finder";
 "Save a screenshot to ~/Pictures/GogglesView (⇧⌘S)" = "Save a screenshot to ~/Pictures/GogglesView (⇧⌘S)";
 "Take screenshot" = "Take screenshot";
 "Copy Frame" = "Copy Frame";
-"Stop recording (⇧⌘R)" = "Stop recording (⇧⌘R)";
-"Record to ~/Movies/GogglesView (⇧⌘R)" = "Record to ~/Movies/GogglesView (⇧⌘R)";
 "Saved to %@" = "Saved to %@";
 "Add Goggles…" = "Add Goggles…";
 "Add more goggles in a new window. This one keeps streaming." = "Add more goggles in a new window. This one keeps streaming.";
@@ -507,7 +510,6 @@
 "List" = "List";
 "Big view" = "Big view";
 "Full screen" = "Full screen";
-"Record" = "Record";
 "%@ free in %@" = "%@ free in %@";
 "About %lld h of recording left at this rate" = "About %lld h of recording left at this rate";
 /* OutputLook.swift */
