@@ -4,6 +4,9 @@ All notable changes to this project are documented here. Format based on [Keep a
 
 ## [Unreleased]
 
+### Changed
+- The Record button is now a labelled pill at the start of the toolbar, with elapsed time while recording.
+
 ## [0.10.0] - 2026-10-16
 
 Picture enhancement (off by default), a new web viewer port and the token fix. Builds on 0.9.1, which was a pre-release.
