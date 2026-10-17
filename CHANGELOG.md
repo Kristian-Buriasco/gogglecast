@@ -10,6 +10,9 @@ All notable changes to this project are documented here. Format based on [Keep a
 ### Fixed
 - Settings: input values and placeholders were hard to read on a light macOS theme, and the Settings button was invisible. The interface now follows the chosen appearance (#9).
 
+### Changed
+- The Record button is now a labelled pill at the start of the toolbar, with elapsed time while recording.
+
 ## [0.10.0] - 2026-10-16
 
 Picture enhancement (off by default), a new web viewer port and the token fix. Builds on 0.9.1, which was a pre-release.
