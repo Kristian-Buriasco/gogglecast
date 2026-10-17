@@ -67,19 +67,22 @@ final class UpdateChecker: ObservableObject {
         return u
     }
 
-    func check() {
-        guard !checking else { return }
+    /// The GitHub token is only read for the retry after an unauthenticated request is refused (private repo),
+    /// so a normal check never touches the Keychain.
+    func check(withToken: Bool = false) {
+        guard withToken || !checking else { return }
         checking = true
         UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: UpdatePrefs.lastCheckKey)
         var req = URLRequest(url: UpdatePrefs.endpoint, timeoutInterval: 15)
         req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        let t = SecretStore.get(UpdatePrefs.tokenKey)
+        let t = withToken ? SecretStore.get(UpdatePrefs.tokenKey) : ""
         if !t.isEmpty {
             req.setValue("Bearer \(t)", forHTTPHeaderField: "Authorization") // never logged
         }
         let current = Self.currentVersion
         URLSession.shared.dataTask(with: req) { data, resp, _ in
             let status = (resp as? HTTPURLResponse)?.statusCode ?? 0
+            if !withToken, [401, 403, 404].contains(status) { DispatchQueue.main.async { self.check(withToken: true) }; return }
             let r = data.map { Self.interpret(status: status, data: $0, current: current) } ?? .failed
             let asset = data.flatMap { UpdateAsset.from(releaseJSON: $0) }
             DispatchQueue.main.async {
