@@ -83,6 +83,7 @@ func openLoginItemsSettings() {
 }
 
 let args = CommandLine.arguments
+AppearancePreference.applyStored()
 let service = HelperRegistration.service
 
 print("plistName: \(plistName)")

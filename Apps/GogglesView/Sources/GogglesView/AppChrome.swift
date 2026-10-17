@@ -27,26 +27,59 @@ import SwiftUI
 // which no longer overlays it.
 // ─────────────────────────────────────────────────────────────────────────
 
-enum AppChrome {
-    /// A dark, near-black main content background -- the task brief's
-    /// description of the CosmoViewer Direct reference ("dark, near-black
-    /// main content background"). Deliberately a fixed color, not
-    /// system-light/dark-adaptive: this is a chosen brand-style dark chrome
-    /// matching the reference, the same way the reference itself doesn't
-    /// switch to a light theme.
-    static let backgroundColor = Color(red: 0.06, green: 0.06, blue: 0.07)
+/// The user's Appearance choice (Settings > Display). `system` follows macOS.
+enum AppearancePreference: String, CaseIterable, Identifiable {
+    case system, light, dark
+    static let key = "appearancePreference"
+    var id: String { rawValue }
 
-    #if canImport(AppKit)
-    /// The exact same near-black as `backgroundColor` above, as an
-    /// `NSColor` -- task-gui-v2's custom title bar (`main.swift`,
-    /// `applyCustomTitleBarChrome(to:)`) sets `NSWindow.backgroundColor` to
-    /// this so the now-transparent titlebar region (behind the traffic-light
-    /// buttons, `titlebarAppearsTransparent = true`) reads as the same
-    /// continuous dark surface as the SwiftUI content below it, rather than
-    /// flashing the default light `NSWindow` background color for a frame
-    /// before the hosted SwiftUI view's own background paints.
-    static let windowBackgroundColor = NSColor(srgbRed: 0.06, green: 0.06, blue: 0.07, alpha: 1.0)
-    #endif
+    var title: String {
+        switch self {
+        case .system: return L("System")
+        case .light: return L("Light")
+        case .dark: return L("Dark")
+        }
+    }
+
+    /// `nil` for System, so `NSApp.appearance` falls back to the Mac's setting.
+    var nsAppearance: NSAppearance? {
+        switch self {
+        case .system: return nil
+        case .light: return NSAppearance(named: .aqua)
+        case .dark: return NSAppearance(named: .darkAqua)
+        }
+    }
+
+    static func stored(_ d: UserDefaults = .standard) -> AppearancePreference {
+        d.string(forKey: key).flatMap(AppearancePreference.init(rawValue:)) ?? .system
+    }
+
+    static func applyStored() { NSApplication.shared.appearance = stored().nsAppearance }
+}
+
+enum AppChrome {
+    /// An `NSColor` that resolves to `dark` or `light` with the effective appearance.
+    private static func adaptive(dark: NSColor, light: NSColor) -> NSColor {
+        NSColor(name: nil) { $0.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? dark : light }
+    }
+
+    private static func gray(_ w: CGFloat, _ a: CGFloat) -> NSColor { NSColor(white: w, alpha: a) }
+
+    /// Main content background: the original near-black in dark, a clean light grey in light.
+    static let backgroundColor = Color(nsColor: windowBackgroundColor)
+
+    /// Same colour as `backgroundColor`, as an `NSColor` for `NSWindow.backgroundColor`
+    /// (`applyCustomTitleBarChrome`), so the transparent titlebar never flashes the other theme.
+    static let windowBackgroundColor = adaptive(
+        dark: NSColor(srgbRed: 0.06, green: 0.06, blue: 0.07, alpha: 1.0),
+        light: NSColor(srgbRed: 0.94, green: 0.94, blue: 0.95, alpha: 1.0))
+
+    // Semantic fills so views do not repeat white.opacity(...) values.
+    static let cardFill = Color(nsColor: adaptive(dark: gray(1, 0.06), light: gray(1, 0.85)))
+    static let cardStroke = Color(nsColor: adaptive(dark: gray(1, 0.08), light: gray(0, 0.10)))
+    static let sidebarFill = Color(nsColor: adaptive(dark: gray(1, 0.03), light: gray(0, 0.04)))
+    static let selectedFill = Color(nsColor: adaptive(dark: gray(1, 0.12), light: gray(0, 0.10)))
+    static let subtleFill = Color(nsColor: adaptive(dark: gray(1, 0.08), light: gray(0, 0.06)))
 
     /// "GogglesView, ver. X.Y (build)" -- sourced from the running bundle's
     /// own `Info.plist` (`CFBundleName`/`CFBundleShortVersionString`/
