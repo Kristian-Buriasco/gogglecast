@@ -23,7 +23,7 @@ struct WebViewerControl: View {
         .onChange(of: enabled) { old, new in apply(justEnabled: new && !old) }
         .onChange(of: port) { _, _ in if enabled { apply(justEnabled: false) } }
         .onChange(of: lan) { _, _ in if enabled { apply(justEnabled: false) } }
-        .onChange(of: token) { _, _ in if enabled { apply(justEnabled: false) } }
+        .onChange(of: token) { old, _ in if enabled, !old.isEmpty { apply(justEnabled: false) } } // "" -> loaded value is not an edit
         .onDisappear { session.removeConsumer(server); server.stop() }
     }
 
@@ -31,14 +31,16 @@ struct WebViewerControl: View {
     /// moment the overlay hint may appear (not on appear, nor when the token or port is edited).
     private func apply(justEnabled: Bool) {
         if enabled {
+            var tok = _token.load()
             // An empty token is only acceptable in localhost-only mode; generate one when the viewer is
             // switched on (or whenever other devices are allowed) so the feed is never open by accident.
-            if token.isEmpty, justEnabled || lan {
-                token = WebViewerPrefs.existingOrNewToken()
+            if tok.isEmpty, justEnabled || lan {
+                tok = WebViewerPrefs.existingOrNewToken()
+                token = tok
             }
             if justEnabled { OverlayHint.noteStarted(.output) }
             session.addKeyframeSafeConsumer(server)
-            server.start(port: WebViewerPrefs.port, allowLAN: lan, token: token)
+            server.start(port: WebViewerPrefs.port, allowLAN: lan, token: tok)
         } else {
             session.removeConsumer(server)
             server.stop()
@@ -51,6 +53,7 @@ struct WebViewerSettingsSection: View {
     @AppStorage(WebViewerPrefs.portKey) private var port = WebViewerPrefs.defaultPort
     @AppStorage(WebViewerPrefs.lanKey) private var lan = false
     @KeychainSecret(WebViewerPrefs.tokenKey) private var token
+    @FocusState private var tokenFocused: Bool
 
     private var effectivePort: Int { (1...65535).contains(port) ? port : WebViewerPrefs.defaultPort }
 
@@ -74,13 +77,15 @@ struct WebViewerSettingsSection: View {
             Text("Web Viewer").font(.headline)
             Toggle("Enable local web viewer", isOn: $enabled)
                 .onChange(of: enabled) { old, new in
-                    if new && !old && token.isEmpty { token = WebViewerPrefs.existingOrNewToken() }
+                    if new && !old && _token.load().isEmpty { token = WebViewerPrefs.existingOrNewToken() }
                 }
             TextField("Port", value: $port, format: .number.grouping(.never))
             Toggle("Allow other devices on the network", isOn: $lan)
-                .onChange(of: lan) { _, new in if new && token.isEmpty { token = WebViewerPrefs.existingOrNewToken() } }
+                .onChange(of: lan) { _, new in if new && _token.load().isEmpty { token = WebViewerPrefs.existingOrNewToken() } }
             HStack {
                 TextField("Access token", text: $token)
+                    .focused($tokenFocused)
+                    .onChange(of: tokenFocused) { _, f in if f { _token.load() } }
                 Button("Generate") { token = WebViewerPrefs.generateToken() }
             }
             Text(lan ? L("A token is required while other devices are allowed.") : L("With the token empty only this Mac can connect, and only through localhost."))
@@ -112,5 +117,6 @@ struct WebViewerSettingsSection: View {
             Text("Safari on iPad, iPhone and Mac plays the page directly. Other browsers: open the URL's live.m3u8 in VLC. Latency comes from 1 s segments and Safari's start-up buffer; expect a few seconds behind live, not real time (not yet measured on hardware). The page shows its own estimate.")
                 .font(.caption).foregroundStyle(.secondary)
         }
+        .onAppear { if enabled { _token.load() } }
     }
 }

@@ -21,6 +21,7 @@ struct OBSSettingsSection: View {
     @AppStorage(FeedPortPrefs.perFeedKey) private var perFeed = true
     @ObservedObject private var program = ProgramOutputController.shared
     @State private var testing = false
+    @FocusState private var passFocused: Bool
 
     private func addFeeds() {
         let scene = feedScene.isEmpty ? (obs.scenes.first ?? "") : feedScene
@@ -46,8 +47,9 @@ struct OBSSettingsSection: View {
                         .frame(width: 70)
                         .accessibilityLabel("OBS WebSocket port")
                 }
-                SecureField("Password", text: $password, prompt: Text("Leave empty if OBS has none"))
+                SecureField("Password", text: Binding(get: { password }, set: { password = $0; OBSIntegration.shared.settingsChanged() }), prompt: Text("Leave empty if OBS has none"))
                     .accessibilityLabel("OBS WebSocket password")
+                    .focused($passFocused)
                 HStack {
                     Button(testing ? L("Testing...") : L("Test connection")) { runTest() }
                         .disabled(testing)
@@ -111,11 +113,11 @@ struct OBSSettingsSection: View {
                 Text(e).font(.caption).foregroundStyle(.orange)
             }
         }
-        .onAppear { if enabled { OBSIntegration.shared.startIfEnabled() } }
-        .onChange(of: enabled) { _, _ in OBSIntegration.shared.settingsChanged() }
+        .onAppear { if enabled { _password.load(); OBSIntegration.shared.startIfEnabled() } }
+        .onChange(of: enabled) { _, on in if on { _password.load() }; OBSIntegration.shared.settingsChanged() }
+        .onChange(of: passFocused) { _, f in if f { _password.load() } }
         .onChange(of: host) { _, _ in OBSIntegration.shared.settingsChanged() }
         .onChange(of: port) { _, _ in OBSIntegration.shared.settingsChanged() }
-        .onChange(of: password) { _, _ in OBSIntegration.shared.settingsChanged() }
     }
 
     private func scenePicker(_ title: String, selection: Binding<String>, role: String) -> some View {

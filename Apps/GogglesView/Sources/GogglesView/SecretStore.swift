@@ -64,18 +64,37 @@ enum SecretStore {
             || ProcessInfo.processInfo.processName.hasSuffix("PackageTests")
     }
 
-    nonisolated(unsafe) static var backend: Backend = runningUnderTests ? MemoryBackend() : KeychainBackend()
+    nonisolated(unsafe) static var backend: Backend = runningUnderTests ? MemoryBackend() : KeychainBackend() { didSet { dropCache() } }
     nonisolated(unsafe) static var defaults: UserDefaults = .standard
 
+    /// Keychain reads (including misses) are remembered for the process, so a prompt appears at most once per
+    /// secret and only when something actually needs it. Values live in memory only, as before.
+    private static let cacheLock = NSLock()
+    nonisolated(unsafe) private static var cache: [String: String?] = [:]
+
+    static func dropCache() { cacheLock.lock(); cache = [:]; cacheLock.unlock() }
+
+    /// Cached Keychain read, no UserDefaults fallback.
+    static func read(_ key: String) -> String? {
+        cacheLock.lock(); defer { cacheLock.unlock() }
+        if let hit = cache[key] { return hit }
+        let v = backend.read(key)
+        cache[key] = .some(v)
+        return v
+    }
+
     static func get(_ key: String) -> String {
-        backend.read(key) ?? defaults.string(forKey: key) ?? ""
+        read(key) ?? defaults.string(forKey: key) ?? ""
     }
 
     static func set(_ value: String, for key: String) {
         if value.isEmpty {
-            backend.remove(key); defaults.removeObject(forKey: key); return
+            backend.remove(key); defaults.removeObject(forKey: key)
+            cacheLock.lock(); cache[key] = .some(nil); cacheLock.unlock()
+            return
         }
         if backend.write(value, key) { defaults.removeObject(forKey: key) } else { defaults.set(value, forKey: key) }
+        cacheLock.lock(); cache[key] = .some(value); cacheLock.unlock()
     }
 
     static var allKeys: [String] {
@@ -98,16 +117,22 @@ enum SecretStore {
 @propertyWrapper
 struct KeychainSecret: DynamicProperty {
     private let key: String
-    @State private var value: String
+    @State private var value = ""
+    @State private var loaded = false
 
-    init(_ key: String) {
-        self.key = key
-        _value = State(initialValue: SecretStore.get(key))
-    }
+    init(_ key: String) { self.key = key }
 
+    /// Empty until `load()` runs or the value is set, so building a view never touches the Keychain.
     var wrappedValue: String {
         get { value }
-        nonmutating set { value = newValue; SecretStore.set(newValue, for: key) }
+        nonmutating set { value = newValue; loaded = true; SecretStore.set(newValue, for: key) }
+    }
+
+    /// Reads the stored secret (once). Call when the feature is on or the user focuses the field.
+    @discardableResult
+    func load() -> String {
+        if !loaded { value = SecretStore.get(key); loaded = true }
+        return value
     }
 
     var projectedValue: Binding<String> {
