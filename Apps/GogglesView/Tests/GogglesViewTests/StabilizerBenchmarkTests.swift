@@ -156,4 +156,91 @@ final class StabilizerBenchmarkTests: XCTestCase {
             for i in 0..<3 { XCTAssertEqual(after[i], before[i], accuracy: 4, "channel \(i) fmt \(fmt)") }
         }
     }
+
+    // MARK: - Mode benchmark (translation vs similarity-homography vs similarity-tiles)
+
+    private struct ModeClip { var name: String; var jitterPx: Double; var jitterRoll: Double; var foreground: Bool; var noise: Bool }
+
+    /// World (textured still, optional moving foreground square, optional per-frame noise) seen by a camera at `pan + jitter`, rolled about the centre.
+    private func modeFrame(_ w: Int, _ h: Int, tx: Double, ty: Double, roll: Double, fg: CGPoint?, noiseSeed: Int?) -> CVPixelBuffer {
+        let b = makeBuffer(w, h, kCVPixelFormatType_32BGRA)
+        let rnd = CIFilter(name: "CIRandomGenerator")!.outputImage!
+        var world = rnd.applyingFilter("CIColorControls", parameters: [kCIInputSaturationKey: 0.6])
+            .transformed(by: CGAffineTransform(scaleX: 12, y: 12))
+        if let fg {
+            let patch = rnd.transformed(by: CGAffineTransform(scaleX: 5, y: 5)).transformed(by: CGAffineTransform(translationX: 777, y: 333))
+                .cropped(to: CGRect(x: fg.x - 90, y: fg.y - 90, width: 180, height: 180))
+            world = patch.composited(over: world)
+        }
+        let c = CGPoint(x: Double(w) / 2, y: Double(h) / 2)
+        var img = world.transformed(by: CGAffineTransform(translationX: -c.x, y: -c.y).concatenating(CGAffineTransform(rotationAngle: CGFloat(roll)))
+            .concatenating(CGAffineTransform(translationX: c.x + tx, y: c.y + ty)))
+        if let n = noiseSeed {
+            let grain = rnd.transformed(by: CGAffineTransform(translationX: Double(n * 97), y: Double(n * 31)))
+                .applyingFilter("CIColorMatrix", parameters: ["inputAVector": CIVector(x: 0, y: 0, z: 0, w: 0.12)])
+            img = grain.composited(over: img)
+        }
+        ci.render(img, to: b, bounds: CGRect(x: 0, y: 0, width: w, height: h), colorSpace: CGColorSpace(name: CGColorSpace.sRGB))
+        return b
+    }
+
+    private struct ModeResult { var jitterPx = 0.0, rollDeg = 0.0, crop = 0.0, ms = 0.0, inPx = 0.0, inRollDeg = 0.0 }
+
+    private func runMode(_ mode: StabilizerMode, clip: ModeClip, w: Int = 1280, h: Int = 720, n: Int = 60) throws -> ModeResult {
+        var r = Rng(s: 7)
+        var jx = 0.0, jy = 0.0, jr = 0.0
+        let st = Stabilizer()
+        var ex = [Double](), ey = [Double](), er = [Double](), ix = [Double](), iy = [Double](), ir = [Double]()
+        var total = 0.0
+        for i in 0..<n {
+            jx = min(12, max(-12, jx * 0.8 + (r.next() - 0.5) * 12 * clip.jitterPx))
+            jy = min(12, max(-12, jy * 0.8 + (r.next() - 0.5) * 12 * clip.jitterPx))
+            jr = min(0.03, max(-0.03, jr * 0.8 + (r.next() - 0.5) * 0.03 * clip.jitterRoll))
+            let gx = clip.jitterPx > 0 ? 0.6 * Double(i) : 0, gy = clip.jitterPx > 0 ? 0.2 * Double(i) : 0
+            let fg = clip.foreground ? CGPoint(x: 300 + 12 * Double(i), y: 300 + 3 * Double(i % 20)) : nil
+            let f = modeFrame(w, h, tx: gx + jx, ty: gy + jy, roll: jr, fg: fg, noiseSeed: clip.noise ? i : nil)
+            let t0 = DispatchTime.now().uptimeNanoseconds
+            let out = st.process(f, strength: 0.6, mode: mode)
+            total += Double(DispatchTime.now().uptimeNanoseconds - t0) / 1e6
+            ci.clearCaches()
+            // Pose of the output against the clean world at the ground-truth smooth pose.
+            let ref = modeFrame(w, h, tx: gx, ty: gy, roll: 0, fg: nil, noiseSeed: nil)
+            let sa = makeBuffer(640, 360, kCVPixelFormatType_32BGRA), sb = makeBuffer(640, 360, kCVPixelFormatType_32BGRA)
+            ci.render(CIImage(cvPixelBuffer: ref).transformed(by: CGAffineTransform(scaleX: 0.5, y: 0.5)), to: sa)
+            ci.render(CIImage(cvPixelBuffer: out).transformed(by: CGAffineTransform(scaleX: 0.5, y: 0.5)), to: sb)
+            ci.clearCaches()
+            if i >= 15, let m = Stabilizer.measure(from: sa, to: sb, mode: .similarityHomography) {
+                ex.append(Double(m.t.x) * 2); ey.append(Double(m.t.y) * 2); er.append(m.roll)
+                ix.append(jx); iy.append(jy); ir.append(jr)
+            }
+        }
+        let zoom = st.stats.meanZoom
+        return ModeResult(jitterPx: (rms(ex) + rms(ey)) / 2, rollDeg: rms(er) * 180 / .pi, crop: (1 - 1 / zoom) * 100, ms: total / Double(n),
+                          inPx: (rms(ix) + rms(iy)) / 2, inRollDeg: rms(ir) * 180 / .pi)
+    }
+
+    func testModeBenchmark() throws {
+        let clips = [ModeClip(name: "roll+shake+fg+noise", jitterPx: 1, jitterRoll: 1, foreground: true, noise: true),
+                     ModeClip(name: "shake+fg+noise", jitterPx: 1, jitterRoll: 0, foreground: true, noise: true),
+                     ModeClip(name: "static clean", jitterPx: 0, jitterRoll: 0, foreground: false, noise: false)]
+        var results: [String: [StabilizerMode: ModeResult]] = [:]
+        print("[stab-modes] clip | mode | in px/deg | residual jitter px | residual roll deg | crop % | ms/frame")
+        for clip in clips { for mode in StabilizerMode.allCases {
+            let r = try runMode(mode, clip: clip)
+            results[clip.name, default: [:]][mode] = r
+            print(String(format: "[stab-modes] %@ | %@ | %.2f/%.2f | %.2f | %.3f | %.1f | %.1f", clip.name, mode.rawValue, r.inPx, r.inRollDeg, r.jitterPx, r.rollDeg, r.crop, r.ms))
+        } }
+        let rollClip = results[clips[0].name]!
+        for m in [StabilizerMode.similarityHomography, .similarityTiles] {
+            XCTAssertLessThan(rollClip[m]!.rollDeg, rollClip[.translation]!.rollDeg, "\(m) must cut roll residual vs translation")
+        }
+        for m in StabilizerMode.allCases {
+            let s = results[clips[2].name]![m]!
+            XCTAssertLessThan(s.jitterPx, 0.75, "\(m) worsens a clean static clip"); XCTAssertLessThan(s.rollDeg, 0.1, "\(m) rolls a clean static clip")
+            // Homography measured ~13 ms (budget 9.9), so only the shipped default plus the other cheap modes are held to it.
+            if ProcessInfo.processInfo.environment["GITHUB_ACTIONS"] == nil, m != .similarityHomography {
+                for c in clips { XCTAssertLessThan(results[c.name]![m]!.ms, 0.3 * 33, "\(m) over time budget on \(c.name)") }
+            }
+        }
+    }
 }

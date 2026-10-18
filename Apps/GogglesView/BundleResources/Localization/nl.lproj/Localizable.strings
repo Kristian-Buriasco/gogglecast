@@ -689,6 +689,10 @@
 "Notifications need permission in System Settings > Notifications. The sound follows the system volume and stops when you bring GogglesView forward. Nothing is shown when you close the window or quit." = "Voor meldingen is toestemming nodig in Systeminstellingen > Meldingen. Het geluid volgt het systeemvolume en stopt wanneer je GogglesView naar voren haalt. Er wordt niets getoond wanneer je het venster sluit of de app stopt.";
 "Live stabilization" = "Live stabilisatie";
 "Stabilize the live picture" = "Het live beeld stabiliseren";
+"Stabilization mode" = "Stabilization mode";
+"Translation only" = "Translation only";
+"Translation and roll (homography)" = "Translation and roll (homography)";
+"Translation and roll (tiles)" = "Translation and roll (tiles)";
 "Strength" = "Sterkte";
 "Stabilization is paused because this Mac can't keep up with the frame rate. It tries again every few seconds." = "Stabilisatie is gepauzeerd omdat deze Mac de framerate niet kan bijhouden. Om de paar seconden wordt het opnieuw geprobeerd.";
 "Smooths shaky footage. Zooms in slightly (4 to 10%) to hide the edges and adds a tiny delay (a few ms). Applies to the preview, recordings and streams." = "Maakt trillerige beelden vloeiender. Zoomt een beetje in (4 tot 10%) om de randen te verbergen en voegt een minieme vertraging toe (enkele ms). Geldt voor de voorvertoning, opnamen en streams.";

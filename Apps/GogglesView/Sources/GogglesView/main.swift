@@ -856,7 +856,7 @@ if args.contains("--stab-probe") {
     // then shake it, to see whether the correction follows the shake.
     var seconds: Double = 20
     if let i = args.firstIndex(of: "--stab-probe"), i + 1 < args.count, let v = Double(args[i + 1]) { seconds = v }
-    UserDefaults.standard.setVolatileDomain(["stabilizeEnabled": true, "stabilizeStrength": 0.6], forName: UserDefaults.argumentDomain)
+    UserDefaults.standard.setVolatileDomain(["stabilizeEnabled": true, "stabilizeStrength": 0.6, "stabilizeMode": ProcessInfo.processInfo.environment["STAB_MODE"] ?? StabilizerPrefs.mode.rawValue], forName: UserDefaults.argumentDomain)
     Stabilizer.probeResidual = true
     let session = DecodeSession()
     let client = HelperClient()
