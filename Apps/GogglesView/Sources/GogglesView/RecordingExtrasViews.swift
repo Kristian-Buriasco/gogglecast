@@ -41,7 +41,7 @@ struct RecordingExtrasSettingsSection: View {
     @AppStorage(RecordingExtras.autoDeleteDaysKey) private var autoDeleteDays = 0
 
     var body: some View {
-        Section("Recording extras") {
+        SettingsGroup("Recording extras") {
             field(L("Split every"), $splitMinutes, range: 0...120, step: 5, unit: L("min"),
                   caption: L("Starts a new -partN file at the next clean cut point; recording continues. Ignored in loop mode."))
             field(L("Split at size"), $splitMegabytes, range: 0...100_000, step: 500, unit: L("MB"),
@@ -70,17 +70,14 @@ struct RecordingExtrasSettingsSection: View {
 
     private func field(_ title: String, _ value: Binding<Int>, range: ClosedRange<Int>, step: Int,
                        unit: String, caption: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
+        SettingsRow(LocalizedStringKey(title), info: LocalizedStringKey(caption)) {
             Stepper(value: value, in: range, step: step) {
-                HStack {
-                    Text(title)
-                    Spacer()
-                    Text(RecordingExtras.valueLabel(value.wrappedValue, unit: unit))
-                        .monospacedDigit()
-                        .foregroundStyle(value.wrappedValue == 0 ? .secondary : .primary)
-                }
+                Text(RecordingExtras.valueLabel(value.wrappedValue, unit: unit))
+                    .monospacedDigit()
+                    .foregroundStyle(value.wrappedValue == 0 ? .secondary : .primary)
             }
-            Text(caption).font(.caption).foregroundStyle(.secondary)
+            .accessibilityLabel(Text(title))
+            .fixedSize()
         }
     }
 }

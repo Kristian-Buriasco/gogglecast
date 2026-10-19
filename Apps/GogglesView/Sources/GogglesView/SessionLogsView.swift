@@ -144,14 +144,16 @@ struct SessionLogSettingsSection: View {
     @AppStorage(SessionLogPrefs.retentionDaysKey) private var retentionDays = SessionLogPrefs.defaultRetentionDays
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Session log").font(.headline)
-            Toggle("Log stream stats while live", isOn: $enabled)
-            Text("Once a second per goggles: fps, bitrate, latency, dropped frames, goggles battery, resolution, recording state, plus connect/stream/recording/marker/replay events. Saved as JSONL; no drone telemetry.")
-                .font(.caption).foregroundStyle(.secondary)
-            Stepper("Keep logs for \(retentionDays) day\(retentionDays == 1 ? "" : "s")", value: $retentionDays,
-                    in: SessionLogPrefs.retentionRange)
-            HStack {
+        Group {
+            SettingsToggleRow("Log stream stats while live", isOn: $enabled,
+                              info: "Once a second per goggles: fps, bitrate, latency, dropped frames, goggles battery, resolution, recording state, plus connect/stream/recording/marker/replay events. Saved as JSONL; no drone telemetry.")
+            SettingsRow("Keep logs for", indented: true) {
+                Stepper(value: $retentionDays, in: SessionLogPrefs.retentionRange) {
+                    Text(verbatim: "\(retentionDays) day\(retentionDays == 1 ? "" : "s")").monospacedDigit()
+                }
+                .fixedSize()
+            }
+            SettingsRow("Logs") {
                 Button("Open logs folder") { NSWorkspace.shared.open(SessionLogsWindowController.ensuredDirectory()) }
                 Button("Session logs…") { SessionLogsWindowController.shared.show() }
             }

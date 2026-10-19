@@ -16,9 +16,8 @@ struct BurnInSettingsSection: View {
     @State private var importError: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Burn-in recording").font(.headline)
-            HStack(spacing: 10) {
+        SettingsGroup("Burn-in recording") {
+            SettingsRow("Logo", info: "Decodes and re-encodes the stream (⇧⌘B) to a separate “-burned” file in the recordings folder. Uses noticeably more CPU/GPU than normal recording; both can run at once.") {
                 preview
                 VStack(alignment: .leading, spacing: 4) {
                     HStack {
@@ -31,34 +30,37 @@ struct BurnInSettingsSection: View {
                     }
                 }
             }
-            Picker("Corner", selection: $corner) {
-                ForEach(BurnInCorner.allCases) { Text($0.label).tag($0.rawValue) }
+            SettingsRow("Corner", indented: true) {
+                Picker("Corner", selection: $corner) {
+                    ForEach(BurnInCorner.allCases) { Text($0.label).tag($0.rawValue) }
+                }
+                .labelsHidden().frame(width: 140)
             }
             slider(L("Logo size"), value: $scale, range: BurnInPrefs.scaleRange, suffix: L("% of width"))
             slider(L("Opacity"), value: $opacity, range: BurnInPrefs.opacityRange, suffix: "%")
-            Toggle("Burn in current time", isOn: $showTime)
-            Toggle("Burn in stream stats (resolution, fps, bitrate)", isOn: $showStats)
-            Picker("Codec", selection: $codec) {
-                ForEach(BurnInCodec.allCases) { Text($0.label).tag($0.rawValue) }
+            SettingsToggleRow("Burn in current time", isOn: $showTime)
+            SettingsToggleRow("Burn in stream stats (resolution, fps, bitrate)", isOn: $showStats)
+            SettingsRow("Codec") {
+                Picker("Codec", selection: $codec) {
+                    ForEach(BurnInCodec.allCases) { Text($0.label).tag($0.rawValue) }
+                }
+                .pickerStyle(.segmented).labelsHidden().frame(width: 200)
             }
-            .pickerStyle(.segmented)
-            Picker("Format", selection: $container) {
-                ForEach(RecordingPrefs.Container.allCases) { Text(verbatim: ".\($0.ext)").tag($0.rawValue) }
+            SettingsRow("Format") {
+                Picker("Format", selection: $container) {
+                    ForEach(RecordingPrefs.Container.allCases) { Text(verbatim: ".\($0.ext)").tag($0.rawValue) }
+                }
+                .pickerStyle(.segmented).labelsHidden().frame(width: 160)
             }
-            .pickerStyle(.segmented)
-            HStack {
-                Text("Bitrate")
-                Spacer()
-                TextField("", value: Binding(
+            SettingsRow("Bitrate") {
+                TextField("Bitrate", value: Binding(
                     get: { bitrate },
                     set: { bitrate = BurnInPrefs.clamp($0, to: BurnInPrefs.bitrateRange) }),
                     format: .number)
-                    .frame(width: 60)
+                    .labelsHidden()
                     .multilineTextAlignment(.trailing)
-                Text("Mbps")
+                    .settingsField(width: 100, unit: "Mbps")
             }
-            Text("Decodes and re-encodes the stream (⇧⌘B) to a separate “-burned” file in the recordings folder. Uses noticeably more CPU/GPU than normal recording; both can run at once.")
-                .font(.caption2).foregroundStyle(.secondary)
         }
     }
 
@@ -81,16 +83,9 @@ struct BurnInSettingsSection: View {
     }
 
     private func slider(_ title: String, value: Binding<Int>, range: ClosedRange<Int>, suffix: String) -> some View {
-        HStack {
-            Text(title)
-            Slider(value: Binding(get: { Double(value.wrappedValue) },
-                                  set: { value.wrappedValue = BurnInPrefs.clamp(Int($0.rounded()), to: range) }),
-                   in: Double(range.lowerBound)...Double(range.upperBound))
-                .accessibilityLabel(title)
-                .accessibilityValue(Text(verbatim: "\(value.wrappedValue)\(suffix)"))
-            Text(verbatim: "\(value.wrappedValue)\(suffix)").font(.caption.monospacedDigit()).fixedSize().frame(minWidth: 90, alignment: .trailing)
-                .accessibilityHidden(true)
-        }
+        SettingsSliderRow(LocalizedStringKey(title), value: Binding(get: { Double(value.wrappedValue) },
+                                                set: { value.wrappedValue = BurnInPrefs.clamp(Int($0.rounded()), to: range) }),
+                          range: Double(range.lowerBound)...Double(range.upperBound), unit: suffix)
     }
 
     private func chooseLogo() {

@@ -390,7 +390,7 @@ import SwiftUI
 struct MenuBarItemSettingsToggle: View {
     @AppStorage(MenuBarPrefs.showKey) private var show = true
     var body: some View {
-        Toggle("Show menu bar item", isOn: $show)
+        SettingsToggleRow("Show menu bar item", isOn: $show)
             .accessibilityIdentifier("showMenuBarItemToggle")
     }
 }

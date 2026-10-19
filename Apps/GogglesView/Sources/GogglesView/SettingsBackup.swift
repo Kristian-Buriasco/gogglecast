@@ -229,9 +229,9 @@ struct SettingsBackupSection: View {
     @State private var message: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Back up settings").font(.headline)
-            HStack {
+        SettingsGroup("Back up settings") {
+            SettingsRow("Settings file", help: message.map { LocalizedStringKey($0) },
+                        info: "Saves your preferences to a file you can restore later or copy to another Mac. Stream keys, passwords, folders and goggles details are never included.") {
                 Button("Export…") { export() }
                     .accessibilityLabel("Export settings to a file")
                     .accessibilityIdentifier("exportSettingsButton")
@@ -239,9 +239,6 @@ struct SettingsBackupSection: View {
                     .accessibilityLabel("Import settings from a file")
                     .accessibilityIdentifier("importSettingsButton")
             }
-            Text("Saves your preferences to a file you can restore later or copy to another Mac. Stream keys, passwords, folders and goggles details are never included.")
-                .font(.caption).foregroundStyle(.secondary)
-            if let message { Text(message).font(.caption).foregroundStyle(.secondary) }
         }
     }
 

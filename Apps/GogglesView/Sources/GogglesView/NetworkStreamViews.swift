@@ -75,13 +75,18 @@ struct NetworkStreamSettingsSection: View {
     @AppStorage(NetStreamPrefs.autoStartKey) private var autoStart = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Network Streaming").font(.headline)
-            TextField("Host (unicast or multicast)", text: $host)
-            TextField("Port", value: $port, format: .number.grouping(.never))
-            Toggle("Start automatically", isOn: $autoStart)
-            Text(L("Receiver: udp://@:%@ (OBS Media Source / VLC). Change applies on next start. Source resolution and bitrate are passed through unchanged.", String(port)))
-                .font(.caption).foregroundStyle(.secondary)
+        SettingsGroup("Network Streaming") {
+            SettingsRow("Host", info: "Change applies on next start. Source resolution and bitrate are passed through unchanged.") {
+                TextField("Host (unicast or multicast)", text: $host).labelsHidden().settingsField(width: 240)
+            }
+            SettingsRow("Port") {
+                TextField("Port", value: $port, format: .number.grouping(.never)).labelsHidden().settingsField(width: 90)
+            }
+            SettingsToggleRow("Start automatically", isOn: $autoStart)
+            SettingsRow("Receiver") {
+                Text(verbatim: "udp://@:\(port)").font(.system(.caption, design: .monospaced)).textSelection(.enabled)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 }

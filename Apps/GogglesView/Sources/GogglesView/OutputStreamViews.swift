@@ -55,34 +55,45 @@ struct SRTSettingsSection: View {
     @KeychainSecret(SRTPrefs.passphraseKey) private var passphrase
     @AppStorage(SRTPrefs.libraryPathKey) private var libPath = ""
     @AppStorage(SRTPrefs.autoStartKey) private var autoStart = false
-    @FocusState private var passFocused: Bool
 
     var body: some View {
         let found = OutputLibrary.resolveSRT(userPath: libPath)
         let m = SRTMode(rawValue: mode) ?? .caller
-        VStack(alignment: .leading, spacing: 6) {
-            Text("SRT Output").font(.headline)
-            Text(found.map { "libsrt: \($0)" } ?? L("libsrt not found. Install with `brew install srt` or choose the library below. It is loaded at runtime only, never bundled."))
-                .font(.caption).foregroundStyle(found == nil ? Color.orange : Color.secondary)
+        SettingsGroup("SRT Output") {
+            SettingsRow("Library",
+                        info: "Works with OBS, VLC and ffplay. Latency should be 3-4x the network RTT. Changes apply on next start.") {
+                Text(found.map { "libsrt: \($0)" } ?? L("libsrt not found. Install with `brew install srt` or choose the library below. It is loaded at runtime only, never bundled."))
+                    .font(.caption).foregroundStyle(found == nil ? Color.orange : Color.secondary)
+                    .lineLimit(2).fixedSize(horizontal: false, vertical: true)
+            }
             LibraryPathRow(title: L("libsrt path (optional)"), path: $libPath)
-            Picker("Mode", selection: $mode) {
-                Text("Caller (connect to receiver)").tag(SRTMode.caller.rawValue)
-                Text("Listener (wait for receiver)").tag(SRTMode.listener.rawValue)
+            SettingsRow("Mode") {
+                Picker("Mode", selection: $mode) {
+                    Text("Caller (connect to receiver)").tag(SRTMode.caller.rawValue)
+                    Text("Listener (wait for receiver)").tag(SRTMode.listener.rawValue)
+                }
+                .labelsHidden().frame(width: 240)
             }
-            if m == .caller { TextField("Receiver host", text: $host) }
-            TextField("Port", value: $port, format: .number.grouping(.never))
-            TextField("Latency (ms, 20-8000)", value: $latency, format: .number.grouping(.never))
-            SecureField("Passphrase (10-79 chars, optional)", text: $passphrase)
-                .focused($passFocused)
-                .onChange(of: passFocused) { _, f in if f { _passphrase.load() } } // Keychain read waits for the click
-            Toggle("Start automatically", isOn: $autoStart)
-            if !SRTPrefs.passphraseValid(passphrase) {
-                Text("Passphrase must be 10-79 characters.").font(.caption).foregroundStyle(.orange)
+            if m == .caller {
+                SettingsRow("Receiver host") { TextField("Receiver host", text: $host).labelsHidden().settingsField(width: 240) }
             }
-            Text(SRTPrefs.receiverHint(mode: m, port: SRTPrefs.clampPort(port), hasPassphrase: !passphrase.isEmpty))
-                .font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
-            Text("Works with OBS, VLC and ffplay. Latency should be 3-4x the network RTT. Changes apply on next start.")
-                .font(.caption).foregroundStyle(.secondary)
+            SettingsRow("Port") {
+                TextField("Port", value: $port, format: .number.grouping(.never)).labelsHidden().settingsField(width: 90)
+            }
+            SettingsRow("Latency") {
+                TextField("Latency (ms, 20-8000)", value: $latency, format: .number.grouping(.never)).labelsHidden()
+                    .settingsField(width: 110, unit: "ms")
+            }
+            SettingsRow("Passphrase", help: LocalizedStringKey(passphrase.isEmpty || SRTPrefs.passphraseValid(passphrase) ? L("Optional, 10-79 characters.") : L("Passphrase must be 10-79 characters."))) {
+                SettingsSecretField(title: "Passphrase (10-79 chars, optional)", text: $passphrase, prompt: "Optional",
+                                    onReveal: { _passphrase.load() }) // Keychain read waits for the click
+            }
+            SettingsToggleRow("Start automatically", isOn: $autoStart)
+            SettingsRow("Receiver") {
+                Text(SRTPrefs.receiverHint(mode: m, port: SRTPrefs.clampPort(port), hasPassphrase: !passphrase.isEmpty))
+                    .font(.system(.caption, design: .monospaced)).foregroundStyle(.secondary).textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 }
@@ -135,15 +146,15 @@ struct NDISettingsSection: View {
 
     var body: some View {
         let found = OutputLibrary.resolveNDI(userPath: libPath)
-        VStack(alignment: .leading, spacing: 6) {
-            Text("NDI Output (experimental)").font(.headline)
-            Text(found.map { "NDI runtime: \($0)" } ?? L("NDI runtime not found. Install NDI Tools / the NDI SDK or choose libndi.dylib below. It is loaded at runtime only, never bundled."))
-                .font(.caption).foregroundStyle(found == nil ? Color.orange : Color.secondary)
+        SettingsGroup("NDI Output (experimental)") {
+            SettingsRow("Runtime", help: "Experimental: may not work with every NDI receiver.") {
+                Text(found.map { "NDI runtime: \($0)" } ?? L("NDI runtime not found. Install NDI Tools / the NDI SDK or choose libndi.dylib below. It is loaded at runtime only, never bundled."))
+                    .font(.caption).foregroundStyle(found == nil ? Color.orange : Color.secondary)
+                    .lineLimit(2).fixedSize(horizontal: false, vertical: true)
+            }
             LibraryPathRow(title: L("libndi.dylib path (optional)"), path: $libPath)
-            TextField("Source name", text: $name)
-            Toggle("I accept the unverified NDI ABI (may crash)", isOn: $ack).disabled(found == nil)
-            Text("Experimental: may not work with every NDI receiver.")
-                .font(.caption).foregroundStyle(.secondary)
+            SettingsRow("Source name") { TextField("Source name", text: $name).labelsHidden().settingsField(width: 240, mono: false) }
+            SettingsToggleRow("I accept the unverified NDI ABI (may crash)", isOn: $ack).disabled(found == nil)
         }
     }
 }
@@ -153,8 +164,8 @@ private struct LibraryPathRow: View {
     @Binding var path: String
 
     var body: some View {
-        HStack {
-            TextField(title, text: $path)
+        SettingsRow(LocalizedStringKey(title)) {
+            TextField(title, text: $path, prompt: Text("Optional")).labelsHidden().settingsField()
             Button("Choose…") {
                 let p = NSOpenPanel()
                 p.canChooseFiles = true; p.canChooseDirectories = false

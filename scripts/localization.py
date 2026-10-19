@@ -49,7 +49,8 @@ EXCLUDED_FILES = {
 
 SWIFTUI_CALLS = (
     "Text|Button|Toggle|Label|Picker|Section|TextField|SecureField|Stepper|LabeledContent|"
-    "DisclosureGroup|Menu|GroupBox|Link|ProgressView|Slider|DatePicker"
+    "DisclosureGroup|Menu|GroupBox|Link|ProgressView|Slider|DatePicker|"
+    "SettingsGroup|SettingsRow|SettingsToggleRow|SettingsSliderRow|SettingsSecretField"
 )
 SWIFTUI_MODIFIERS = (
     r"\.help|\.accessibilityLabel|\.accessibilityHint|\.accessibilityValue|\.navigationTitle|"
@@ -61,7 +62,7 @@ RE_L = re.compile(r"(?<![A-Za-z0-9_.])(?:L|NSLocalizedString)\(\s*" + STRING)
 RE_UI = re.compile(r"(?<![A-Za-z0-9_.])(?:" + SWIFTUI_CALLS + r")\(\s*" + STRING)
 RE_MOD = re.compile(r"(?:" + SWIFTUI_MODIFIERS + r")\(\s*" + STRING)
 RE_PROMPT = re.compile(r"prompt:\s*Text\(\s*" + STRING)
-RE_NAMED = re.compile(r"named:\s*" + STRING)
+RE_NAMED = re.compile(r"(?:named|help|info|footer|accessibilityName|title|prompt):\s*" + STRING)
 
 # printf style specifiers, positional form included. A space is not accepted as a flag so that
 # "100% of" is not read as a specifier.

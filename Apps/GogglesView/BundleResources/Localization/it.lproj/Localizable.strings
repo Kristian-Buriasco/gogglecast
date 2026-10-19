@@ -43,7 +43,6 @@
 "Markers appear in the clip's .markers.json and as chapters in QuickTime Player, Final Cut, Resolve and VLC. They are drawn in a different colour from your own markers when you trim." = "I marcatori finiscono nel file .markers.json della clip e compaiono come capitoli in QuickTime Player, Final Cut, Resolve e VLC. Quando tagli, hanno un colore diverso da quelli messi da te.";
 /* AutoOpenSettingsSection.swift */
 "Open GogglesView when goggles are plugged in" = "Apri GogglesView quando colleghi i goggles";
-"Status: %@" = "Stato: %@";
 "Open Login Items Settings…" = "Apri le impostazioni Elementi login…";
 "macOS may ask you to approve this in System Settings > Login Items & Extensions." = "macOS potrebbe chiederti di approvarlo in Impostazioni di Sistema > Elementi login ed estensioni.";
 /* Automation.swift */
@@ -66,11 +65,9 @@
 "Allow automation (URL scheme and AppleScript)" = "Consenti l'automazione (schema URL e AppleScript)";
 "Allow gogglesview:// URL commands" = "Consenti comandi URL gogglesview://";
 "Off by default: any web page or app can open a gogglesview:// link, so URL commands only run when you turn this on. Each one shows a short on-screen notice and at most 3 run per second. AppleScript is not affected." = "Disattivato di default: qualsiasi pagina web o app può aprire un link gogglesview://, quindi i comandi URL vengono eseguiti solo se attivi questa opzione. Ognuno mostra un breve avviso sullo schermo e se ne eseguono al massimo 3 al secondo. AppleScript non è interessato.";
-"Lets Shortcuts, Stream Deck, Raycast, `open` and AppleScript start/stop recording, save the replay, take a screenshot, freeze, add a marker, start/stop the UDP stream and show the window. URLs can only trigger these actions -- never files, shell commands or hosts." = "Permette a Comandi Rapidi, Stream Deck, Raycast, `open` e AppleScript di avviare e fermare la registrazione, salvare il replay, fare uno screenshot, bloccare l'immagine, aggiungere un marcatore, avviare e fermare lo stream UDP e mostrare la finestra. Gli URL possono attivare solo queste azioni, mai file, comandi di shell o host.";
 "Example automation URL" = "URL di esempio per l'automazione";
 "Copied" = "Copiato";
 "Copy example" = "Copia esempio";
-"Add ?device=<serial> to target specific goggles. See docs/automation.md." = "Aggiungi ?device=<serial> per scegliere dei goggles precisi. Vedi docs/automation.md.";
 /* BurnInRecordControl.swift */
 "Stop burn-in recording" = "Ferma registrazione con overlay incorporato";
 "Start burn-in recording" = "Avvia registrazione con overlay incorporato";
@@ -96,7 +93,6 @@
 "Codec" = "Codec";
 "Format" = "Formato";
 "Bitrate" = "Bitrate";
-"Mbps" = "Mbps";
 "Decodes and re-encodes the stream (⇧⌘B) to a separate “-burned” file in the recordings folder. Uses noticeably more CPU/GPU than normal recording; both can run at once." = "Decodifica e ricodifica lo stream (⇧⌘B) in un file separato “-burned” nella cartella delle registrazioni. Usa molta più CPU/GPU della registrazione normale; le due possono andare insieme.";
 "No logo" = "Nessun logo";
 "Logo preview, no logo selected" = "Anteprima del logo, nessun logo selezionato";
@@ -402,7 +398,6 @@
 "Host (unicast or multicast)" = "Host (unicast o multicast)";
 "Port" = "Porta";
 "Start automatically" = "Avvia in automatico";
-"Receiver: udp://@:%@ (OBS Media Source / VLC). Change applies on next start. Source resolution and bitrate are passed through unchanged." = "Ricevitore: udp://@:%@ (sorgente media di OBS / VLC). La modifica vale dal prossimo avvio. Risoluzione e bitrate della sorgente passano invariati.";
 /* NetworkStreamer.swift */
 "Invalid port" = "Porta non valida";
 /* OBSClient.swift */
@@ -432,9 +427,7 @@
 "Testing..." = "Prova in corso...";
 "Test connection" = "Prova connessione";
 "Test OBS connection" = "Prova la connessione a OBS";
-"The password is stored in the macOS Keychain." = "La password è conservata nel Portachiavi di macOS.";
 "Record in OBS while I'm live" = "Registra in OBS mentre sono in diretta";
-"Stop after the signal is lost for %lld s" = "Ferma dopo %lld s senza segnale";
 "Stop OBS recording after signal loss" = "Ferma la registrazione di OBS dopo la perdita del segnale";
 "seconds" = "secondi";
 "Switch OBS scenes" = "Cambia le scene di OBS";
@@ -541,8 +534,6 @@
 "Server URL" = "URL del server";
 "rtmp://live.twitch.tv/app" = "rtmp://live.twitch.tv/app";
 "Stream key" = "Chiave dello stream";
-"The stream key is stored in the macOS Keychain and is never logged. Changes apply on next start." = "La chiave dello stream è conservata nel Portachiavi di macOS e non finisce mai nei log. Le modifiche valgono dal prossimo avvio.";
-"Twitch and YouTube prefer 8 Mbps or less with a keyframe every 2 s. Goggles video is passed through unchanged, so the stream may be rejected or look worse. Not yet tested against a live service." = "Twitch e YouTube preferiscono 8 Mbps o meno con un keyframe ogni 2 s. Il video dei goggles passa invariato, quindi lo stream potrebbe essere rifiutato o sembrare peggiore. Non ancora provato con un servizio reale.";
 /* RaceMode.swift */
 "RACE" = "GARA";
 "Race mode" = "Modalità gara";
@@ -659,7 +650,6 @@
 "GogglesView" = "GogglesView";
 "Start recording automatically when live" = "Avvia la registrazione in automatico quando sei in diretta";
 "Records the goggles' stream as-is (no re-encoding), so quality is whatever the goggles send." = "Registra lo stream dei goggles così com'è (senza ricodifica), quindi la qualità è quella che mandano i goggles.";
-"Capture window" = "Finestra di cattura";
 "Show capture window (for OBS Window Capture)" = "Mostra la finestra di cattura (per Cattura finestra di OBS)";
 "Keep on top" = "Tieni in primo piano";
 "Developer tools" = "Strumenti per sviluppatori";
@@ -729,10 +719,6 @@
 /* Stabilizer.swift */
 "Live stabilization" = "Stabilizzazione live";
 "Stabilize the live picture" = "Stabilizza l'immagine live";
-"Stabilization mode" = "Stabilization mode";
-"Translation only" = "Translation only";
-"Translation and roll (homography)" = "Translation and roll (homography)";
-"Translation and roll (tiles)" = "Translation and roll (tiles)";
 "Strength" = "Intensità";
 "Stabilization is paused because this Mac can't keep up with the frame rate. It tries again every few seconds." = "La stabilizzazione è in pausa perché questo Mac non regge il frame rate. Riprova ogni pochi secondi.";
 "Smooths shaky footage. Zooms in slightly (4 to 10%) to hide the edges and adds a tiny delay (a few ms). Applies to the preview, recordings and streams." = "Smorza le riprese traballanti. Ingrandisce un po' (da 4 a 10%) per nascondere i bordi e aggiunge un piccolo ritardo (pochi ms). Vale per anteprima, registrazioni e stream.";
@@ -830,8 +816,6 @@
 "Scan with the iPad or phone camera to open the viewer. Safari there can use Share > Add to Home Screen for a full-screen app. The device must be on the same network. The QR code contains the access token, so do not share a screenshot of it." = "Inquadra con la fotocamera di iPad o telefono per aprire il visualizzatore. Lì Safari può usare Condividi > Aggiungi a Home per avere un'app a schermo intero. Il dispositivo deve essere sulla stessa rete. Il codice QR contiene il token di accesso, quindi non condividerne uno screenshot.";
 "No local network address found. Connect this Mac to Wi-Fi or Ethernet." = "Nessun indirizzo di rete locale trovato. Collega questo Mac a Wi-Fi o Ethernet.";
 "To watch on an iPad or phone, turn on 'Allow other devices on the network'. A QR code appears here." = "Per guardare da iPad o telefono, attiva 'Consenti altri dispositivi sulla rete'. Qui compare un codice QR.";
-"Off by default. Anyone on your network can watch while it is on. There is no encryption (plain HTTP) and the token is sent in the URL, so keep it off on untrusted networks. It only listens on this Mac unless 'Allow other devices' is on." = "Disattivato di default. Chiunque sulla tua rete può guardare mentre è attivo. Non c'è cifratura (HTTP semplice) e il token viaggia nell'URL, quindi tienilo spento sulle reti non fidate. Ascolta solo su questo Mac, a meno che 'Consenti altri dispositivi' non sia attivo.";
-"Safari on iPad, iPhone and Mac plays the page directly. Other browsers: open the URL's live.m3u8 in VLC. Latency comes from 1 s segments and Safari's start-up buffer; expect a few seconds behind live, not real time (not yet measured on hardware). The page shows its own estimate." = "Safari su iPad, iPhone e Mac riproduce la pagina direttamente. Altri browser: apri il live.m3u8 dell'URL in VLC. La latenza deriva dai segmenti da 1 s e dal buffer iniziale di Safari: aspettati qualche secondo di ritardo, non tempo reale (non ancora misurata su hardware). La pagina mostra una sua stima.";
 /* main.swift */
 "About GogglesView" = "Informazioni su GogglesView";
 "File" = "File";
@@ -876,7 +860,6 @@
 "Feed" = "Feed";
 "Follow the active window" = "Segui la finestra attiva";
 "Show feed names" = "Mostra i nomi dei feed";
-"Feed names" = "Nomi dei feed";
 "Program Output" = "Uscita programma";
 
 "Show the program outputs" = "Mostra le uscite programma";
@@ -952,7 +935,54 @@
 "Clean output: hide all names, warnings and the no-signal marker" = "Clean output: hide all names, warnings and the no-signal marker";
 "Stabilize the program output (also stabilizes the preview, works in race mode)" = "Stabilize the program output (also stabilizes the preview, works in race mode)";
 
-/* TODO: translate (English placeholder) */
+/* Settings redesign */
+"After" = "After";
+"Auto-open" = "Auto-open";
+"Bypasses stabilization, LUT, stats overlay and power-saving hints." = "Bypasses stabilization, LUT, stats overlay and power-saving hints.";
+"Change applies on next start. Source resolution and bitrate are passed through unchanged." = "Change applies on next start. Source resolution and bitrate are passed through unchanged.";
+"Connection" = "Connection";
+"Defaults" = "Defaults";
+"Device" = "Device";
+"Diagnostics" = "Diagnostics";
+"Example URL" = "Example URL";
+"Feeds" = "Feeds";
+"Folder" = "Folder";
+"Gallery" = "Gallery";
+"Health" = "Health";
+"Integrations" = "Integrations";
+"Invalid" = "Invalid";
+"Latency" = "Latency";
+"Lets Shortcuts, Stream Deck, Raycast, `open` and AppleScript start/stop recording, save the replay, take a screenshot, freeze, add a marker, start/stop the UDP stream and show the window. URLs can only trigger these actions -- never files, shell commands or hosts.\n\nAdd ?device=<serial> to target specific goggles. See docs/automation.md." = "Permette a Comandi Rapidi, Stream Deck, Raycast, `open` e AppleScript di avviare e fermare la registrazione, salvare il replay, fare uno screenshot, bloccare l'immagine, aggiungere un marcatore, avviare e fermare lo stream UDP e mostrare la finestra. Gli URL possono attivare solo queste azioni, mai file, comandi di shell o host.\n\nAggiungi ?device=<serial> per scegliere dei goggles precisi. Vedi docs/automation.md.";
+"Library" = "Library";
+"Log" = "Log";
+"Logo" = "Logo";
+"More information" = "More information";
+"Off by default. Anyone on your network can watch while it is on. There is no encryption (plain HTTP) and the token is sent in the URL, so keep it off on untrusted networks. It only listens on this Mac unless 'Allow other devices' is on.\n\nSafari on iPad, iPhone and Mac plays the page directly. Other browsers: open the URL's live.m3u8 in VLC. Latency comes from 1 s segments and Safari's start-up buffer; expect a few seconds behind live, not real time (not yet measured on hardware). The page shows its own estimate." = "Disattivato di default. Chiunque sulla tua rete può guardare mentre è attivo. Non c'è cifratura (HTTP semplice) e il token viaggia nell'URL, quindi tienilo spento sulle reti non fidate. Ascolta solo su questo Mac, a meno che 'Consenti altri dispositivi' non sia attivo.\n\nSafari su iPad, iPhone e Mac riproduce la pagina direttamente. Altri browser: apri il live.m3u8 dell'URL in VLC. La latenza deriva dai segmenti da 1 s e dal buffer iniziale di Safari: aspettati qualche secondo di ritardo, non tempo reale (non ancora misurata su hardware). La pagina mostra una sua stima.";
+"Off by default: any web page or app can open a gogglesview:// link." = "Off by default: any web page or app can open a gogglesview:// link.";
+"Optional, 10-79 characters." = "Optional, 10-79 characters.";
+"Output" = "Output";
+"Outputs" = "Outputs";
+"Passphrase" = "Passphrase";
+"Picture" = "Picture";
+"QR code" = "QR code";
+"Receiver" = "Receiver";
+"Rules while connected" = "Rules while connected";
+"Runtime" = "Runtime";
+"Scan with the iPad or phone camera to open the viewer. The QR code contains the access token, so do not share a screenshot of it." = "Scan with the iPad or phone camera to open the viewer. The QR code contains the access token, so do not share a screenshot of it.";
+"Settings file" = "Settings file";
+"Stop after signal loss" = "Stop after signal loss";
+"Stored in the macOS Keychain, never logged." = "Stored in the macOS Keychain, never logged.";
+"Stored in the macOS Keychain." = "Stored in the macOS Keychain.";
+"The stream key is stored in the macOS Keychain and is never logged. Changes apply on next start.\n\nTwitch and YouTube prefer 8 Mbps or less with a keyframe every 2 s. Goggles video is passed through unchanged, so the stream may be rejected or look worse. Not yet tested against a live service." = "La chiave dello stream è conservata nel Portachiavi di macOS e non finisce mai nei log. Le modifiche valgono dal prossimo avvio.\n\nTwitch e YouTube preferiscono 8 Mbps o meno con un keyframe ogni 2 s. Il video dei goggles passa invariato, quindi lo stream potrebbe essere rifiutato o sembrare peggiore. Non ancora provato con un servizio reale.";
+"Valid" = "Valid";
+"Warning" = "Warning";
+"Window 1 uses the port in Settings, window 2 the next one, and so on." = "Window 1 uses the port in Settings, window 2 the next one, and so on.";
+"Windows" = "Windows";
+"batteryLow threshold" = "batteryLow threshold";
+"Optional" = "Optional";
+"Setup" = "Setup";
+
+/* Remote alerts, stabilizer modes (merged from main) */
 "Picture frozen" = "Picture frozen";
 "Battery low" = "Battery low";
 "Battery critical" = "Battery critical";
@@ -967,6 +997,7 @@
 "Output connected" = "Output connected";
 "Helper responding again" = "Helper responding again";
 "still failing, reminder %lld" = "still failing, reminder %lld";
+"GogglesView: " = "GogglesView: ";
 "display" = "display";
 "Away mode (remote alerts)" = "Away mode (remote alerts)";
 "Test alert from GogglesView" = "Test alert from GogglesView";
@@ -974,6 +1005,7 @@
 "Urgent test alert from GogglesView" = "Urgent test alert from GogglesView";
 "Program output %lld" = "Program output %lld";
 "Remote alerts (ntfy)" = "Remote alerts (ntfy)";
+"Nothing is sent until Away mode is on. Each problem is sent once, then again every few minutes until it clears, followed by a recovery message. Messages use the crew feed names, never a serial number. The token is kept in the macOS Keychain. The heartbeat pings the URL every 30 s while Away mode is on, so an external monitor can alert you if this Mac goes silent." = "Nothing is sent until Away mode is on. Each problem is sent once, then again every few minutes until it clears, followed by a recovery message. Messages use the crew feed names, never a serial number. The token is kept in the macOS Keychain. The heartbeat pings the URL every 30 s while Away mode is on, so an external monitor can alert you if this Mac goes silent.";
 "Away mode: send alerts to my phone" = "Away mode: send alerts to my phone";
 "Away mode" = "Away mode";
 "Server" = "Server";
@@ -988,6 +1020,7 @@
 "Last send: ok at %@" = "Last send: ok at %@";
 "Last send: failed at %@" = "Last send: failed at %@";
 "Not sent yet" = "Not sent yet";
+"Repeat" = "Repeat";
 "Do not repeat while still failing" = "Do not repeat while still failing";
 "Repeat every %lld min while still failing (up to 10 times)" = "Repeat every %lld min while still failing (up to 10 times)";
 "Repeat interval in minutes" = "Repeat interval in minutes";
@@ -995,7 +1028,6 @@
 "Heartbeat URL" = "Heartbeat URL";
 "Heartbeat: ok at %@" = "Heartbeat: ok at %@";
 "Heartbeat: failed at %@" = "Heartbeat: failed at %@";
-"Nothing is sent until Away mode is on. Each problem is sent once, then again every few minutes until it clears, followed by a recovery message. Messages use the crew feed names, never a serial number. The token is kept in the macOS Keychain. The heartbeat pings the URL every 30 s while Away mode is on, so an external monitor can alert you if this Mac goes silent." = "Nothing is sent until Away mode is on. Each problem is sent once, then again every few minutes until it clears, followed by a recovery message. Messages use the crew feed names, never a serial number. The token is kept in the macOS Keychain. The heartbeat pings the URL every 30 s while Away mode is on, so an external monitor can alert you if this Mac goes silent.";
 "after %lld s" = "after %lld s";
 "%@: delay in seconds" = "%@: delay in seconds";
 "Priority" = "Priority";
@@ -1003,3 +1035,7 @@
 "Default" = "Default";
 "Urgent" = "Urgent";
 "%@: priority" = "%@: priority";
+"Stabilization mode" = "Stabilization mode";
+"Translation only" = "Translation only";
+"Translation and roll (homography)" = "Translation and roll (homography)";
+"Translation and roll (tiles)" = "Translation and roll (tiles)";

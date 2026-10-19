@@ -300,21 +300,26 @@ struct SignalAlertSettingsSection: View {
     @AppStorage(SignalAlertPrefs.soundNameKey) private var soundName = SignalAlertPrefs.defaultSoundName
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Signal-lost alert").font(.headline)
-            Toggle("Alert when the video signal is lost", isOn: $enabled)
-            Stepper(L("After %lld s without video", threshold), value: $threshold, in: SignalAlertPrefs.thresholdRange)
-                .disabled(!enabled)
-            Toggle("Repeat a sound until the signal returns", isOn: $soundOn).disabled(!enabled)
-            HStack {
+        SettingsGroup("Signal-lost alert",
+                      info: "Notifications need permission in System Settings > Notifications. The sound follows the system volume and stops when you bring GogglesView forward. Nothing is shown when you close the window or quit.") {
+            SettingsToggleRow("Alert when the video signal is lost", isOn: $enabled)
+            SettingsRow("After", indented: true) {
+                Stepper(value: $threshold, in: SignalAlertPrefs.thresholdRange) {
+                    Text(verbatim: "\(threshold) s").monospacedDigit()
+                }
+                .fixedSize()
+                .accessibilityLabel(Text(verbatim: L("After %lld s without video", threshold)))
+            }
+            .disabled(!enabled)
+            SettingsToggleRow("Repeat a sound until the signal returns", isOn: $soundOn, indented: true).disabled(!enabled)
+            SettingsRow("Sound", indented: true) {
                 Picker("Sound", selection: $soundName) {
                     ForEach(SignalAlertPrefs.soundChoices, id: \.self) { Text($0).tag($0) }
                 }
+                .labelsHidden().frame(width: 160)
                 Button("Test") { SignalAlertSound.play(soundName) }
             }
             .disabled(!enabled || !soundOn)
-            Text("Notifications need permission in System Settings > Notifications. The sound follows the system volume and stops when you bring GogglesView forward. Nothing is shown when you close the window or quit.")
-                .font(.caption).foregroundStyle(.secondary)
         }
     }
 }

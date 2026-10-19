@@ -364,27 +364,25 @@ struct LookSettingsSection: View {
     @State private var message: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Color look (LUT)").font(.headline)
-            HStack {
+        SettingsGroup("Color look (LUT)") {
+            SettingsRow("Look",
+                        info: "Load a .cube colour look to correct flat or hazy goggles footage. 'Apply to recordings and streams' re-encodes the video, which uses more CPU.") {
                 Picker("Look", selection: $name) {
                     Text("None").tag("")
                     ForEach(names, id: \.self) { Text($0).tag($0) }
                 }
-                Button("Import .cube…") { importLUT() }
+                .labelsHidden().frame(width: 160)
                 Button("Remove") { LUTLibrary.remove(name); name = ""; names = LUTLibrary.names() }
                     .disabled(name.isEmpty)
             }
-            HStack {
-                Text("Intensity").frame(width: 80, alignment: .leading)
-                Slider(value: $intensity, in: 0...1).disabled(name.isEmpty)
-                Text(verbatim: "\(Int(intensity * 100))%").monospacedDigit().frame(width: 44, alignment: .trailing)
+            SettingsRow("Import") { Button("Import .cube…") { importLUT() } }
+            SettingsSliderRow("Intensity", value: $intensity, range: 0...1, scale: 100, unit: "%", indented: true)
+                .disabled(name.isEmpty)
+            SettingsToggleRow("Apply to the preview", isOn: $preview, indented: true).disabled(name.isEmpty)
+            SettingsToggleRow("Apply to recordings and streams", isOn: $output, indented: true).disabled(name.isEmpty)
+            if let message {
+                SettingsRow("Status") { Text(message).font(.caption).foregroundStyle(.orange) }
             }
-            Toggle("Apply to the preview", isOn: $preview).disabled(name.isEmpty)
-            Toggle("Apply to recordings and streams", isOn: $output).disabled(name.isEmpty)
-            if let message { Text(message).font(.caption).foregroundStyle(.orange) }
-            Text("Load a .cube colour look to correct flat or hazy goggles footage. 'Apply to recordings and streams' re-encodes the video, which uses more CPU.")
-                .font(.caption).foregroundStyle(.secondary)
         }
     }
 
@@ -413,26 +411,22 @@ struct OutputFramingSettingsSection: View {
     @AppStorage(OutputFramingPrefs.panYKey) private var panY = 0.0
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Output framing").font(.headline)
-            Toggle("Use a separate crop for recordings, replay and streams", isOn: $enabled)
-            Picker("Aspect", selection: $aspect) {
-                ForEach([FramingAspect.fit, .r16x9, .r4x3, .r1x1, .r9x16]) { Text($0 == .fit ? L("Full") : $0.title).tag($0.rawValue) }
+        SettingsGroup("Output framing") {
+            SettingsToggleRow("Use a separate crop for recordings, replay and streams", isOn: $enabled,
+                info: "Crop recordings and streams separately from the preview, for example 9:16 for shorts. Change the aspect while stopped; it takes effect on the next recording or stream. Zoom and position can change live.")
+            SettingsRow("Aspect", indented: true) {
+                Picker("Aspect", selection: $aspect) {
+                    ForEach([FramingAspect.fit, .r16x9, .r4x3, .r1x1, .r9x16]) { Text($0 == .fit ? L("Full") : $0.title).tag($0.rawValue) }
+                }
+                .pickerStyle(.segmented).labelsHidden().frame(width: 280)
             }
-            .pickerStyle(.segmented).disabled(!enabled)
-            row(L("Zoom"), $zoom, 1...4, format: "%.1fx")
-            row(L("Horizontal"), $panX, -1...1, format: "%+.2f")
-            row(L("Vertical"), $panY, -1...1, format: "%+.2f")
-            Text("Crop recordings and streams separately from the preview, for example 9:16 for shorts. Change the aspect while stopped; it takes effect on the next recording or stream. Zoom and position can change live.")
-                .font(.caption).foregroundStyle(.secondary)
-        }
-    }
-
-    private func row(_ title: String, _ value: Binding<Double>, _ range: ClosedRange<Double>, format: String) -> some View {
-        HStack {
-            Text(title).frame(width: 80, alignment: .leading)
-            Slider(value: value, in: range).disabled(!enabled || (title != L("Zoom") && zoom <= 1))
-            Text(String(format: format, value.wrappedValue)).monospacedDigit().frame(width: 48, alignment: .trailing)
+            .disabled(!enabled)
+            SettingsSliderRow("Zoom", value: $zoom, range: 1...4, format: "%.1f", unit: "x", indented: true)
+                .disabled(!enabled)
+            SettingsSliderRow("Horizontal", value: $panX, range: -1...1, format: "%+.2f", indented: true)
+                .disabled(!enabled || zoom <= 1)
+            SettingsSliderRow("Vertical", value: $panY, range: -1...1, format: "%+.2f", indented: true)
+                .disabled(!enabled || zoom <= 1)
         }
     }
 }

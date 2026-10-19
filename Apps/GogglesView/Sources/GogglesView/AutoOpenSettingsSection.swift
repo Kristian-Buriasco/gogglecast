@@ -9,19 +9,17 @@ struct AutoOpenSettingsSection: View {
     @State private var error: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Toggle("Open GogglesView when goggles are plugged in", isOn: Binding(
+        SettingsGroup("Auto-open") {
+            SettingsToggleRow("Open GogglesView when goggles are plugged in", isOn: Binding(
                 get: { isOn },
                 set: { apply($0) }
-            ))
-            Text(L("Status: %@", HelperRegistration.plainDescription(status)))
-                .font(.caption).foregroundStyle(.secondary)
-            if status == .requiresApproval {
-                Button("Open Login Items Settings…") { AutoOpenRegistration.openLoginItemsSettings() }
+            ), info: "macOS may ask you to approve this in System Settings > Login Items & Extensions.")
+            SettingsRow("Status", help: error.map { LocalizedStringKey($0) }) {
+                Text(HelperRegistration.plainDescription(status)).foregroundStyle(.secondary)
+                if status == .requiresApproval {
+                    Button("Open Login Items Settings…") { AutoOpenRegistration.openLoginItemsSettings() }
+                }
             }
-            Text("macOS may ask you to approve this in System Settings > Login Items & Extensions.")
-                .font(.caption).foregroundStyle(.secondary)
-            if let error { Text(error).font(.caption).foregroundStyle(.red) }
         }
         .onAppear(perform: refresh)
     }

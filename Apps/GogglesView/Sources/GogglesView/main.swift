@@ -721,7 +721,7 @@ if let idx = args.firstIndex(of: "--settings-shot"), idx + 2 < args.count {
     // opens only the Settings window on that tab, writes it to a PNG and exits. No helper, no XPC.
     DocShots.requireEnabled(flag: "--settings-shot")
     let tab = args[idx + 1], out = URL(fileURLWithPath: args[idx + 2])
-    let height = idx + 3 < args.count ? CGFloat(Double(args[idx + 3]) ?? 580) : 580
+    let height = idx + 3 < args.count ? CGFloat(Double(args[idx + 3]) ?? 680) : 680
     DocShots.overridePrefs(["settingsTab": tab]) // in-memory only; the real defaults are untouched
     SecretStore.backend = DocShots.EmptySecrets()
     SettingsView.heightOverride = height

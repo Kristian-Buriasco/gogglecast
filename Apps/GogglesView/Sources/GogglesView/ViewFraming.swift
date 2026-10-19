@@ -213,34 +213,25 @@ struct FramingSettingsSection: View {
     @AppStorage(FramingPrefs.saturationKey) private var saturation = 1.0
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Framing and color").font(.headline)
-            Picker("Aspect", selection: $aspect) {
-                ForEach(FramingAspect.allCases) { Text($0.title).tag($0.rawValue) }
+        SettingsGroup("Framing and color") {
+            SettingsRow("Aspect") {
+                Picker("Aspect", selection: $aspect) {
+                    ForEach(FramingAspect.allCases) { Text($0.title).tag($0.rawValue) }
+                }
+                .pickerStyle(.segmented).labelsHidden().frame(width: 280)
             }
-            .pickerStyle(.segmented)
-            slider(L("Zoom"), $zoom, 1...4, format: "%.1fx")
-            Picker("Grid", selection: $grid) {
-                ForEach(FramingGrid.allCases) { Text($0.title).tag($0.rawValue) }
+            SettingsSliderRow("Zoom", value: $zoom, range: 1...4, format: "%.1f", unit: "x",
+                info: "Scroll or pinch to zoom, drag to pan, double-click to reset. Affects the main and capture windows only; recordings and streams use Output framing below.")
+            SettingsRow("Grid") {
+                Picker("Grid", selection: $grid) {
+                    ForEach(FramingGrid.allCases) { Text($0.title).tag($0.rawValue) }
+                }
+                .pickerStyle(.segmented).labelsHidden().frame(width: 280)
             }
-            .pickerStyle(.segmented)
-            slider(L("Brightness"), $brightness, -0.5...0.5, format: "%+.2f")
-            slider(L("Contrast"), $contrast, 0.5...2, format: "%.2f")
-            slider(L("Saturation"), $saturation, 0...2, format: "%.2f")
-            Button("Reset") { FramingPrefs.resetAll() }
-            Text("Scroll or pinch to zoom, drag to pan, double-click to reset. Affects the main and capture windows only; recordings and streams use Output framing below.")
-                .font(.caption2).foregroundStyle(.secondary)
-        }
-    }
-
-    private func slider(_ title: String, _ value: Binding<Double>, _ range: ClosedRange<Double>, format: String) -> some View {
-        HStack {
-            Text(title).frame(width: 80, alignment: .leading)
-            Slider(value: value, in: range)
-                .accessibilityLabel(title)
-                .accessibilityValue(String(format: format, value.wrappedValue))
-            Text(String(format: format, value.wrappedValue)).monospacedDigit().frame(width: 48, alignment: .trailing)
-                .accessibilityHidden(true)
+            SettingsSliderRow("Brightness", value: $brightness, range: -0.5...0.5, format: "%+.2f")
+            SettingsSliderRow("Contrast", value: $contrast, range: 0.5...2, format: "%.2f")
+            SettingsSliderRow("Saturation", value: $saturation, range: 0...2, format: "%.2f")
+            SettingsRow("Reset") { Button("Reset") { FramingPrefs.resetAll() } }
         }
     }
 }

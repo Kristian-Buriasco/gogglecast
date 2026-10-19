@@ -365,25 +365,20 @@ struct ProgramOutputSettingsSection: View {
     @State private var screens = ProgramOutputController.screenInfos()
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Program output (HDMI)").font(.headline)
-            Toggle("Show the program outputs", isOn: $enabled)
-            Toggle("Open the program outputs when the app starts", isOn: $openAtLaunch)
-            Toggle("Clean output: hide all names, warnings and the no-signal marker", isOn: $clean)
-            Toggle("Stabilize the program output (also stabilizes the preview, works in race mode)", isOn: $stabilize)
+        SettingsGroup("Program output (HDMI)",
+                      info: "A clean full screen picture on each chosen display, for a vision mixer, projector or TV: one output per HDMI connection. A grid shows every open goggles window and marks a feed with no signal; one feed shows just that picture. Names never include the goggles serial number. Zebra stripes and peaking are not drawn here.") {
+            SettingsToggleRow("Show the program outputs", isOn: $enabled)
+            SettingsToggleRow("Open the program outputs when the app starts", isOn: $openAtLaunch)
+            SettingsToggleRow("Clean output: hide all names, warnings and the no-signal marker", isOn: $clean)
+            SettingsToggleRow("Stabilize the program output (also stabilizes the preview, works in race mode)", isOn: $stabilize)
             ForEach($outputs) { $o in
                 OutputRow(output: $o, screens: screens, feeds: controller.available,
                           canRemove: outputs.count > 1) { outputs.removeAll { $0.id == o.id } }
             }
             if outputs.count < ProgramOutputPrefs.maxOutputs {
-                Button("Add output") { outputs.append(ProgramOutputConfig()) }
+                SettingsRow("Outputs") { Button("Add output") { outputs.append(ProgramOutputConfig()) } }
             }
-            if !controller.available.isEmpty {
-                Text("Feed names").font(.subheadline).padding(.top, 4)
-                ForEach(controller.available) { f in FeedNameRow(info: f) }
-            }
-            Text("A clean full screen picture on each chosen display, for a vision mixer, projector or TV: one output per HDMI connection. A grid shows every open goggles window and marks a feed with no signal; one feed shows just that picture. Names never include the goggles serial number. Zebra stripes and peaking are not drawn here.")
-                .font(.caption).foregroundStyle(.secondary)
+            ForEach(controller.available) { f in FeedNameRow(info: f) }
         }
         .onChange(of: outputs) { ProgramOutputPrefs.setOutputs($0) }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)) { _ in
@@ -400,33 +395,43 @@ private struct OutputRow: View {
     let remove: () -> Void
 
     var body: some View {
-        GroupBox {
-            VStack(alignment: .leading, spacing: 6) {
+        Group {
+            SettingsRow("Display") {
                 Picker("Display", selection: Binding(get: { Int(output.display) }, set: { output.display = UInt32($0) })) {
                     Text("Automatic (next external display)").tag(0)
                     ForEach(screens, id: \.id) { s in
                         Text(verbatim: s.isMain ? "\(s.name) (\(L("main display")))" : s.name).tag(Int(s.id))
                     }
                 }
-                if output.display != 0, screens.first(where: { Int($0.id) == Int(output.display) })?.isMain == true {
+                .labelsHidden().frame(width: 260)
+            }
+            if output.display != 0, screens.first(where: { Int($0.id) == Int(output.display) })?.isMain == true {
+                SettingsRow("Warning") {
                     Text("This is your main display: the program output will cover your controls. Pick an external display unless you know what you are doing.")
-                        .font(.caption).foregroundStyle(.orange)
+                        .font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
                 }
+            }
+            SettingsRow("Show") {
                 Picker("Show", selection: $output.layout) {
                     Text("All feeds in a grid").tag("grid")
                     Text("One feed").tag("single")
                 }
-                if output.isGrid {
-                    Toggle("Show feed names", isOn: $output.showNames)
-                } else {
+                .labelsHidden().frame(width: 260)
+            }
+            if output.isGrid {
+                SettingsToggleRow("Show feed names", isOn: $output.showNames, indented: true)
+            } else {
+                SettingsRow("Feed", indented: true) {
                     Picker("Feed", selection: $output.feed) {
                         Text("Follow the active window").tag("")
                         ForEach(feeds) { f in Text(verbatim: f.name).tag(f.id) }
                     }
+                    .labelsHidden().frame(width: 260)
                 }
-                if canRemove { Button("Remove output", role: .destructive, action: remove) }
             }
-            .padding(4)
+            if canRemove {
+                SettingsRow("Output") { Button("Remove output", role: .destructive, action: remove) }
+            }
         }
     }
 }
@@ -436,8 +441,10 @@ private struct FeedNameRow: View {
     @State private var text = ""
 
     var body: some View {
-        HStack {
+        SettingsRow(LocalizedStringKey(info.name)) {
             TextField(text: $text, prompt: Text(verbatim: info.name)) { Text("Name") }
+                .labelsHidden()
+                .settingsField(width: 240, mono: false)
                 .onSubmit { commit() }
                 .onChange(of: text) { _ in commit() }
         }
