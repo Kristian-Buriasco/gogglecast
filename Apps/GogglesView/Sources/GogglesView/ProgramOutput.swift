@@ -3,6 +3,7 @@ import Foundation
 import SwiftUI
 import AppKit
 import Combine
+import Carbon.HIToolbox
 #endif
 
 // Program output: a clean, borderless, fullscreen window on a chosen display (for example the HDMI
@@ -261,6 +262,37 @@ final class ProgramOutputController: ObservableObject {
     private var shownKeys: [String: String] = [:]
     private var observers: [AnyCancellable] = []
     private var pending: DispatchWorkItem?
+    private var panicRef: EventHotKeyRef?
+    private var panicHandler: EventHandlerRef?
+
+    /// Emergency close, works from any app: for example when an output landed on the only screen and the
+    /// picture covers the controls. Registered only while an output is on screen.
+    static let panicCombo = HotkeyCombo(keyCode: UInt32(kVK_ANSI_Period), carbonModifiers: UInt32(controlKey | optionKey | cmdKey))
+    private static let panicID = EventHotKeyID(signature: OSType(0x47565050), id: 1) // 'GVPP'
+
+    private func updatePanicHotkey() {
+        guard !windows.isEmpty else { removePanicHotkey(); return }
+        guard panicRef == nil else { return }
+        var spec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
+        InstallEventHandler(GetApplicationEventTarget(), { _, event, _ in
+            var id = EventHotKeyID()
+            GetEventParameter(event, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID),
+                              nil, MemoryLayout<EventHotKeyID>.size, nil, &id)
+            // Other hotkeys share the application target: leave theirs to their own handler.
+            guard id.signature == ProgramOutputController.panicID.signature, id.id == ProgramOutputController.panicID.id else { return OSStatus(eventNotHandledErr) }
+            DispatchQueue.main.async { UserDefaults.standard.set(false, forKey: ProgramOutputPrefs.enabledKey) }
+            return noErr
+        }, 1, &spec, nil, &panicHandler)
+        RegisterEventHotKey(Self.panicCombo.keyCode, Self.panicCombo.carbonModifiers, Self.panicID,
+                            GetApplicationEventTarget(), 0, &panicRef)
+    }
+
+    private func removePanicHotkey() {
+        if let panicRef { UnregisterEventHotKey(panicRef) }
+        panicRef = nil
+        if let panicHandler { RemoveEventHandler(panicHandler) }
+        panicHandler = nil
+    }
 
     func install(sessions: @escaping () -> [GogglesSession], active: @escaping () -> GogglesSession?) {
         self.sessions = sessions
@@ -314,7 +346,7 @@ final class ProgramOutputController: ObservableObject {
 
         let outputs = ProgramOutputPrefs.outputs()
         for id in Set(windows.keys).subtracting(outputs.map(\.id)) { close(id) }
-        guard ProgramOutputPrefs.enabled() else { missingOutputs = []; for id in Array(windows.keys) { close(id) }; return }
+        guard ProgramOutputPrefs.enabled() else { missingOutputs = []; for id in Array(windows.keys) { close(id) }; updatePanicHotkey(); return }
 
         let assigned = ProgramDisplayChoice.assign(outputs: outputs, screens: Self.screenInfos())
         missingOutputs = zip(outputs.indices, assigned).filter { $0.1 == nil }.map { L("Program output %lld", $0.0 + 1) }
@@ -352,6 +384,7 @@ final class ProgramOutputController: ObservableObject {
             w.orderFrontRegardless()
             windows[output.id] = w
         }
+        updatePanicHotkey()
     }
 }
 
@@ -368,6 +401,10 @@ struct ProgramOutputSettingsSection: View {
         SettingsGroup("Program output (HDMI)",
                       info: "A clean full screen picture on each chosen display, for a vision mixer, projector or TV: one output per HDMI connection. A grid shows every open goggles window and marks a feed with no signal; one feed shows just that picture. Names never include the goggles serial number. Zebra stripes and peaking are not drawn here.") {
             SettingsToggleRow("Show the program outputs", isOn: $enabled)
+            SettingsRow("Emergency close") {
+                Text("Stuck behind a full-screen output? Press ⌃⌥⌘. in any app to close all program outputs.")
+                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
             SettingsToggleRow("Open the program outputs when the app starts", isOn: $openAtLaunch)
             SettingsToggleRow("Clean output: hide all names, warnings and the no-signal marker", isOn: $clean)
             SettingsToggleRow("Stabilize the program output (also stabilizes the preview, works in race mode)", isOn: $stabilize)

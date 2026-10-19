@@ -969,3 +969,5 @@
 "Translation and roll (homography)" = "Translation and roll (homography)";
 "Translation and roll (tiles)" = "Translation and roll (tiles)";
 "Fill in the server and topic below to switch this on." = "Fill in the server and topic below to switch this on.";
+"Emergency close" = "Emergency close";
+"Stuck behind a full-screen output? Press ⌃⌥⌘. in any app to close all program outputs." = "Stuck behind a full-screen output? Press ⌃⌥⌘. in any app to close all program outputs.";
