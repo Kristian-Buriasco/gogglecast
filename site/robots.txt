@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://kristian-buriasco.github.io/gogglecast/sitemap.xml
+Sitemap: https://gogglesview.kristianburiasco.it/sitemap.xml
