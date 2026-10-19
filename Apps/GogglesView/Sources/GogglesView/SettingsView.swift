@@ -24,7 +24,7 @@ struct SettingsView: View {
 
     enum Tab: String, CaseIterable, Identifiable {
         case general = "General", display = "Display", picture = "Picture", recording = "Recording", streaming = "Streaming"
-        case outputs = "Outputs", integrations = "Integrations", advanced = "Advanced"
+        case outputs = "Outputs", hdmi = "HDMI", integrations = "Integrations", advanced = "Advanced"
         var id: String { rawValue }
         var title: String {
             switch self {
@@ -32,6 +32,7 @@ struct SettingsView: View {
             case .display: return L("Display")
             case .picture: return L("Picture")
             case .outputs: return L("Outputs")
+            case .hdmi: return L("HDMI")
             case .integrations: return L("Integrations")
             case .recording: return L("Recording")
             case .streaming: return L("Streaming")
@@ -44,6 +45,7 @@ struct SettingsView: View {
             case .display: return "display"
             case .picture: return "wand.and.stars"
             case .outputs: return "tv.and.mediabox"
+            case .hdmi: return "rectangle.on.rectangle"
             case .integrations: return "puzzlepiece.extension"
             case .recording: return "record.circle"
             case .streaming: return "antenna.radiowaves.left.and.right"
@@ -101,6 +103,7 @@ struct SettingsView: View {
                         SRTSettingsSection()
                         NDISettingsSection()
                         WebViewerSettingsSection()
+                    case .hdmi:
                         ProgramOutputSettingsSection()
                     case .integrations:
                         OBSSettingsSection()

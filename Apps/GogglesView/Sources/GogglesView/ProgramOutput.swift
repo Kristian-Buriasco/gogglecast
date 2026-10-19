@@ -96,6 +96,23 @@ struct ProgramScreenInfo: Equatable {
     let id: UInt32
     let name: String
     let isMain: Bool
+    /// Pixel size such as "1920 × 1080", empty when unknown.
+    var resolution = ""
+}
+
+/// What the settings card tells the user about one output.
+enum ProgramOutputStatus: Equatable {
+    case off                      // the program outputs are switched off
+    case noDisplay                // no display for this output (unplugged, or already used by an earlier output)
+    case showing(String)          // on this external display
+    case onMain(String)           // on the main display: covers the controls
+
+    static func status(index: Int, outputs: [ProgramOutputConfig], screens: [ProgramScreenInfo], enabled: Bool) -> ProgramOutputStatus {
+        guard enabled else { return .off }
+        let assigned = ProgramDisplayChoice.assign(outputs: outputs, screens: screens)
+        guard index < assigned.count, let id = assigned[index], let s = screens.first(where: { $0.id == id }) else { return .noDisplay }
+        return s.isMain ? .onMain(s.name) : .showing(s.name)
+    }
 }
 
 enum ProgramDisplayChoice {
@@ -323,7 +340,9 @@ final class ProgramOutputController: ObservableObject {
     static func screenInfos() -> [ProgramScreenInfo] {
         NSScreen.screens.compactMap { s in
             guard let id = (s.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value else { return nil }
-            return ProgramScreenInfo(id: id, name: s.localizedName, isMain: s == NSScreen.screens.first)
+            let px = CGSize(width: s.frame.width * s.backingScaleFactor, height: s.frame.height * s.backingScaleFactor)
+            return ProgramScreenInfo(id: id, name: s.localizedName, isMain: s == NSScreen.screens.first,
+                                     resolution: "\(Int(px.width)) × \(Int(px.height))")
         }
     }
 
@@ -398,24 +417,39 @@ struct ProgramOutputSettingsSection: View {
     @State private var screens = ProgramOutputController.screenInfos()
 
     var body: some View {
-        SettingsGroup("Program output (HDMI)",
-                      info: "A clean full screen picture on each chosen display, for a vision mixer, projector or TV: one output per HDMI connection. A grid shows every open goggles window and marks a feed with no signal; one feed shows just that picture. Names never include the goggles serial number. Zebra stripes and peaking are not drawn here.") {
-            SettingsToggleRow("Show the program outputs", isOn: $enabled)
-            SettingsRow("Emergency close") {
-                Text("Stuck behind a full-screen output? Press ⌃⌥⌘. in any app to close all program outputs.")
-                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+        Group {
+            SettingsGroup("Program outputs",
+                          info: "A clean full screen picture on each chosen display, for a vision mixer, projector or TV: one output per HDMI connection. A grid shows every open goggles window and marks a feed with no signal; one feed shows just that picture. Names never include the goggles serial number. Zebra stripes and peaking are not drawn here.") {
+                SettingsToggleRow("Show the program outputs", isOn: $enabled)
+                SettingsToggleRow("Open the program outputs when the app starts", isOn: $openAtLaunch)
+                SettingsToggleRow("Clean output", isOn: $clean, help: "Hides all names, warnings and the no-signal marker.")
+                SettingsToggleRow("Stabilize output", isOn: $stabilize, help: "Also stabilizes the preview. Works in race mode.")
+                SettingsRow("Emergency close") {
+                    Text("Stuck behind a full-screen output? Press ⌃⌥⌘. in any app to close all program outputs.")
+                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
             }
-            SettingsToggleRow("Open the program outputs when the app starts", isOn: $openAtLaunch)
-            SettingsToggleRow("Clean output: hide all names, warnings and the no-signal marker", isOn: $clean)
-            SettingsToggleRow("Stabilize the program output (also stabilizes the preview, works in race mode)", isOn: $stabilize)
+            SettingsGroup("Connected displays") {
+                let assigned = ProgramDisplayChoice.assign(outputs: outputs, screens: screens)
+                ForEach(screens, id: \.id) { s in
+                    DisplayRow(screen: s, user: assigned.firstIndex(of: s.id))
+                }
+            }
             ForEach($outputs) { $o in
-                OutputRow(output: $o, screens: screens, feeds: controller.available,
-                          canRemove: outputs.count > 1) { outputs.removeAll { $0.id == o.id } }
+                OutputGroup(index: outputs.firstIndex { $0.id == o.id } ?? 0, output: $o, outputs: outputs, screens: screens, enabled: enabled,
+                            feeds: controller.available, canRemove: outputs.count > 1) { outputs.removeAll { $0.id == o.id } }
             }
             if outputs.count < ProgramOutputPrefs.maxOutputs {
-                SettingsRow("Outputs") { Button("Add output") { outputs.append(ProgramOutputConfig()) } }
+                Button(L("Add output (%lld of %lld)", outputs.count + 1, ProgramOutputPrefs.maxOutputs)) {
+                    outputs.append(ProgramOutputConfig())
+                }
+                .fixedSize()
             }
-            ForEach(controller.available) { f in FeedNameRow(info: f) }
+            if !controller.available.isEmpty {
+                SettingsGroup("Feed names") {
+                    ForEach(controller.available) { f in FeedNameRow(info: f) }
+                }
+            }
         }
         .onChange(of: outputs) { ProgramOutputPrefs.setOutputs($0) }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)) { _ in
@@ -424,15 +458,43 @@ struct ProgramOutputSettingsSection: View {
     }
 }
 
-private struct OutputRow: View {
+private struct DisplayRow: View {
+    let screen: ProgramScreenInfo
+    let user: Int?   // index of the output using this display
+
+    var body: some View {
+        SettingsRow(screen.name.isEmpty ? "Display" : LocalizedStringKey(screen.name)) {
+            HStack(spacing: 8) {
+                Text(verbatim: screen.isMain ? L("Main") : L("External"))
+                    .font(.caption.weight(.medium)).padding(.horizontal, 6).padding(.vertical, 1)
+                    .background(Capsule().fill(screen.isMain ? Color.orange.opacity(0.25) : Color.secondary.opacity(0.2)))
+                    .fixedSize()
+                if !screen.resolution.isEmpty { Text(verbatim: screen.resolution).font(.caption).foregroundStyle(.secondary).fixedSize() }
+                Spacer(minLength: 0)
+                Text(verbatim: user.map { L("Output %lld", $0 + 1) } ?? L("free"))
+                    .foregroundStyle(user == nil ? .secondary : .primary)
+            }
+        }
+    }
+}
+
+private struct OutputGroup: View {
+    let index: Int
     @Binding var output: ProgramOutputConfig
+    let outputs: [ProgramOutputConfig]
     let screens: [ProgramScreenInfo]
+    let enabled: Bool
     let feeds: [ProgramFeedInfo]
     let canRemove: Bool
     let remove: () -> Void
 
+    private var status: ProgramOutputStatus {
+        ProgramOutputStatus.status(index: index, outputs: outputs, screens: screens, enabled: enabled)
+    }
+
     var body: some View {
-        Group {
+        SettingsGroup(LocalizedStringKey(L("Output %lld", index + 1))) {
+            statusRow
             SettingsRow("Display") {
                 Picker("Display", selection: Binding(get: { Int(output.display) }, set: { output.display = UInt32($0) })) {
                     Text("Automatic (next external display)").tag(0)
@@ -441,12 +503,6 @@ private struct OutputRow: View {
                     }
                 }
                 .labelsHidden().frame(width: 260)
-            }
-            if output.display != 0, screens.first(where: { Int($0.id) == Int(output.display) })?.isMain == true {
-                SettingsRow("Warning") {
-                    Text("This is your main display: the program output will cover your controls. Pick an external display unless you know what you are doing.")
-                        .font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
-                }
             }
             SettingsRow("Show") {
                 Picker("Show", selection: $output.layout) {
@@ -467,9 +523,29 @@ private struct OutputRow: View {
                 }
             }
             if canRemove {
-                SettingsRow("Output") { Button("Remove output", role: .destructive, action: remove) }
+                SettingsRow("Remove") { Button("Remove output", role: .destructive, action: remove).fixedSize() }
             }
         }
+    }
+
+    private var statusRow: some View {
+        let (color, text): (Color, String) = {
+            switch status {
+            case .off: return (.gray, L("Off"))
+            case .noDisplay: return (.orange, L("No display connected"))
+            case .showing(let n): return (.green, L("Showing on %@", n))
+            case .onMain: return (.orange, L("Main display: it will cover your controls"))
+            }
+        }()
+        return HStack(spacing: 8) {
+            Circle().fill(color).frame(width: 8, height: 8).accessibilityHidden(true)
+            Text(verbatim: text).fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, 7)
+        .overlay(alignment: .top) { Divider().opacity(0.6) }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(Text(verbatim: L("Output %lld", index + 1) + ": " + text))
     }
 }
 

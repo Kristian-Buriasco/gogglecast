@@ -24,13 +24,31 @@
 "left unchanged" = "left unchanged";
 "Scene when live, %@" = "Scene when live, %@";
 "Scene when lost, %@" = "Scene when lost, %@";
+/* AlertEngine.swift */
+"Signal lost" = "Signal lost";
+"Picture frozen" = "Picture frozen";
+"Black picture" = "Black picture";
+"Battery low" = "Battery low";
+"Battery critical" = "Battery critical";
+"Output failed" = "Output failed";
+"Output waiting for connection" = "Output waiting for connection";
+"Helper not responding" = "Helper not responding";
+"Signal back" = "Signal back";
+"Picture moving again" = "Picture moving again";
+"Picture no longer black" = "Picture no longer black";
+"Battery recovered" = "Battery recovered";
+"Output working again" = "Output working again";
+"Output connected" = "Output connected";
+"Helper responding again" = "Helper responding again";
+"still failing, reminder %lld" = "still failing, reminder %lld";
+"GogglesView: " = "GogglesView: ";
+"display" = "display";
 /* AppChrome.swift */
 "System" = "System";
 "Light" = "Light";
 "Dark" = "Dark";
 "Status" = "Status";
 /* AutoMarkers.swift */
-"Signal lost" = "Signal lost";
 "Signal restored" = "Signal restored";
 "Goggles battery low (%lld%%)" = "Goggles battery low (%lld%%)";
 "Replay saved" = "Replay saved";
@@ -39,15 +57,16 @@
 "Race mode off" = "Race mode off";
 "Automatic markers" = "Automatic markers";
 "Add markers to recordings automatically" = "Add markers to recordings automatically";
+"Markers appear in the clip's .markers.json and as chapters in QuickTime Player, Final Cut, Resolve and VLC. They are drawn in a different colour from your own markers when you trim." = "Markers appear in the clip's .markers.json and as chapters in QuickTime Player, Final Cut, Resolve and VLC. They are drawn in a different colour from your own markers when you trim.";
 "Signal lost and restored" = "Signal lost and restored";
 "Goggles battery low (once per recording)" = "Goggles battery low (once per recording)";
 "Replay saved and screenshot taken" = "Replay saved and screenshot taken";
 "Race mode turned on or off" = "Race mode turned on or off";
-"Markers appear in the clip's .markers.json and as chapters in QuickTime Player, Final Cut, Resolve and VLC. They are drawn in a different colour from your own markers when you trim." = "Markers appear in the clip's .markers.json and as chapters in QuickTime Player, Final Cut, Resolve and VLC. They are drawn in a different colour from your own markers when you trim.";
 /* AutoOpenSettingsSection.swift */
+"Auto-open" = "Auto-open";
 "Open GogglesView when goggles are plugged in" = "Open GogglesView when goggles are plugged in";
-"Open Login Items Settings…" = "Open Login Items Settings…";
 "macOS may ask you to approve this in System Settings > Login Items & Extensions." = "macOS may ask you to approve this in System Settings > Login Items & Extensions.";
+"Open Login Items Settings…" = "Open Login Items Settings…";
 /* Automation.swift */
 "Start recording" = "Start recording";
 "Stop recording" = "Stop recording";
@@ -71,9 +90,12 @@
 "URL command: %@" = "URL command: %@";
 /* AutomationSettingsSection.swift */
 "Automation" = "Automation";
+"Lets Shortcuts, Stream Deck, Raycast, `open` and AppleScript start/stop recording, save the replay, take a screenshot, freeze, add a marker, start/stop the UDP stream and show the window. URLs can only trigger these actions -- never files, shell commands or hosts.\n\nAdd ?device=<serial> to target specific goggles. See docs/automation.md." = "Lets Shortcuts, Stream Deck, Raycast, `open` and AppleScript start/stop recording, save the replay, take a screenshot, freeze, add a marker, start/stop the UDP stream and show the window. URLs can only trigger these actions -- never files, shell commands or hosts.\n\nAdd ?device=<serial> to target specific goggles. See docs/automation.md.";
 "Allow automation (URL scheme and AppleScript)" = "Allow automation (URL scheme and AppleScript)";
 "Allow gogglesview:// URL commands" = "Allow gogglesview:// URL commands";
+"Off by default: any web page or app can open a gogglesview:// link." = "Off by default: any web page or app can open a gogglesview:// link.";
 "Off by default: any web page or app can open a gogglesview:// link, so URL commands only run when you turn this on. Each one shows a short on-screen notice and at most 3 run per second. AppleScript is not affected." = "Off by default: any web page or app can open a gogglesview:// link, so URL commands only run when you turn this on. Each one shows a short on-screen notice and at most 3 run per second. AppleScript is not affected.";
+"Example URL" = "Example URL";
 "Example automation URL" = "Example automation URL";
 "Copied" = "Copied";
 "Copy example" = "Copy example";
@@ -91,6 +113,8 @@
 "Bottom right" = "Bottom right";
 /* BurnInSettingsSection.swift */
 "Burn-in recording" = "Burn-in recording";
+"Logo" = "Logo";
+"Decodes and re-encodes the stream (⇧⌘B) to a separate “-burned” file in the recordings folder. Uses noticeably more CPU/GPU than normal recording; both can run at once." = "Decodes and re-encodes the stream (⇧⌘B) to a separate “-burned” file in the recordings folder. Uses noticeably more CPU/GPU than normal recording; both can run at once.";
 "Choose logo…" = "Choose logo…";
 "Remove" = "Remove";
 "Corner" = "Corner";
@@ -102,7 +126,6 @@
 "Codec" = "Codec";
 "Format" = "Format";
 "Bitrate" = "Bitrate";
-"Decodes and re-encodes the stream (⇧⌘B) to a separate “-burned” file in the recordings folder. Uses noticeably more CPU/GPU than normal recording; both can run at once." = "Decodes and re-encodes the stream (⇧⌘B) to a separate “-burned” file in the recordings folder. Uses noticeably more CPU/GPU than normal recording; both can run at once.";
 "No logo" = "No logo";
 "Logo preview, no logo selected" = "Logo preview, no logo selected";
 "Logo preview" = "Logo preview";
@@ -180,6 +203,7 @@
 "Clip Gallery" = "Clip Gallery";
 "Clip gallery (⇧⌘G)" = "Clip gallery (⇧⌘G)";
 "Clip gallery" = "Clip gallery";
+"Gallery" = "Gallery";
 "Open clip gallery" = "Open clip gallery";
 /* ClipIndex.swift */
 "Newest first" = "Newest first";
@@ -273,6 +297,7 @@
 "Copies technical details to the clipboard so you can send them to support" = "Copies technical details to the clipboard so you can send them to support";
 "Open setup assistant" = "Open setup assistant";
 "Opens a guided checklist that finds the problem" = "Opens a guided checklist that finds the problem";
+"Diagnostics" = "Diagnostics";
 "Save to file…" = "Save to file…";
 /* EventHooksSettingsSection.swift */
 "Event hooks" = "Event hooks";
@@ -280,11 +305,13 @@
 "No program" = "No program";
 "Choose…" = "Choose…";
 "Clear" = "Clear";
+"Test" = "Test";
 "Webhook URL (https://…)" = "Webhook URL (https://…)";
 "Must be an http(s) URL" = "Must be an http(s) URL";
-"Test" = "Test";
+"batteryLow threshold" = "batteryLow threshold";
 "batteryLow threshold: %lld%%" = "batteryLow threshold: %lld%%";
 "Recent runs" = "Recent runs";
+"Log" = "Log";
 "No runs yet" = "No runs yet";
 "exit %lld" = "exit %lld";
 "failed" = "failed";
@@ -292,10 +319,10 @@
 /* EventStatus.swift */
 "Battery %lld%%" = "Battery %lld%%";
 "Picture not changing" = "Picture not changing";
-"Black picture" = "Black picture";
 /* ExposureAssist.swift */
 "Exposure and focus aids" = "Exposure and focus aids";
 "Zebra stripes" = "Zebra stripes";
+"Stripes mark areas that are close to white, so you can see where highlights clip. Peaking colours sharp edges. Both only appear in the preview; recordings and streams are not changed. Race mode turns them off." = "Stripes mark areas that are close to white, so you can see where highlights clip. Peaking colours sharp edges. Both only appear in the preview; recordings and streams are not changed. Race mode turns them off.";
 "Stripes from" = "Stripes from";
 "Focus peaking" = "Focus peaking";
 "Sensitivity" = "Sensitivity";
@@ -307,7 +334,6 @@
 "Green" = "Green";
 "Yellow" = "Yellow";
 "White" = "White";
-"Stripes mark areas that are close to white, so you can see where highlights clip. Peaking colours sharp edges. Both only appear in the preview; recordings and streams are not changed. Race mode turns them off." = "Stripes mark areas that are close to white, so you can see where highlights clip. Peaking colours sharp edges. Both only appear in the preview; recordings and streams are not changed. Race mode turns them off.";
 /* GlobalHotkeys.swift */
 "Start/stop recording" = "Start/stop recording";
 "Save instant replay" = "Save instant replay";
@@ -316,6 +342,7 @@
 "Work while another app is focused" = "Work while another app is focused";
 "Press keys… (esc cancels)" = "Press keys… (esc cancels)";
 "%@ is already used by \"%@\"" = "%@ is already used by \"%@\"";
+"Defaults" = "Defaults";
 "Reset to defaults" = "Reset to defaults";
 /* GogglesConnectionView.swift */
 "No frame yet" = "No frame yet";
@@ -350,6 +377,7 @@
 "Save current settings to this goggles" = "Save current settings to this goggles";
 "Saved." = "Saved.";
 "Auto-apply on connect" = "Auto-apply on connect";
+"Device" = "Device";
 "Connect goggles to name them and save settings per device." = "Connect goggles to name them and save settings per device.";
 /* GogglesSession.swift */
 "Goggles" = "Goggles";
@@ -393,6 +421,7 @@
 "Disconnect" = "Disconnect";
 "Setup assistant…" = "Setup assistant…";
 "Race Mode" = "Race Mode";
+"Away mode (remote alerts)" = "Away mode (remote alerts)";
 "Settings…" = "Settings…";
 "Quit GogglesView" = "Quit GogglesView";
 "%@ (recording)" = "%@ (recording)";
@@ -427,11 +456,18 @@
 "Network stream" = "Network stream";
 "Streaming, %.1f megabits per second" = "Streaming, %.1f megabits per second";
 "Network Streaming" = "Network Streaming";
+"Host" = "Host";
+"Change applies on next start. Source resolution and bitrate are passed through unchanged." = "Change applies on next start. Source resolution and bitrate are passed through unchanged.";
 "Host (unicast or multicast)" = "Host (unicast or multicast)";
 "Port" = "Port";
 "Start automatically" = "Start automatically";
+"Receiver" = "Receiver";
 /* NetworkStreamer.swift */
 "Invalid port" = "Invalid port";
+/* NtfySender.swift */
+"Test alert from GogglesView" = "Test alert from GogglesView";
+"Test (urgent)" = "Test (urgent)";
+"Urgent test alert from GogglesView" = "Urgent test alert from GogglesView";
 /* OBSClient.swift */
 "Couldn't reach OBS. Is OBS running with WebSocket enabled (Tools > WebSocket Server Settings)?" = "Couldn't reach OBS. Is OBS running with WebSocket enabled (Tools > WebSocket Server Settings)?";
 "Wrong WebSocket password" = "Wrong WebSocket password";
@@ -454,30 +490,35 @@
 "Connect to OBS over its WebSocket server to start recording and switch scenes when your goggles go live. Off by default. GogglesView only talks to the host you enter here." = "Connect to OBS over its WebSocket server to start recording and switch scenes when your goggles go live. Off by default. GogglesView only talks to the host you enter here.";
 "Connect to OBS" = "Connect to OBS";
 "Connect to OBS Studio" = "Connect to OBS Studio";
-"Host" = "Host";
 "OBS host" = "OBS host";
 "OBS WebSocket port" = "OBS WebSocket port";
 "Password" = "Password";
+"Stored in the macOS Keychain." = "Stored in the macOS Keychain.";
 "Leave empty if OBS has none" = "Leave empty if OBS has none";
 "OBS WebSocket password" = "OBS WebSocket password";
+"Connection" = "Connection";
 "Testing..." = "Testing...";
 "Test connection" = "Test connection";
 "Test OBS connection" = "Test OBS connection";
+"Rules while connected" = "Rules while connected";
+"Only affects a recording GogglesView started in OBS. If a start or stop fails, you see one message here and nothing is retried." = "Only affects a recording GogglesView started in OBS. If a start or stop fails, you see one message here and nothing is retried.";
 "Record in OBS while I'm live" = "Record in OBS while I'm live";
+"Stop after signal loss" = "Stop after signal loss";
 "Stop OBS recording after signal loss" = "Stop OBS recording after signal loss";
 "seconds" = "seconds";
 "Switch OBS scenes" = "Switch OBS scenes";
 "Scene when live" = "Scene when live";
 "Scene when lost" = "Scene when lost";
 "Stop the OBS recording when I stop mine" = "Stop the OBS recording when I stop mine";
-"Only affects a recording GogglesView started in OBS. If a start or stop fails, you see one message here and nothing is retried." = "Only affects a recording GogglesView started in OBS. If a start or stop fails, you see one message here and nothing is retried.";
 "Several goggles" = "Several goggles";
+"Creates one Media Source per open goggles, named after the feed (rename feeds under Program output). Press the SRT or UDP button in each window to start sending. Existing sources are updated, never deleted." = "Creates one Media Source per open goggles, named after the feed (rename feeds under Program output). Press the SRT or UDP button in each window to start sending. Existing sources are updated, never deleted.";
 "Separate port for each goggles window" = "Separate port for each goggles window";
+"Window 1 uses the port in Settings, window 2 the next one, and so on." = "Window 1 uses the port in Settings, window 2 the next one, and so on.";
 "Window 1 uses the port in Settings, window 2 the next one, and so on (NDI adds a number to the name). Needed to send several goggles at once." = "Window 1 uses the port in Settings, window 2 the next one, and so on (NDI adds a number to the name). Needed to send several goggles at once.";
 "Scene" = "Scene";
 "Using" = "Using";
+"Feeds" = "Feeds";
 "Add all feeds to OBS" = "Add all feeds to OBS";
-"Creates one Media Source per open goggles, named after the feed (rename feeds under Program output). Press the SRT or UDP button in each window to start sending. Existing sources are updated, never deleted." = "Creates one Media Source per open goggles, named after the feed (rename feeds under Program output). Press the SRT or UDP button in each window to start sending. Existing sources are updated, never deleted.";
 "Leave unchanged" = "Leave unchanged";
 /* OSDOverlay.swift */
 "%lld dropped" = "%lld dropped";
@@ -511,22 +552,23 @@
 /* OutputLook.swift */
 "Color look (LUT)" = "Color look (LUT)";
 "Look" = "Look";
+"Load a .cube colour look to correct flat or hazy goggles footage. 'Apply to recordings and streams' re-encodes the video, which uses more CPU." = "Load a .cube colour look to correct flat or hazy goggles footage. 'Apply to recordings and streams' re-encodes the video, which uses more CPU.";
 "None" = "None";
+"Import" = "Import";
 "Import .cube…" = "Import .cube…";
 "Intensity" = "Intensity";
 "Apply to the preview" = "Apply to the preview";
 "Apply to recordings and streams" = "Apply to recordings and streams";
-"Load a .cube colour look to correct flat or hazy goggles footage. 'Apply to recordings and streams' re-encodes the video, which uses more CPU." = "Load a .cube colour look to correct flat or hazy goggles footage. 'Apply to recordings and streams' re-encodes the video, which uses more CPU.";
 "Reading look…" = "Reading look…";
 "Couldn't read that file as a 3D .cube LUT (max 64 MB, size 2 to 129)." = "Couldn't read that file as a 3D .cube LUT (max 64 MB, size 2 to 129).";
 "Output framing" = "Output framing";
 "Use a separate crop for recordings, replay and streams" = "Use a separate crop for recordings, replay and streams";
+"Crop recordings and streams separately from the preview, for example 9:16 for shorts. Change the aspect while stopped; it takes effect on the next recording or stream. Zoom and position can change live." = "Crop recordings and streams separately from the preview, for example 9:16 for shorts. Change the aspect while stopped; it takes effect on the next recording or stream. Zoom and position can change live.";
 "Aspect" = "Aspect";
 "Full" = "Full";
 "Zoom" = "Zoom";
 "Horizontal" = "Horizontal";
 "Vertical" = "Vertical";
-"Crop recordings and streams separately from the preview, for example 9:16 for shorts. Change the aspect while stopped; it takes effect on the next recording or stream. Zoom and position can change live." = "Crop recordings and streams separately from the preview, for example 9:16 for shorts. Change the aspect while stopped; it takes effect on the next recording or stream. Zoom and position can change live.";
 /* OutputStreamViews.swift */
 "SRT stream" = "SRT stream";
 "libsrt not found (brew install srt, or set the path in Settings > Streaming)" = "libsrt not found (brew install srt, or set the path in Settings > Streaming)";
@@ -534,26 +576,32 @@
 "SRT waiting for peer" = "SRT waiting for peer";
 "Start SRT stream" = "Start SRT stream";
 "SRT Output" = "SRT Output";
+"Library" = "Library";
+"Works with OBS, VLC and ffplay. Latency should be 3-4x the network RTT. Changes apply on next start." = "Works with OBS, VLC and ffplay. Latency should be 3-4x the network RTT. Changes apply on next start.";
 "libsrt not found. Install with `brew install srt` or choose the library below. It is loaded at runtime only, never bundled." = "libsrt not found. Install with `brew install srt` or choose the library below. It is loaded at runtime only, never bundled.";
 "libsrt path (optional)" = "libsrt path (optional)";
 "Mode" = "Mode";
 "Caller (connect to receiver)" = "Caller (connect to receiver)";
 "Listener (wait for receiver)" = "Listener (wait for receiver)";
 "Receiver host" = "Receiver host";
+"Latency" = "Latency";
 "Latency (ms, 20-8000)" = "Latency (ms, 20-8000)";
-"Passphrase (10-79 chars, optional)" = "Passphrase (10-79 chars, optional)";
+"Passphrase" = "Passphrase";
+"Optional, 10-79 characters." = "Optional, 10-79 characters.";
 "Passphrase must be 10-79 characters." = "Passphrase must be 10-79 characters.";
-"Works with OBS, VLC and ffplay. Latency should be 3-4x the network RTT. Changes apply on next start." = "Works with OBS, VLC and ffplay. Latency should be 3-4x the network RTT. Changes apply on next start.";
+"Passphrase (10-79 chars, optional)" = "Passphrase (10-79 chars, optional)";
+"Optional" = "Optional";
 "NDI output" = "NDI output";
 "NDI runtime not found (install NDI Tools or the NDI SDK)" = "NDI runtime not found (install NDI Tools or the NDI SDK)";
 "Sending NDI source %@" = "Sending NDI source %@";
 "Start NDI output (experimental)" = "Start NDI output (experimental)";
 "NDI Output (experimental)" = "NDI Output (experimental)";
+"Runtime" = "Runtime";
+"Experimental: may not work with every NDI receiver." = "Experimental: may not work with every NDI receiver.";
 "NDI runtime not found. Install NDI Tools / the NDI SDK or choose libndi.dylib below. It is loaded at runtime only, never bundled." = "NDI runtime not found. Install NDI Tools / the NDI SDK or choose libndi.dylib below. It is loaded at runtime only, never bundled.";
 "libndi.dylib path (optional)" = "libndi.dylib path (optional)";
 "Source name" = "Source name";
 "I accept the unverified NDI ABI (may crash)" = "I accept the unverified NDI ABI (may crash)";
-"Experimental: may not work with every NDI receiver." = "Experimental: may not work with every NDI receiver.";
 /* OverlayHint.swift */
 "The goggles' overlay will be in your stream" = "The goggles' overlay will be in your stream";
 "The goggles draw their own on-screen display (flight data, battery, storage warnings) into the picture they send, so it appears in OBS, recordings and streams too.\n\nTo turn it off, open the goggles' Settings > Camera > Advanced camera settings > Camera View Recording and switch it off. Or crop it out here with Output framing. That crop only affects what you record and stream; the preview stays as it is." = "The goggles draw their own on-screen display (flight data, battery, storage warnings) into the picture they send, so it appears in OBS, recordings and streams too.\n\nTo turn it off, open the goggles' Settings > Camera > Advanced camera settings > Camera View Recording and switch it off. Or crop it out here with Output framing. That crop only affects what you record and stream; the preview stays as it is.";
@@ -581,15 +629,27 @@
 /* ProgramOutput.swift */
 "Feed %lld" = "Feed %lld";
 "NO SIGNAL" = "NO SIGNAL";
-"Program output (HDMI)" = "Program output (HDMI)";
+"Program output %lld" = "Program output %lld";
+"Program outputs" = "Program outputs";
+"A clean full screen picture on each chosen display, for a vision mixer, projector or TV: one output per HDMI connection. A grid shows every open goggles window and marks a feed with no signal; one feed shows just that picture. Names never include the goggles serial number. Zebra stripes and peaking are not drawn here." = "A clean full screen picture on each chosen display, for a vision mixer, projector or TV: one output per HDMI connection. A grid shows every open goggles window and marks a feed with no signal; one feed shows just that picture. Names never include the goggles serial number. Zebra stripes and peaking are not drawn here.";
 "Show the program outputs" = "Show the program outputs";
 "Open the program outputs when the app starts" = "Open the program outputs when the app starts";
-"Add output" = "Add output";
-"A clean full screen picture on each chosen display, for a vision mixer, projector or TV: one output per HDMI connection. A grid shows every open goggles window and marks a feed with no signal; one feed shows just that picture. Names never include the goggles serial number. Zebra stripes and peaking are not drawn here." = "A clean full screen picture on each chosen display, for a vision mixer, projector or TV: one output per HDMI connection. A grid shows every open goggles window and marks a feed with no signal; one feed shows just that picture. Names never include the goggles serial number. Zebra stripes and peaking are not drawn here.";
+"Clean output" = "Clean output";
+"Hides all names, warnings and the no-signal marker." = "Hides all names, warnings and the no-signal marker.";
+"Stabilize output" = "Stabilize output";
+"Also stabilizes the preview. Works in race mode." = "Also stabilizes the preview. Works in race mode.";
+"Emergency close" = "Emergency close";
+"Stuck behind a full-screen output? Press ⌃⌥⌘. in any app to close all program outputs." = "Stuck behind a full-screen output? Press ⌃⌥⌘. in any app to close all program outputs.";
+"Connected displays" = "Connected displays";
+"Add output (%lld of %lld)" = "Add output (%lld of %lld)";
+"Feed names" = "Feed names";
+"Main" = "Main";
+"External" = "External";
+"Output %lld" = "Output %lld";
+"free" = "free";
 "Display" = "Display";
 "Automatic (next external display)" = "Automatic (next external display)";
 "main display" = "main display";
-"This is your main display: the program output will cover your controls. Pick an external display unless you know what you are doing." = "This is your main display: the program output will cover your controls. Pick an external display unless you know what you are doing.";
 "Show" = "Show";
 "All feeds in a grid" = "All feeds in a grid";
 "One feed" = "One feed";
@@ -597,6 +657,9 @@
 "Feed" = "Feed";
 "Follow the active window" = "Follow the active window";
 "Remove output" = "Remove output";
+"No display connected" = "No display connected";
+"Showing on %@" = "Showing on %@";
+"Main display: it will cover your controls" = "Main display: it will cover your controls";
 /* RTMPPublisher.swift */
 "Invalid RTMP URL (expected rtmp://host/app)" = "Invalid RTMP URL (expected rtmp://host/app)";
 "Stream key is empty" = "Stream key is empty";
@@ -611,10 +674,13 @@
 "Server URL" = "Server URL";
 "rtmp://live.twitch.tv/app" = "rtmp://live.twitch.tv/app";
 "Stream key" = "Stream key";
+"Stored in the macOS Keychain, never logged." = "Stored in the macOS Keychain, never logged.";
+"The stream key is stored in the macOS Keychain and is never logged. Changes apply on next start.\n\nTwitch and YouTube prefer 8 Mbps or less with a keyframe every 2 s. Goggles video is passed through unchanged, so the stream may be rejected or look worse. Not yet tested against a live service." = "The stream key is stored in the macOS Keychain and is never logged. Changes apply on next start.\n\nTwitch and YouTube prefer 8 Mbps or less with a keyframe every 2 s. Goggles video is passed through unchanged, so the stream may be rejected or look worse. Not yet tested against a live service.";
 /* RaceMode.swift */
 "RACE" = "RACE";
 "Race mode" = "Race mode";
 "Lowest-latency preview" = "Lowest-latency preview";
+"Bypasses stabilization, LUT, stats overlay and power-saving hints." = "Bypasses stabilization, LUT, stats overlay and power-saving hints.";
 "One switch for flying: bypasses stabilization, drops the preview LUT and colour adjustments, hides the stats overlay, grid and mini window, and runs the decoder without power-saving hints. Takes effect immediately, no reconnect. Recording and streaming keep working if you start them. Stabilized frames are not recorded or streamed while it is on. Orientation, crop and zoom stay as set." = "One switch for flying: bypasses stabilization, drops the preview LUT and colour adjustments, hides the stats overlay, grid and mini window, and runs the decoder without power-saving hints. Takes effect immediately, no reconnect. Recording and streaming keep working if you start them. Stabilized frames are not recorded or streamed while it is on. Orientation, crop and zoom stay as set.";
 /* Recorder.swift */
 "This stream can't be recorded in the chosen format. Try .mov in Settings > Recording." = "This stream can't be recorded in the chosen format. Try .mov in Settings > Recording.";
@@ -662,10 +728,44 @@
 /* ReencodeHub.swift */
 "Keyframes for replay and streams" = "Keyframes for replay and streams";
 "Re-encode with regular keyframes" = "Re-encode with regular keyframes";
+"The goggles send one keyframe when Share Liveview starts and none after, so instant replay, UDP, RTMP, SRT and the web viewer can't start cleanly later. This re-encodes the picture with a keyframe every second (hardware encoder, runs only while one of those is active). Turn it off to pass the goggles' stream through untouched; clips and late-joining viewers may then show grey until the next keyframe." = "The goggles send one keyframe when Share Liveview starts and none after, so instant replay, UDP, RTMP, SRT and the web viewer can't start cleanly later. This re-encodes the picture with a keyframe every second (hardware encoder, runs only while one of those is active). Turn it off to pass the goggles' stream through untouched; clips and late-joining viewers may then show grey until the next keyframe.";
 "Bitrate: %lld Mbps" = "Bitrate: %lld Mbps";
 "Re-encode at 30 fps (lighter, for several goggles)" = "Re-encode at 30 fps (lighter, for several goggles)";
 "Each goggles window with a recording or stream uses its own hardware encoder, and a Mac can only encode a limited number of frames per second in total (about 150 on an M1 Pro). At 30 fps, recordings and streams are half as smooth, but twice as many goggles fit. The live view stays at full frame rate." = "Each goggles window with a recording or stream uses its own hardware encoder, and a Mac can only encode a limited number of frames per second in total (about 150 on an M1 Pro). At 30 fps, recordings and streams are half as smooth, but twice as many goggles fit. The live view stays at full frame rate.";
-"The goggles send one keyframe when Share Liveview starts and none after, so instant replay, UDP, RTMP, SRT and the web viewer can't start cleanly later. This re-encodes the picture with a keyframe every second (hardware encoder, runs only while one of those is active). Turn it off to pass the goggles' stream through untouched; clips and late-joining viewers may then show grey until the next keyframe." = "The goggles send one keyframe when Share Liveview starts and none after, so instant replay, UDP, RTMP, SRT and the web viewer can't start cleanly later. This re-encodes the picture with a keyframe every second (hardware encoder, runs only while one of those is active). Turn it off to pass the goggles' stream through untouched; clips and late-joining viewers may then show grey until the next keyframe.";
+/* RemoteAlertsSettingsSection.swift */
+"Remote alerts (ntfy)" = "Remote alerts (ntfy)";
+"Nothing is sent until Away mode is on. Each problem is sent once, then again every few minutes until it clears, followed by a recovery message. Messages use the crew feed names, never a serial number. The token is kept in the macOS Keychain. The heartbeat pings the URL every 30 s while Away mode is on, so an external monitor can alert you if this Mac goes silent." = "Nothing is sent until Away mode is on. Each problem is sent once, then again every few minutes until it clears, followed by a recovery message. Messages use the crew feed names, never a serial number. The token is kept in the macOS Keychain. The heartbeat pings the URL every 30 s while Away mode is on, so an external monitor can alert you if this Mac goes silent.";
+"Setup" = "Setup";
+"Fill in the server and topic below to switch this on." = "Fill in the server and topic below to switch this on.";
+"Away mode: send alerts to my phone" = "Away mode: send alerts to my phone";
+"Away mode" = "Away mode";
+"Server" = "Server";
+"ntfy server" = "ntfy server";
+"Topic" = "Topic";
+"ntfy topic" = "ntfy topic";
+"Access token (optional)" = "Access token (optional)";
+"ntfy access token" = "ntfy access token";
+"The server must start with http:// or https://. The topic may use letters, digits, - and _." = "The server must start with http:// or https://. The topic may use letters, digits, - and _.";
+"Send test" = "Send test";
+"Send test alerts" = "Send test alerts";
+"Last send: ok at %@" = "Last send: ok at %@";
+"Last send: failed at %@" = "Last send: failed at %@";
+"Not sent yet" = "Not sent yet";
+"Repeat" = "Repeat";
+"Do not repeat while still failing" = "Do not repeat while still failing";
+"Repeat every %lld min while still failing (up to 10 times)" = "Repeat every %lld min while still failing (up to 10 times)";
+"Repeat interval in minutes" = "Repeat interval in minutes";
+"Heartbeat URL (optional)" = "Heartbeat URL (optional)";
+"Heartbeat URL" = "Heartbeat URL";
+"Heartbeat: ok at %@" = "Heartbeat: ok at %@";
+"Heartbeat: failed at %@" = "Heartbeat: failed at %@";
+"after %lld s" = "after %lld s";
+"%@: delay in seconds" = "%@: delay in seconds";
+"Priority" = "Priority";
+"Min" = "Min";
+"Default" = "Default";
+"Urgent" = "Urgent";
+"%@: priority" = "%@: priority";
 /* ReplayBuffer.swift */
 "Instant replay needs the keyframe encoder. Turn it on in Settings > Streaming." = "Instant replay needs the keyframe encoder. Turn it on in Settings > Streaming.";
 "Instant replay is off. Turn it on in Settings > Recording." = "Instant replay is off. Turn it on in Settings > Recording.";
@@ -681,6 +781,7 @@
 "The buffer lives in memory and uses up to %lld MB while replay is on." = "The buffer lives in memory and uses up to %lld MB while replay is on.";
 "Instant replay" = "Instant replay";
 "Keep a replay buffer (⇧⌘P saves it)" = "Keep a replay buffer (⇧⌘P saves it)";
+"Window" = "Window";
 "Window: %lld s" = "Window: %lld s";
 /* SRTOutput.swift */
 "Start the receiver first as listener: srt://:%lld?mode=listener%@" = "Start the receiver first as listener: srt://:%lld?mode=listener%@";
@@ -698,20 +799,28 @@
 "Ignored %lld unknown." = "Ignored %lld unknown.";
 "Some settings apply after you reopen the goggles windows." = "Some settings apply after you reopen the goggles windows.";
 "Back up settings" = "Back up settings";
+"Settings file" = "Settings file";
+"Saves your preferences to a file you can restore later or copy to another Mac. Stream keys, passwords, folders and goggles details are never included." = "Saves your preferences to a file you can restore later or copy to another Mac. Stream keys, passwords, folders and goggles details are never included.";
 "Export…" = "Export…";
 "Export settings to a file" = "Export settings to a file";
 "Import…" = "Import…";
 "Import settings from a file" = "Import settings from a file";
-"Saves your preferences to a file you can restore later or copy to another Mac. Stream keys, passwords, folders and goggles details are never included." = "Saves your preferences to a file you can restore later or copy to another Mac. Stream keys, passwords, folders and goggles details are never included.";
 "Saved settings to %@." = "Saved settings to %@.";
 "Could not save the file: %@" = "Could not save the file: %@";
 "Nothing to change." = "Nothing to change.";
 "Import 1 setting?" = "Import 1 setting?";
 "Import %lld settings?" = "Import %lld settings?";
-"Import" = "Import";
 "Could not read the file: %@" = "Could not read the file: %@";
+/* SettingsComponents.swift */
+"More information" = "More information";
+"Valid" = "Valid";
+"Invalid" = "Invalid";
 /* SettingsView.swift */
 "General" = "General";
+"Picture" = "Picture";
+"Outputs" = "Outputs";
+"HDMI" = "HDMI";
+"Integrations" = "Integrations";
 "Advanced" = "Advanced";
 "Startup" = "Startup";
 "Launch GogglesView at login" = "Launch GogglesView at login";
@@ -725,14 +834,17 @@
 "Latency (stream in to decoded picture)" = "Latency (stream in to decoded picture)";
 "Dropped frames" = "Dropped frames";
 "Goggles battery" = "Goggles battery";
+"Folder" = "Folder";
+"Records the goggles' stream as-is (no re-encoding), so quality is whatever the goggles send." = "Records the goggles' stream as-is (no re-encoding), so quality is whatever the goggles send.";
 "File name prefix" = "File name prefix";
 "GogglesView" = "GogglesView";
 "Start recording automatically when live" = "Start recording automatically when live";
-"Records the goggles' stream as-is (no re-encoding), so quality is whatever the goggles send." = "Records the goggles' stream as-is (no re-encoding), so quality is whatever the goggles send.";
+"Windows" = "Windows";
 "Show capture window (for OBS Window Capture)" = "Show capture window (for OBS Window Capture)";
 "Keep on top" = "Keep on top";
 "Developer tools" = "Developer tools";
 "Troubleshooting" = "Troubleshooting";
+"Health" = "Health";
 "No device selected yet." = "No device selected yet.";
 /* SettingsViewModel.swift */
 "Waiting for your approval. Opening Login Items & Extensions…" = "Waiting for your approval. Opening Login Items & Extensions…";
@@ -790,17 +902,22 @@
 "%@ stopped sending video." = "%@ stopped sending video.";
 "%@ is sending video again." = "%@ is sending video again.";
 "Signal-lost alert" = "Signal-lost alert";
+"Notifications need permission in System Settings > Notifications. The sound follows the system volume and stops when you bring GogglesView forward. Nothing is shown when you close the window or quit." = "Notifications need permission in System Settings > Notifications. The sound follows the system volume and stops when you bring GogglesView forward. Nothing is shown when you close the window or quit.";
 "Alert when the video signal is lost" = "Alert when the video signal is lost";
+"After" = "After";
 "After %lld s without video" = "After %lld s without video";
 "Repeat a sound until the signal returns" = "Repeat a sound until the signal returns";
 "Sound" = "Sound";
-"Notifications need permission in System Settings > Notifications. The sound follows the system volume and stops when you bring GogglesView forward. Nothing is shown when you close the window or quit." = "Notifications need permission in System Settings > Notifications. The sound follows the system volume and stops when you bring GogglesView forward. Nothing is shown when you close the window or quit.";
 /* Stabilizer.swift */
 "Live stabilization" = "Live stabilization";
 "Stabilize the live picture" = "Stabilize the live picture";
-"Strength" = "Strength";
-"Stabilization is paused because this Mac can't keep up with the frame rate. It tries again every few seconds." = "Stabilization is paused because this Mac can't keep up with the frame rate. It tries again every few seconds.";
 "Smooths shaky footage. Zooms in slightly (4 to 10%) to hide the edges and adds a tiny delay (a few ms). Applies to the preview, recordings and streams." = "Smooths shaky footage. Zooms in slightly (4 to 10%) to hide the edges and adds a tiny delay (a few ms). Applies to the preview, recordings and streams.";
+"Strength" = "Strength";
+"Stabilization mode" = "Stabilization mode";
+"Translation only" = "Translation only";
+"Translation and roll (homography)" = "Translation and roll (homography)";
+"Translation and roll (tiles)" = "Translation and roll (tiles)";
+"Stabilization is paused because this Mac can't keep up with the frame rate. It tries again every few seconds." = "Stabilization is paused because this Mac can't keep up with the frame rate. It tries again every few seconds.";
 /* TrimView.swift */
 "Export not available for this file" = "Export not available for this file";
 "Export failed" = "Export failed";
@@ -851,9 +968,9 @@
 "Picture enhancement" = "Picture enhancement";
 "Upscaling needs a Mac with Apple silicon." = "Upscaling needs a Mac with Apple silicon.";
 "Reduce noise (low light, high ISO)" = "Reduce noise (low light, high ISO)";
+"Reducing noise blends each picture with the ones before it, so a moving subject can leave a faint trail at high strength. Upscaling makes the picture larger and sharper with Apple's MetalFX scaler. The goggles still send 1080p, so it helps most for recordings and large displays; it does not add detail that was never captured. Both run on the GPU, add no frames of delay, switch themselves off when the Mac cannot keep up, and are off in race mode. They apply to the preview, recordings and streams." = "Reducing noise blends each picture with the ones before it, so a moving subject can leave a faint trail at high strength. Upscaling makes the picture larger and sharper with Apple's MetalFX scaler. The goggles still send 1080p, so it helps most for recordings and large displays; it does not add detail that was never captured. Both run on the GPU, add no frames of delay, switch themselves off when the Mac cannot keep up, and are off in race mode. They apply to the preview, recordings and streams.";
 "Upscale the picture" = "Upscale the picture";
 "Scale" = "Scale";
-"Reducing noise blends each picture with the ones before it, so a moving subject can leave a faint trail at high strength. Upscaling makes the picture larger and sharper with Apple's MetalFX scaler. The goggles still send 1080p, so it helps most for recordings and large displays; it does not add detail that was never captured. Both run on the GPU, add no frames of delay, switch themselves off when the Mac cannot keep up, and are off in race mode. They apply to the preview, recordings and streams." = "Reducing noise blends each picture with the ones before it, so a moving subject can leave a faint trail at high strength. Upscaling makes the picture larger and sharper with Apple's MetalFX scaler. The goggles still send 1080p, so it helps most for recordings and large displays; it does not add detail that was never captured. Both run on the GPU, add no frames of delay, switch themselves off when the Mac cannot keep up, and are off in race mode. They apply to the preview, recordings and streams.";
 /* ViewFraming.swift */
 "Fit" = "Fit";
 "Fill" = "Fill";
@@ -865,19 +982,19 @@
 "Freeze video" = "Freeze video";
 "Recording and streaming continue while frozen" = "Recording and streaming continue while frozen";
 "Framing and color" = "Framing and color";
+"Scroll or pinch to zoom, drag to pan, double-click to reset. Affects the main and capture windows only; recordings and streams use Output framing below." = "Scroll or pinch to zoom, drag to pan, double-click to reset. Affects the main and capture windows only; recordings and streams use Output framing below.";
 "Grid" = "Grid";
 "Brightness" = "Brightness";
 "Contrast" = "Contrast";
 "Saturation" = "Saturation";
 "Reset" = "Reset";
-"Scroll or pinch to zoom, drag to pan, double-click to reset. Affects the main and capture windows only; recordings and streams use Output framing below." = "Scroll or pinch to zoom, drag to pan, double-click to reset. Affects the main and capture windows only; recordings and streams use Output framing below.";
 /* ViewOrientation.swift */
 "Orientation and full screen" = "Orientation and full screen";
 "Rotate" = "Rotate";
+"Orientation applies to the main and capture windows, not to recordings or screenshots." = "Orientation applies to the main and capture windows, not to recordings or screenshots.";
 "Flip horizontally" = "Flip horizontally";
 "Flip vertically" = "Flip vertically";
 "Hide cursor when idle in full screen" = "Hide cursor when idle in full screen";
-"Orientation applies to the main and capture windows, not to recordings or screenshots." = "Orientation applies to the main and capture windows, not to recordings or screenshots.";
 /* WaitingForKeyframeCard.swift */
 "Waiting… %d:%02d" = "Waiting… %d:%02d";
 /* WebViewerServer.swift */
@@ -890,17 +1007,20 @@
 "Copy URL" = "Copy URL";
 "Copy %@ URL" = "Copy %@ URL";
 "Web Viewer" = "Web Viewer";
+"Off by default. Anyone on your network can watch while it is on. There is no encryption (plain HTTP) and the token is sent in the URL, so keep it off on untrusted networks. It only listens on this Mac unless 'Allow other devices' is on.\n\nSafari on iPad, iPhone and Mac plays the page directly. Other browsers: open the URL's live.m3u8 in VLC. Latency comes from 1 s segments and Safari's start-up buffer; expect a few seconds behind live, not real time (not yet measured on hardware). The page shows its own estimate." = "Off by default. Anyone on your network can watch while it is on. There is no encryption (plain HTTP) and the token is sent in the URL, so keep it off on untrusted networks. It only listens on this Mac unless 'Allow other devices' is on.\n\nSafari on iPad, iPhone and Mac plays the page directly. Other browsers: open the URL's live.m3u8 in VLC. Latency comes from 1 s segments and Safari's start-up buffer; expect a few seconds behind live, not real time (not yet measured on hardware). The page shows its own estimate.";
 "Enable local web viewer" = "Enable local web viewer";
 "Allow other devices on the network" = "Allow other devices on the network";
-"Access token" = "Access token";
-"Generate" = "Generate";
 "A token is required while other devices are allowed." = "A token is required while other devices are allowed.";
 "With the token empty only this Mac can connect, and only through localhost." = "With the token empty only this Mac can connect, and only through localhost.";
+"Access token" = "Access token";
+"Generate" = "Generate";
 "This Mac (.local)" = "This Mac (.local)";
 "This Mac" = "This Mac";
 "IP address" = "IP address";
-"QR code of the viewer address" = "QR code of the viewer address";
+"QR code" = "QR code";
+"Scan with the iPad or phone camera to open the viewer. The QR code contains the access token, so do not share a screenshot of it." = "Scan with the iPad or phone camera to open the viewer. The QR code contains the access token, so do not share a screenshot of it.";
 "Scan with the iPad or phone camera to open the viewer. Safari there can use Share > Add to Home Screen for a full-screen app. The device must be on the same network. The QR code contains the access token, so do not share a screenshot of it." = "Scan with the iPad or phone camera to open the viewer. Safari there can use Share > Add to Home Screen for a full-screen app. The device must be on the same network. The QR code contains the access token, so do not share a screenshot of it.";
+"QR code of the viewer address" = "QR code of the viewer address";
 "No local network address found. Connect this Mac to Wi-Fi or Ethernet." = "No local network address found. Connect this Mac to Wi-Fi or Ethernet.";
 "To watch on an iPad or phone, turn on 'Allow other devices on the network'. A QR code appears here." = "To watch on an iPad or phone, turn on 'Allow other devices on the network'. A QR code appears here.";
 /* main.swift */
@@ -911,118 +1031,6 @@
 "Focus Peaking" = "Focus Peaking";
 "Operator Overview…" = "Operator Overview…";
 "Connection Health…" = "Connection Health…";
-"Window" = "Window";
 "Minimize" = "Minimize";
 "Bring All to Front" = "Bring All to Front";
 "Help" = "Help";
-
-"Clean output: hide all names, warnings and the no-signal marker" = "Clean output: hide all names, warnings and the no-signal marker";
-"Stabilize the program output (also stabilizes the preview, works in race mode)" = "Stabilize the program output (also stabilizes the preview, works in race mode)";
-
-/* Settings redesign */
-"After" = "After";
-"Auto-open" = "Auto-open";
-"Bypasses stabilization, LUT, stats overlay and power-saving hints." = "Bypasses stabilization, LUT, stats overlay and power-saving hints.";
-"Change applies on next start. Source resolution and bitrate are passed through unchanged." = "Change applies on next start. Source resolution and bitrate are passed through unchanged.";
-"Connection" = "Connection";
-"Defaults" = "Defaults";
-"Device" = "Device";
-"Diagnostics" = "Diagnostics";
-"Example URL" = "Example URL";
-"Feeds" = "Feeds";
-"Folder" = "Folder";
-"Gallery" = "Gallery";
-"Health" = "Health";
-"Integrations" = "Integrations";
-"Invalid" = "Invalid";
-"Latency" = "Latency";
-"Lets Shortcuts, Stream Deck, Raycast, `open` and AppleScript start/stop recording, save the replay, take a screenshot, freeze, add a marker, start/stop the UDP stream and show the window. URLs can only trigger these actions -- never files, shell commands or hosts.\n\nAdd ?device=<serial> to target specific goggles. See docs/automation.md." = "Lets Shortcuts, Stream Deck, Raycast, `open` and AppleScript start/stop recording, save the replay, take a screenshot, freeze, add a marker, start/stop the UDP stream and show the window. URLs can only trigger these actions -- never files, shell commands or hosts.\n\nAdd ?device=<serial> to target specific goggles. See docs/automation.md.";
-"Library" = "Library";
-"Log" = "Log";
-"Logo" = "Logo";
-"More information" = "More information";
-"Off by default. Anyone on your network can watch while it is on. There is no encryption (plain HTTP) and the token is sent in the URL, so keep it off on untrusted networks. It only listens on this Mac unless 'Allow other devices' is on.\n\nSafari on iPad, iPhone and Mac plays the page directly. Other browsers: open the URL's live.m3u8 in VLC. Latency comes from 1 s segments and Safari's start-up buffer; expect a few seconds behind live, not real time (not yet measured on hardware). The page shows its own estimate." = "Off by default. Anyone on your network can watch while it is on. There is no encryption (plain HTTP) and the token is sent in the URL, so keep it off on untrusted networks. It only listens on this Mac unless 'Allow other devices' is on.\n\nSafari on iPad, iPhone and Mac plays the page directly. Other browsers: open the URL's live.m3u8 in VLC. Latency comes from 1 s segments and Safari's start-up buffer; expect a few seconds behind live, not real time (not yet measured on hardware). The page shows its own estimate.";
-"Off by default: any web page or app can open a gogglesview:// link." = "Off by default: any web page or app can open a gogglesview:// link.";
-"Optional, 10-79 characters." = "Optional, 10-79 characters.";
-"Output" = "Output";
-"Outputs" = "Outputs";
-"Passphrase" = "Passphrase";
-"Picture" = "Picture";
-"QR code" = "QR code";
-"Receiver" = "Receiver";
-"Rules while connected" = "Rules while connected";
-"Runtime" = "Runtime";
-"Scan with the iPad or phone camera to open the viewer. The QR code contains the access token, so do not share a screenshot of it." = "Scan with the iPad or phone camera to open the viewer. The QR code contains the access token, so do not share a screenshot of it.";
-"Settings file" = "Settings file";
-"Stop after signal loss" = "Stop after signal loss";
-"Stored in the macOS Keychain, never logged." = "Stored in the macOS Keychain, never logged.";
-"Stored in the macOS Keychain." = "Stored in the macOS Keychain.";
-"The stream key is stored in the macOS Keychain and is never logged. Changes apply on next start.\n\nTwitch and YouTube prefer 8 Mbps or less with a keyframe every 2 s. Goggles video is passed through unchanged, so the stream may be rejected or look worse. Not yet tested against a live service." = "The stream key is stored in the macOS Keychain and is never logged. Changes apply on next start.\n\nTwitch and YouTube prefer 8 Mbps or less with a keyframe every 2 s. Goggles video is passed through unchanged, so the stream may be rejected or look worse. Not yet tested against a live service.";
-"Valid" = "Valid";
-"Warning" = "Warning";
-"Window 1 uses the port in Settings, window 2 the next one, and so on." = "Window 1 uses the port in Settings, window 2 the next one, and so on.";
-"Windows" = "Windows";
-"batteryLow threshold" = "batteryLow threshold";
-"Optional" = "Optional";
-"Setup" = "Setup";
-
-/* Remote alerts, stabilizer modes (merged from main) */
-"Picture frozen" = "Picture frozen";
-"Battery low" = "Battery low";
-"Battery critical" = "Battery critical";
-"Output failed" = "Output failed";
-"Output waiting for connection" = "Output waiting for connection";
-"Helper not responding" = "Helper not responding";
-"Signal back" = "Signal back";
-"Picture moving again" = "Picture moving again";
-"Picture no longer black" = "Picture no longer black";
-"Battery recovered" = "Battery recovered";
-"Output working again" = "Output working again";
-"Output connected" = "Output connected";
-"Helper responding again" = "Helper responding again";
-"still failing, reminder %lld" = "still failing, reminder %lld";
-"GogglesView: " = "GogglesView: ";
-"display" = "display";
-"Away mode (remote alerts)" = "Away mode (remote alerts)";
-"Test alert from GogglesView" = "Test alert from GogglesView";
-"Test (urgent)" = "Test (urgent)";
-"Urgent test alert from GogglesView" = "Urgent test alert from GogglesView";
-"Program output %lld" = "Program output %lld";
-"Remote alerts (ntfy)" = "Remote alerts (ntfy)";
-"Nothing is sent until Away mode is on. Each problem is sent once, then again every few minutes until it clears, followed by a recovery message. Messages use the crew feed names, never a serial number. The token is kept in the macOS Keychain. The heartbeat pings the URL every 30 s while Away mode is on, so an external monitor can alert you if this Mac goes silent." = "Nothing is sent until Away mode is on. Each problem is sent once, then again every few minutes until it clears, followed by a recovery message. Messages use the crew feed names, never a serial number. The token is kept in the macOS Keychain. The heartbeat pings the URL every 30 s while Away mode is on, so an external monitor can alert you if this Mac goes silent.";
-"Away mode: send alerts to my phone" = "Away mode: send alerts to my phone";
-"Away mode" = "Away mode";
-"Server" = "Server";
-"ntfy server" = "ntfy server";
-"Topic" = "Topic";
-"ntfy topic" = "ntfy topic";
-"Access token (optional)" = "Access token (optional)";
-"ntfy access token" = "ntfy access token";
-"The server must start with http:// or https://. The topic may use letters, digits, - and _." = "The server must start with http:// or https://. The topic may use letters, digits, - and _.";
-"Send test" = "Send test";
-"Send test alerts" = "Send test alerts";
-"Last send: ok at %@" = "Last send: ok at %@";
-"Last send: failed at %@" = "Last send: failed at %@";
-"Not sent yet" = "Not sent yet";
-"Repeat" = "Repeat";
-"Do not repeat while still failing" = "Do not repeat while still failing";
-"Repeat every %lld min while still failing (up to 10 times)" = "Repeat every %lld min while still failing (up to 10 times)";
-"Repeat interval in minutes" = "Repeat interval in minutes";
-"Heartbeat URL (optional)" = "Heartbeat URL (optional)";
-"Heartbeat URL" = "Heartbeat URL";
-"Heartbeat: ok at %@" = "Heartbeat: ok at %@";
-"Heartbeat: failed at %@" = "Heartbeat: failed at %@";
-"after %lld s" = "after %lld s";
-"%@: delay in seconds" = "%@: delay in seconds";
-"Priority" = "Priority";
-"Min" = "Min";
-"Default" = "Default";
-"Urgent" = "Urgent";
-"%@: priority" = "%@: priority";
-"Stabilization mode" = "Stabilization mode";
-"Translation only" = "Translation only";
-"Translation and roll (homography)" = "Translation and roll (homography)";
-"Translation and roll (tiles)" = "Translation and roll (tiles)";
-"Fill in the server and topic below to switch this on." = "Fill in the server and topic below to switch this on.";
-"Emergency close" = "Emergency close";
-"Stuck behind a full-screen output? Press ⌃⌥⌘. in any app to close all program outputs." = "Stuck behind a full-screen output? Press ⌃⌥⌘. in any app to close all program outputs.";

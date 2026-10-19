@@ -131,3 +131,18 @@ import CoreGraphics
         #expect(!ProgramOutputPrefs.clean(d))
     }
 }
+
+@Suite struct ProgramOutputStatusTests {
+    private let main = ProgramScreenInfo(id: 1, name: "Built-in", isMain: true)
+    private let ext = ProgramScreenInfo(id: 2, name: "HDMI TV", isMain: false)
+    private func out(_ d: UInt32) -> ProgramOutputConfig { var o = ProgramOutputConfig(); o.display = d; return o }
+
+    @Test func statusFollowsAssignment() {
+        let outs = [out(0), out(0), out(1)]
+        let s = { (i: Int, on: Bool) in ProgramOutputStatus.status(index: i, outputs: outs, screens: [main, ext], enabled: on) }
+        #expect(s(0, true) == .showing("HDMI TV"))
+        #expect(s(1, true) == .noDisplay)
+        #expect(s(2, true) == .onMain("Built-in"))
+        #expect(s(0, false) == .off)
+    }
+}
