@@ -127,10 +127,16 @@ struct UpdateSettingsSection: View {
     var body: some View {
         SettingsGroup("Updates") {
             SettingsRow("Status") {
-                Text(status).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                primaryButton
-                if case .available(_, let url) = checker.result {
-                    Button("Release notes") { NSWorkspace.shared.open(url) }
+                // Buttons keep their full width; the status line wraps underneath instead of squeezing them.
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 6) {
+                        primaryButton
+                        if case .available(_, let url) = checker.result {
+                            Button("Release notes") { NSWorkspace.shared.open(url) }
+                        }
+                    }
+                    .fixedSize()
+                    Text(status).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 }
             }
             SettingsToggleRow("Check for updates daily", isOn: $enabled)
