@@ -136,6 +136,12 @@ final class EventStatus: ObservableObject {
                 isRecording: rec?.isRecording ?? false, elapsed: rec?.elapsed ?? 0,
                 issues: issues, outputs: SessionControlBoard.shared.outputChips(for: s.decodeSession))
         }
+        AlertCenter.shared.update(
+            feeds: zip(all, next).map { s, r in
+                AlertFeed(id: r.id, name: r.name, isLive: r.isLive, issues: r.issues, outputs: SessionControlBoard.shared.alertChips(for: s.decodeSession))
+            },
+            helperDown: all.contains { $0.coordinator.uiState.kind == .noHelper },
+            missingPrograms: ProgramOutputController.shared.missingOutputs)
         let before = worst
         if next != rows {
             rows = next

@@ -104,6 +104,7 @@ struct SettingsView: View {
                         card { EventHooksSettingsSection() }
                         card { AutomationSettingsSection() }
                         card { SignalAlertSettingsSection() }
+                        card { RemoteAlertsSettingsSection() }
                         card { developerToolsSection }
                     }
                 }

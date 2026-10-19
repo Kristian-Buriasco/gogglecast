@@ -119,6 +119,7 @@ final class SessionControlBoard {
         weak var streamer: NetworkStreamer?
         weak var srt: SRTOutput?
         weak var ndi: NDIOutput?
+        weak var rtmp: RTMPPublisher?
     }
     private var entries: [ObjectIdentifier: Entry] = [:]
 
@@ -134,6 +135,19 @@ final class SessionControlBoard {
 
     func register(srt: SRTOutput, for session: AnyObject) { entries[ObjectIdentifier(session), default: Entry()].srt = srt }
     func register(ndi: NDIOutput, for session: AnyObject) { entries[ObjectIdentifier(session), default: Entry()].ndi = ndi }
+    func register(rtmp: RTMPPublisher, for session: AnyObject) { entries[ObjectIdentifier(session), default: Entry()].rtmp = rtmp }
+
+    /// Chips for the remote alerts: the overview's SRT/UDP/NDI plus RTMP and the recording (a recorder that
+    /// stopped with an error). Kept apart from `outputChips` so the overview and web page are unchanged.
+    func alertChips(for session: AnyObject) -> [OutputChip] {
+        let e = entries[ObjectIdentifier(session)]
+        var chips = outputChips(for: session)
+        if let r = e?.rtmp {
+            chips.append(OutputChip(name: "RTMP", state: r.lastError != nil ? .error : (r.isStreaming ? (r.isLive ? .on : .waiting) : .off)))
+        }
+        if let rec = e?.recorder, !rec.isRecording, rec.lastError != nil { chips.append(OutputChip(name: L("Recording"), state: .error)) }
+        return chips
+    }
 
     /// What this window is sending right now (UDP, SRT, NDI), for the operator overview.
     func outputChips(for session: AnyObject) -> [OutputChip] {

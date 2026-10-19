@@ -24,13 +24,30 @@
 "left unchanged" = "left unchanged";
 "Scene when live, %@" = "Scene when live, %@";
 "Scene when lost, %@" = "Scene when lost, %@";
+/* AlertEngine.swift */
+"Signal lost" = "Signal lost";
+"Picture frozen" = "Picture frozen";
+"Black picture" = "Black picture";
+"Battery low" = "Battery low";
+"Battery critical" = "Battery critical";
+"Output failed" = "Output failed";
+"Output waiting for connection" = "Output waiting for connection";
+"Helper not responding" = "Helper not responding";
+"Signal back" = "Signal back";
+"Picture moving again" = "Picture moving again";
+"Picture no longer black" = "Picture no longer black";
+"Battery recovered" = "Battery recovered";
+"Output working again" = "Output working again";
+"Output connected" = "Output connected";
+"Helper responding again" = "Helper responding again";
+"still failing, reminder %lld" = "still failing, reminder %lld";
+"display" = "display";
 /* AppChrome.swift */
 "System" = "System";
 "Light" = "Light";
 "Dark" = "Dark";
 "Status" = "Status";
 /* AutoMarkers.swift */
-"Signal lost" = "Signal lost";
 "Signal restored" = "Signal restored";
 "Goggles battery low (%lld%%)" = "Goggles battery low (%lld%%)";
 "Replay saved" = "Replay saved";
@@ -296,7 +313,6 @@
 /* EventStatus.swift */
 "Battery %lld%%" = "Battery %lld%%";
 "Picture not changing" = "Picture not changing";
-"Black picture" = "Black picture";
 /* ExposureAssist.swift */
 "Exposure and focus aids" = "Exposure and focus aids";
 "Zebra stripes" = "Zebra stripes";
@@ -397,6 +413,7 @@
 "Disconnect" = "Disconnect";
 "Setup assistant…" = "Setup assistant…";
 "Race Mode" = "Race Mode";
+"Away mode (remote alerts)" = "Away mode (remote alerts)";
 "Settings…" = "Settings…";
 "Quit GogglesView" = "Quit GogglesView";
 "%@ (recording)" = "%@ (recording)";
@@ -437,6 +454,10 @@
 "Receiver: udp://@:%@ (OBS Media Source / VLC). Change applies on next start. Source resolution and bitrate are passed through unchanged." = "Receiver: udp://@:%@ (OBS Media Source / VLC). Change applies on next start. Source resolution and bitrate are passed through unchanged.";
 /* NetworkStreamer.swift */
 "Invalid port" = "Invalid port";
+/* NtfySender.swift */
+"Test alert from GogglesView" = "Test alert from GogglesView";
+"Test (urgent)" = "Test (urgent)";
+"Urgent test alert from GogglesView" = "Urgent test alert from GogglesView";
 /* OBSClient.swift */
 "Couldn't reach OBS. Is OBS running with WebSocket enabled (Tools > WebSocket Server Settings)?" = "Couldn't reach OBS. Is OBS running with WebSocket enabled (Tools > WebSocket Server Settings)?";
 "Wrong WebSocket password" = "Wrong WebSocket password";
@@ -588,9 +609,12 @@
 /* ProgramOutput.swift */
 "Feed %lld" = "Feed %lld";
 "NO SIGNAL" = "NO SIGNAL";
+"Program output %lld" = "Program output %lld";
 "Program output (HDMI)" = "Program output (HDMI)";
 "Show the program outputs" = "Show the program outputs";
 "Open the program outputs when the app starts" = "Open the program outputs when the app starts";
+"Clean output: hide all names, warnings and the no-signal marker" = "Clean output: hide all names, warnings and the no-signal marker";
+"Stabilize the program output (also stabilizes the preview, works in race mode)" = "Stabilize the program output (also stabilizes the preview, works in race mode)";
 "Add output" = "Add output";
 "Feed names" = "Feed names";
 "A clean full screen picture on each chosen display, for a vision mixer, projector or TV: one output per HDMI connection. A grid shows every open goggles window and marks a feed with no signal; one feed shows just that picture. Names never include the goggles serial number. Zebra stripes and peaking are not drawn here." = "A clean full screen picture on each chosen display, for a vision mixer, projector or TV: one output per HDMI connection. A grid shows every open goggles window and marks a feed with no signal; one feed shows just that picture. Names never include the goggles serial number. Zebra stripes and peaking are not drawn here.";
@@ -676,6 +700,37 @@
 "Re-encode at 30 fps (lighter, for several goggles)" = "Re-encode at 30 fps (lighter, for several goggles)";
 "Each goggles window with a recording or stream uses its own hardware encoder, and a Mac can only encode a limited number of frames per second in total (about 150 on an M1 Pro). At 30 fps, recordings and streams are half as smooth, but twice as many goggles fit. The live view stays at full frame rate." = "Each goggles window with a recording or stream uses its own hardware encoder, and a Mac can only encode a limited number of frames per second in total (about 150 on an M1 Pro). At 30 fps, recordings and streams are half as smooth, but twice as many goggles fit. The live view stays at full frame rate.";
 "The goggles send one keyframe when Share Liveview starts and none after, so instant replay, UDP, RTMP, SRT and the web viewer can't start cleanly later. This re-encodes the picture with a keyframe every second (hardware encoder, runs only while one of those is active). Turn it off to pass the goggles' stream through untouched; clips and late-joining viewers may then show grey until the next keyframe." = "The goggles send one keyframe when Share Liveview starts and none after, so instant replay, UDP, RTMP, SRT and the web viewer can't start cleanly later. This re-encodes the picture with a keyframe every second (hardware encoder, runs only while one of those is active). Turn it off to pass the goggles' stream through untouched; clips and late-joining viewers may then show grey until the next keyframe.";
+/* RemoteAlertsSettingsSection.swift */
+"Remote alerts (ntfy)" = "Remote alerts (ntfy)";
+"Away mode: send alerts to my phone" = "Away mode: send alerts to my phone";
+"Away mode" = "Away mode";
+"Server" = "Server";
+"ntfy server" = "ntfy server";
+"Topic" = "Topic";
+"ntfy topic" = "ntfy topic";
+"Access token (optional)" = "Access token (optional)";
+"ntfy access token" = "ntfy access token";
+"The server must start with http:// or https://. The topic may use letters, digits, - and _." = "The server must start with http:// or https://. The topic may use letters, digits, - and _.";
+"Send test" = "Send test";
+"Send test alerts" = "Send test alerts";
+"Last send: ok at %@" = "Last send: ok at %@";
+"Last send: failed at %@" = "Last send: failed at %@";
+"Not sent yet" = "Not sent yet";
+"Do not repeat while still failing" = "Do not repeat while still failing";
+"Repeat every %lld min while still failing (up to 10 times)" = "Repeat every %lld min while still failing (up to 10 times)";
+"Repeat interval in minutes" = "Repeat interval in minutes";
+"Heartbeat URL (optional)" = "Heartbeat URL (optional)";
+"Heartbeat URL" = "Heartbeat URL";
+"Heartbeat: ok at %@" = "Heartbeat: ok at %@";
+"Heartbeat: failed at %@" = "Heartbeat: failed at %@";
+"Nothing is sent until Away mode is on. Each problem is sent once, then again every few minutes until it clears, followed by a recovery message. Messages use the crew feed names, never a serial number. The token is kept in the macOS Keychain. The heartbeat pings the URL every 30 s while Away mode is on, so an external monitor can alert you if this Mac goes silent." = "Nothing is sent until Away mode is on. Each problem is sent once, then again every few minutes until it clears, followed by a recovery message. Messages use the crew feed names, never a serial number. The token is kept in the macOS Keychain. The heartbeat pings the URL every 30 s while Away mode is on, so an external monitor can alert you if this Mac goes silent.";
+"after %lld s" = "after %lld s";
+"%@: delay in seconds" = "%@: delay in seconds";
+"Priority" = "Priority";
+"Min" = "Min";
+"Default" = "Default";
+"Urgent" = "Urgent";
+"%@: priority" = "%@: priority";
 /* ReplayBuffer.swift */
 "Instant replay needs the keyframe encoder. Turn it on in Settings > Streaming." = "Instant replay needs the keyframe encoder. Turn it on in Settings > Streaming.";
 "Instant replay is off. Turn it on in Settings > Recording." = "Instant replay is off. Turn it on in Settings > Recording.";
@@ -928,6 +983,3 @@
 "Minimize" = "Minimize";
 "Bring All to Front" = "Bring All to Front";
 "Help" = "Help";
-
-"Clean output: hide all names, warnings and the no-signal marker" = "Clean output: hide all names, warnings and the no-signal marker";
-"Stabilize the program output (also stabilizes the preview, works in race mode)" = "Stabilize the program output (also stabilizes the preview, works in race mode)";

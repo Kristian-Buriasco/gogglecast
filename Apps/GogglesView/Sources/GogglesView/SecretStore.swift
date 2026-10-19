@@ -98,7 +98,7 @@ enum SecretStore {
     }
 
     static var allKeys: [String] {
-        [RTMPPrefs.streamKeyKey, SRTPrefs.passphraseKey, WebViewerPrefs.tokenKey, UpdatePrefs.tokenKey, OBSPrefs.passwordKey]
+        [RTMPPrefs.streamKeyKey, SRTPrefs.passphraseKey, WebViewerPrefs.tokenKey, UpdatePrefs.tokenKey, OBSPrefs.passwordKey, AlertPrefs.tokenKey]
             + AppEvent.allCases.map { EventHookConfig.webhookKey($0) }
     }
 
