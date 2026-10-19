@@ -851,9 +851,7 @@
 
 "Feed %lld" = "Feed %lld";
 "NO SIGNAL" = "NESSUN SEGNALE";
-"Program output (HDMI)" = "Uscita programma (HDMI)";
 "main display" = "display principale";
-"This is your main display: the program output will cover your controls. Pick an external display unless you know what you are doing." = "Questo è il display principale: l'uscita programma coprirà i tuoi controlli. Scegli un display esterno, a meno che tu non sappia cosa stai facendo.";
 "Show" = "Mostra";
 "All feeds in a grid" = "Tutti i feed in una griglia";
 "One feed" = "Un solo feed";
@@ -863,7 +861,6 @@
 "Program Output" = "Uscita programma";
 
 "Show the program outputs" = "Mostra le uscite programma";
-"Add output" = "Aggiungi uscita";
 "A clean full screen picture on each chosen display, for a vision mixer, projector or TV: one output per HDMI connection. A grid shows every open goggles window and marks a feed with no signal; one feed shows just that picture. Names never include the goggles serial number. Zebra stripes and peaking are not drawn here." = "Un'immagine pulita a schermo intero su ogni display scelto, per un mixer video, un proiettore o una TV: un'uscita per ogni connessione HDMI. La griglia mostra ogni finestra dei visori aperta e segnala un feed senza segnale; con un solo feed vedi solo quell'immagine. I nomi non includono mai il numero di serie dei visori. Zebra e peaking non vengono disegnati qui.";
 "Automatic (next external display)" = "Automatico (prossimo display esterno)";
 "Remove output" = "Rimuovi uscita";
@@ -932,8 +929,6 @@
 "Stop" = "Ferma";
 "Connect the goggles and turn on Share Liveview to record" = "Collega gli occhiali e attiva Share Liveview per registrare";
 
-"Clean output: hide all names, warnings and the no-signal marker" = "Clean output: hide all names, warnings and the no-signal marker";
-"Stabilize the program output (also stabilizes the preview, works in race mode)" = "Stabilize the program output (also stabilizes the preview, works in race mode)";
 
 /* Settings redesign */
 "After" = "After";
@@ -960,7 +955,6 @@
 "Off by default. Anyone on your network can watch while it is on. There is no encryption (plain HTTP) and the token is sent in the URL, so keep it off on untrusted networks. It only listens on this Mac unless 'Allow other devices' is on.\n\nSafari on iPad, iPhone and Mac plays the page directly. Other browsers: open the URL's live.m3u8 in VLC. Latency comes from 1 s segments and Safari's start-up buffer; expect a few seconds behind live, not real time (not yet measured on hardware). The page shows its own estimate." = "Disattivato di default. Chiunque sulla tua rete può guardare mentre è attivo. Non c'è cifratura (HTTP semplice) e il token viaggia nell'URL, quindi tienilo spento sulle reti non fidate. Ascolta solo su questo Mac, a meno che 'Consenti altri dispositivi' non sia attivo.\n\nSafari su iPad, iPhone e Mac riproduce la pagina direttamente. Altri browser: apri il live.m3u8 dell'URL in VLC. La latenza deriva dai segmenti da 1 s e dal buffer iniziale di Safari: aspettati qualche secondo di ritardo, non tempo reale (non ancora misurata su hardware). La pagina mostra una sua stima.";
 "Off by default: any web page or app can open a gogglesview:// link." = "Off by default: any web page or app can open a gogglesview:// link.";
 "Optional, 10-79 characters." = "Optional, 10-79 characters.";
-"Output" = "Output";
 "Outputs" = "Outputs";
 "Passphrase" = "Passphrase";
 "Picture" = "Picture";
@@ -975,7 +969,6 @@
 "Stored in the macOS Keychain." = "Stored in the macOS Keychain.";
 "The stream key is stored in the macOS Keychain and is never logged. Changes apply on next start.\n\nTwitch and YouTube prefer 8 Mbps or less with a keyframe every 2 s. Goggles video is passed through unchanged, so the stream may be rejected or look worse. Not yet tested against a live service." = "La chiave dello stream è conservata nel Portachiavi di macOS e non finisce mai nei log. Le modifiche valgono dal prossimo avvio.\n\nTwitch e YouTube preferiscono 8 Mbps o meno con un keyframe ogni 2 s. Il video dei goggles passa invariato, quindi lo stream potrebbe essere rifiutato o sembrare peggiore. Non ancora provato con un servizio reale.";
 "Valid" = "Valid";
-"Warning" = "Warning";
 "Window 1 uses the port in Settings, window 2 the next one, and so on." = "Window 1 uses the port in Settings, window 2 the next one, and so on.";
 "Windows" = "Windows";
 "batteryLow threshold" = "batteryLow threshold";
@@ -1042,3 +1035,25 @@
 "Fill in the server and topic below to switch this on." = "Fill in the server and topic below to switch this on.";
 "Emergency close" = "Emergency close";
 "Stuck behind a full-screen output? Press ⌃⌥⌘. in any app to close all program outputs." = "Stuck behind a full-screen output? Press ⌃⌥⌘. in any app to close all program outputs.";
+
+/* TODO: translate (English placeholder) */
+"Program outputs" = "Program outputs";
+"Connected displays" = "Connected displays";
+"Add output (%lld of %lld)" = "Add output (%lld of %lld)";
+"Feed names" = "Feed names";
+"Output %lld" = "Output %lld";
+"free" = "free";
+"No display connected" = "No display connected";
+"Showing on %@" = "Showing on %@";
+"Main display: it will cover your controls" = "Main display: it will cover your controls";
+"HDMI" = "HDMI";
+
+/* TODO: translate (English placeholder) */
+"Main" = "Main";
+"External" = "External";
+
+/* TODO: translate (English placeholder) */
+"Clean output" = "Clean output";
+"Hides all names, warnings and the no-signal marker." = "Hides all names, warnings and the no-signal marker.";
+"Stabilize output" = "Stabilize output";
+"Also stabilizes the preview. Works in race mode." = "Also stabilizes the preview. Works in race mode.";
