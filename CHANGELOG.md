@@ -4,6 +4,17 @@ All notable changes to this project are documented here. Format based on [Keep a
 
 ## [Unreleased]
 
+## [0.10.3] - 2026-10-19
+
+Remote alerts, so you can step away from the Mac during an event.
+
+### Added
+- Remote alerts (Settings > Advanced, off by default): sends a notification to a self-hosted [ntfy](https://ntfy.sh) server when a goggles signal is lost or back, the picture freezes or goes black, the battery runs low, an output (RTMP, SRT, NDI, recording or the HDMI window) fails or stalls, or the helper is unreachable. Each condition has its own delay and priority, alerts repeat while the fault lasts and a recovery message is sent. An Away switch (also in the menu bar) turns sending on, and an optional heartbeat URL lets an outside monitor notice if the Mac goes silent. Messages use the crew's feed names, never serial numbers.
+
+### Known limits
+- ntfy on iOS delivers these as normal notifications; Apple critical alerts are not supported by the ntfy app.
+- A recording alerts only when it stops on an error; NDI and UDP outputs can fail but not stall; a hung helper that still reports live is not detected.
+
 ## [0.10.2] - 2026-10-19
 
 Two options for the HDMI program output.
