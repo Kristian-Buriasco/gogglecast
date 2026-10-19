@@ -729,6 +729,10 @@
 /* Stabilizer.swift */
 "Live stabilization" = "Stabilizzazione live";
 "Stabilize the live picture" = "Stabilizza l'immagine live";
+"Stabilization mode" = "Stabilization mode";
+"Translation only" = "Translation only";
+"Translation and roll (homography)" = "Translation and roll (homography)";
+"Translation and roll (tiles)" = "Translation and roll (tiles)";
 "Strength" = "Intensità";
 "Stabilization is paused because this Mac can't keep up with the frame rate. It tries again every few seconds." = "La stabilizzazione è in pausa perché questo Mac non regge il frame rate. Riprova ogni pochi secondi.";
 "Smooths shaky footage. Zooms in slightly (4 to 10%) to hide the edges and adds a tiny delay (a few ms). Applies to the preview, recordings and streams." = "Smorza le riprese traballanti. Ingrandisce un po' (da 4 a 10%) per nascondere i bordi e aggiunge un piccolo ritardo (pochi ms). Vale per anteprima, registrazioni e stream.";

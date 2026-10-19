@@ -12,7 +12,21 @@ import SwiftUI
 /// buffer), so it adds processing time (a few ms) but no frames of delay. It removes shake, not
 /// slow pans, by low-pass filtering the cumulative camera path and shifting the frame by the
 /// difference. A small zoom hides the edges the shift would otherwise reveal.
+/// How the camera motion is measured. `translation` is the original behaviour (no roll correction).
+enum StabilizerMode: String, CaseIterable {
+    case translation
+    case similarityHomography = "similarity-homography"
+    case similarityTiles = "similarity-tiles"
+}
+
 enum StabilizerPrefs {
+    static let modeKey = "stabilizeMode"
+    /// The similarity modes won `StabilizerBenchmarkTests.testModeBenchmark` on synthetic clips, but stay opt-in until
+    /// they have been compared with real goggles footage.
+    static let defaultMode = StabilizerMode.translation
+    static var mode: StabilizerMode {
+        (UserDefaults.standard.string(forKey: modeKey)).flatMap(StabilizerMode.init(rawValue:)) ?? defaultMode
+    }
     static let enabledKey = "stabilizeEnabled"
     static let strengthKey = "stabilizeStrength"
     static let defaultStrength = 0.6
@@ -31,6 +45,12 @@ enum StabilizerPrefs {
     /// The crop to use now: as much as the recent corrections needed (instant attack, slow release via `peak`,
     /// the largest correction seen lately as a fraction of the frame), never above `cap`, never below the resting
     /// crop. Always at least what the current correction needs, so the frame edge is never revealed.
+    /// Crop (per edge, as a fraction) a rotation of `roll` radians eats on a `w` x `h` frame, so it can be added to the translation need.
+    static func rollMargin(_ roll: Double, w: Double, h: Double) -> Double {
+        let a = max(w / h, h / w), r = abs(roll)
+        return (1 - 1 / (cos(r) + sin(r) * a)) / 2
+    }
+
     static func effectiveMargin(peak: Double, cap: Double) -> Double {
         min(cap, max(restingMargin, peak + 0.01))
     }
@@ -179,6 +199,8 @@ final class Stabilizer {
     private static let sharedContext = CIContext(options: [.cacheIntermediates: false])
     private var ci: CIContext { Self.sharedContext }
     private var smoother = PathSmoother(strength: StabilizerPrefs.defaultStrength)
+    /// Roll (radians) rides on the x axis of its own smoother.
+    private var rollSmoother = PathSmoother(strength: StabilizerPrefs.defaultStrength)
     private var previousSmall: CVPixelBuffer?
     private var outPool: CVPixelBufferPool?
     private var smallPool: CVPixelBufferPool?
@@ -239,18 +261,18 @@ final class Stabilizer {
     }
 
     /// Drain the autoreleased Core Image / Vision objects after each picture (the decoder's thread does not).
-    func process(_ input: CVPixelBuffer, strength: Double) -> CVPixelBuffer {
-        autoreleasepool { processUnpooled(input, strength: strength) }
+    func process(_ input: CVPixelBuffer, strength: Double, mode: StabilizerMode = StabilizerPrefs.mode) -> CVPixelBuffer {
+        autoreleasepool { processUnpooled(input, strength: strength, mode: mode) }
     }
 
-    private func processUnpooled(_ input: CVPixelBuffer, strength: Double) -> CVPixelBuffer {
+    private func processUnpooled(_ input: CVPixelBuffer, strength: Double, mode: StabilizerMode) -> CVPixelBuffer {
         lock.lock(); defer { lock.unlock() }
         statLock.lock()
         let doReset = resetRequested
         resetRequested = false
         statLock.unlock()
         if doReset {
-            previousSmall = nil; smoother.reset(); correctionPeak = 0
+            previousSmall = nil; smoother.reset(); rollSmoother.reset(); correctionPeak = 0
             statLock.lock(); _stats.resets += 1; statLock.unlock()
         }
         let start = DispatchTime.now().uptimeNanoseconds
@@ -260,9 +282,9 @@ final class Stabilizer {
         if poolKey?.w != w || poolKey?.h != h || poolKey?.fmt != fmt {
             makePools(w: w, h: h, fmt: fmt)
             previousSmall = nil
-            smoother.reset()
+            smoother.reset(); rollSmoother.reset()
         }
-        smoother.strength = strength
+        smoother.strength = strength; rollSmoother.strength = strength
         guard let outPool, let smallPool,
               let small = makeBuffer(from: smallPool),
               let out = makeBuffer(from: outPool) else { return input }
@@ -272,20 +294,30 @@ final class Stabilizer {
         ci.render(image.transformed(by: CGAffineTransform(scaleX: scale, y: scale)), to: small)
 
         var motion = CGPoint.zero
+        var rollMotion = 0.0
         var measureFailed = false
         var outlier = false
         if let prev = previousSmall {
-            if let m = Stabilizer.measure(from: prev, to: small) {
-                let gated = Stabilizer.gate(CGPoint(x: m.x / scale, y: m.y / scale), width: CGFloat(w))
+            if let m = Stabilizer.measure(from: prev, to: small, mode: mode) {
+                let gated = Stabilizer.gate(CGPoint(x: m.t.x / scale, y: m.t.y / scale), width: CGFloat(w))
                 motion = gated.motion
                 outlier = gated.rejected
+                if !outlier, abs(m.roll) <= Self.maxPlausibleRoll { rollMotion = m.roll } else { outlier = true }
             } else { measureFailed = true }
         }
         previousSmall = small
 
         let capMargin = StabilizerPrefs.margin(forStrength: strength)
-        let c = smoother.step(motion: motion, limit: CGSize(width: CGFloat(capMargin) * CGFloat(w), height: CGFloat(capMargin) * CGFloat(h)))
-        let need = max(Double(abs(c.x)) / Double(w), Double(abs(c.y)) / Double(h))
+        // With roll on, translation and rotation share the crop budget (65% / 35%), so their sum never exceeds the cap.
+        let similarity = mode != .translation
+        let tShare = similarity ? 0.65 : 1.0
+        let c = smoother.step(motion: motion, limit: CGSize(width: CGFloat(capMargin * tShare) * CGFloat(w), height: CGFloat(capMargin * tShare) * CGFloat(h)))
+        var rollC = 0.0
+        if similarity {
+            let rl = CGFloat(0.7 * capMargin / max(Double(w) / Double(h), Double(h) / Double(w)))
+            rollC = Double(rollSmoother.step(motion: CGPoint(x: rollMotion, y: 0), limit: CGSize(width: rl, height: rl)).x)
+        }
+        let need = max(Double(abs(c.x)) / Double(w), Double(abs(c.y)) / Double(h)) + StabilizerPrefs.rollMargin(rollC, w: Double(w), h: Double(h))
         correctionPeak = max(need, correctionPeak * 0.995)
         let margin = CGFloat(StabilizerPrefs.effectiveMargin(peak: correctionPeak, cap: capMargin))
         statLock.lock()
@@ -299,7 +331,9 @@ final class Stabilizer {
         statLock.unlock()
         let zoom = 1 / (1 - 2 * margin)
         let cx = CGFloat(w) / 2, cy = CGFloat(h) / 2
-        let t = CGAffineTransform(translationX: c.x, y: c.y)
+        let t = CGAffineTransform(translationX: -cx, y: -cy)
+            .concatenating(CGAffineTransform(rotationAngle: CGFloat(rollC)))
+            .concatenating(CGAffineTransform(translationX: cx + c.x, y: cy + c.y))
             .concatenating(CGAffineTransform(translationX: -cx, y: -cy))
             .concatenating(CGAffineTransform(scaleX: zoom, y: zoom))
             .concatenating(CGAffineTransform(translationX: cx, y: cy))
@@ -331,6 +365,9 @@ final class Stabilizer {
     /// about 80% at full strength, against about 33% without.
     static let maxPlausibleMotion = 0.25
 
+    /// Largest believable roll between two frames (radians, about 8.6 degrees).
+    static let maxPlausibleRoll = 0.15
+
     /// Returns `motion`, or zero when it is implausibly large for a frame `width` pixels wide.
     static func gate(_ motion: CGPoint, width: CGFloat) -> (motion: CGPoint, rejected: Bool) {
         hypot(motion.x, motion.y) > maxPlausibleMotion * width ? (.zero, true) : (motion, false)
@@ -344,6 +381,86 @@ final class Stabilizer {
               let r = request.results?.first as? VNImageTranslationAlignmentObservation else { return nil }
         // The transform aligns `to` back onto `from`, i.e. it is the opposite of the content motion.
         return CGPoint(x: -r.alignmentTransform.tx, y: -r.alignmentTransform.ty)
+    }
+
+    /// Content motion between two frames for `mode`: translation of the frame centre plus roll (radians, counter-clockwise, y up).
+    static func measure(from: CVPixelBuffer, to: CVPixelBuffer, mode: StabilizerMode) -> (t: CGPoint, roll: Double)? {
+        switch mode {
+        case .translation: return measure(from: from, to: to).map { ($0, 0) }
+        case .similarityHomography: return measureHomography(from: from, to: to)
+        case .similarityTiles: return measureTiles(from: from, to: to)
+        }
+    }
+
+    private static func measureHomography(from: CVPixelBuffer, to: CVPixelBuffer) -> (t: CGPoint, roll: Double)? {
+        let request = VNHomographicImageRegistrationRequest(targetedCVPixelBuffer: to)
+        let handler = VNImageRequestHandler(cvPixelBuffer: from, options: [:])
+        guard (try? handler.perform([request])) != nil,
+              let r = request.results?.first as? VNImageHomographicAlignmentObservation else { return nil }
+        // warpTransform aligns `to` onto `from`; its inverse is the content motion. Small-angle: scale and perspective are ignored.
+        let a = r.warpTransform.inverse
+        let c = SIMD3<Float>(Float(CVPixelBufferGetWidth(to)) / 2, Float(CVPixelBufferGetHeight(to)) / 2, 1)
+        let q = a * c
+        guard q.z.isFinite, abs(q.z) > 1e-6 else { return nil }
+        return (CGPoint(x: CGFloat(q.x / q.z - c.x), y: CGFloat(q.y / q.z - c.y)), Double(atan2(a[0][1], a[0][0])))
+    }
+
+    /// 3x3 grid of translational registrations, least-squares similarity fit, tiles far from the fit dropped and refit.
+    private static func measureTiles(from: CVPixelBuffer, to: CVPixelBuffer) -> (t: CGPoint, roll: Double)? {
+        let pw = CVPixelBufferGetWidth(to), ph = CVPixelBufferGetHeight(to)
+        let w = Double(pw), h = Double(ph), tw = pw / 3, th = ph / 3
+        guard CVPixelBufferGetPixelFormatType(to) == kCVPixelFormatType_32BGRA,
+              CVPixelBufferGetPixelFormatType(from) == kCVPixelFormatType_32BGRA,
+              CVPixelBufferLockBaseAddress(from, .readOnly) == kCVReturnSuccess else { return nil }
+        defer { CVPixelBufferUnlockBaseAddress(from, .readOnly) }
+        guard CVPixelBufferLockBaseAddress(to, .readOnly) == kCVReturnSuccess else { return nil }
+        defer { CVPixelBufferUnlockBaseAddress(to, .readOnly) }
+        // Zero-copy views onto each tile (Vision's regionOfInterest does not restrict registration).
+        func tile(_ b: CVPixelBuffer, _ i: Int, _ j: Int) -> CVPixelBuffer? {
+            let bpr = CVPixelBufferGetBytesPerRow(b)
+            let base = CVPixelBufferGetBaseAddress(b)! + (ph - (j + 1) * th) * bpr + i * tw * 4
+            var t: CVPixelBuffer?
+            CVPixelBufferCreateWithBytes(nil, tw, th, kCVPixelFormatType_32BGRA, base, bpr, nil, nil, nil, &t)
+            return t
+        }
+        // Vision request creation is not thread-safe (crashes in VNSession), so build serially and only perform concurrently.
+        var jobs: [(i: Int, j: Int, req: VNTranslationalImageRegistrationRequest, handler: VNImageRequestHandler)] = []
+        for k in 0..<9 {
+            let i = k % 3, j = k / 3
+            guard let tf = tile(from, i, j), let tt = tile(to, i, j) else { continue }
+            jobs.append((i, j, VNTranslationalImageRegistrationRequest(targetedCVPixelBuffer: tt), VNImageRequestHandler(cvPixelBuffer: tf, options: [:])))
+        }
+        var slots = [(r: SIMD2<Double>, d: SIMD2<Double>)?](repeating: nil, count: jobs.count)
+        let slotLock = NSLock()
+        DispatchQueue.concurrentPerform(iterations: jobs.count) { k in
+            let (i, j, req, handler) = jobs[k]
+            guard (try? handler.perform([req])) != nil,
+                  let o = req.results?.first as? VNImageTranslationAlignmentObservation else { return }
+            let e = (r: SIMD2((Double(i) + 0.5) / 3 * w - w / 2, (Double(j) + 0.5) / 3 * h - h / 2),
+                     d: SIMD2(-o.alignmentTransform.tx, -o.alignmentTransform.ty))
+            slotLock.lock(); slots[k] = e; slotLock.unlock()
+        }
+        let samples = slots.compactMap { $0 }
+        func fit(_ s: [(r: SIMD2<Double>, d: SIMD2<Double>)]) -> (t: SIMD2<Double>, roll: Double) {
+            let n = Double(s.count)
+            let rb = s.reduce(SIMD2<Double>.zero) { $0 + $1.r } / n, db = s.reduce(SIMD2<Double>.zero) { $0 + $1.d } / n
+            var num = 0.0, den = 0.0
+            for e in s { let r = e.r - rb, d = e.d - db; num += r.x * d.y - r.y * d.x; den += r.x * r.x + r.y * r.y }
+            let th = den > 0 ? num / den : 0
+            return (db - th * SIMD2(-rb.y, rb.x), th)
+        }
+        func residual(_ f: (t: SIMD2<Double>, roll: Double), _ e: (r: SIMD2<Double>, d: SIMD2<Double>)) -> Double {
+            let p = f.t + f.roll * SIMD2(-e.r.y, e.r.x)
+            return (e.d - p).x * (e.d - p).x + (e.d - p).y * (e.d - p).y
+        }
+        guard samples.count >= 5 else { return nil }
+        var f = fit(samples)
+        let res = samples.map { residual(f, $0).squareRoot() }
+        let median = res.sorted()[res.count / 2]
+        // Drop tiles more than 2.5x the median residual (and at least 1 px) off the fit: moving foreground, blur.
+        let kept = zip(samples, res).filter { $0.1 <= max(1.0, 2.5 * median) }.map { $0.0 }
+        if kept.count >= 4, kept.count < samples.count { f = fit(kept) }
+        return (CGPoint(x: f.t.x, y: f.t.y), f.roll)
     }
 
     private func makePools(w: Int, h: Int, fmt: OSType) {
@@ -381,12 +498,18 @@ final class Stabilizer {
 struct StabilizerSettingsSection: View {
     @AppStorage(StabilizerPrefs.enabledKey) private var enabled = false
     @AppStorage(StabilizerPrefs.strengthKey) private var strength = StabilizerPrefs.defaultStrength
+    @AppStorage(StabilizerPrefs.modeKey) private var mode = StabilizerPrefs.defaultMode.rawValue
     @ObservedObject private var status = StabilizerStatus.shared
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Live stabilization").font(.headline)
             Toggle("Stabilize the live picture", isOn: $enabled)
+            Picker("Stabilization mode", selection: $mode) {
+                Text("Translation only").tag(StabilizerMode.translation.rawValue)
+                Text("Translation and roll (homography)").tag(StabilizerMode.similarityHomography.rawValue)
+                Text("Translation and roll (tiles)").tag(StabilizerMode.similarityTiles.rawValue)
+            }.disabled(!enabled)
             HStack {
                 Text("Strength")
                 Slider(value: $strength, in: 0...1).disabled(!enabled)
