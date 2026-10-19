@@ -16,6 +16,12 @@ struct RemoteAlertsSettingsSection: View {
     var body: some View {
         SettingsGroup("Remote alerts (ntfy)",
                       footer: "Nothing is sent until Away mode is on. Each problem is sent once, then again every few minutes until it clears, followed by a recovery message. Messages use the crew feed names, never a serial number. The token is kept in the macOS Keychain. The heartbeat pings the URL every 30 s while Away mode is on, so an external monitor can alert you if this Mac goes silent.") {
+            if !configured {
+                SettingsRow("Setup") {
+                    Text("Fill in the server and topic below to switch this on.")
+                        .font(.callout).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
+                }
+            }
             SettingsToggleRow("Away mode: send alerts to my phone", isOn: $away, accessibilityName: "Away mode")
                 .disabled(!configured)
             SettingsRow("Server") {
@@ -37,8 +43,9 @@ struct RemoteAlertsSettingsSection: View {
                 }
             }
             SettingsRow("Send test") {
-                HStack {
+                VStack(alignment: .leading, spacing: 4) {
                     Button("Send test") { center.sendTests() }
+                        .fixedSize()
                         .disabled(!configured)
                         .accessibilityLabel("Send test alerts")
                     Text(center.lastSend.map { $0.ok ? L("Last send: ok at %@", Self.time($0)) : L("Last send: failed at %@", Self.time($0)) } ?? L("Not sent yet"))
