@@ -192,7 +192,7 @@ struct DiagnosticsSettingsSection: View {
     @State private var copied = false
 
     var body: some View {
-        HStack {
+        SettingsRow("Diagnostics") {
             Button("Copy diagnostics") {
                 run { text in
                     NSPasteboard.general.clearContents()

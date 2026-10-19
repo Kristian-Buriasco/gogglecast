@@ -135,11 +135,10 @@ struct RaceModeSettingsSection: View {
     @AppStorage(RaceModePrefs.key) private var race = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Race mode").font(.headline)
-            Toggle("Lowest-latency preview", isOn: $race)
-            Text("One switch for flying: bypasses stabilization, drops the preview LUT and colour adjustments, hides the stats overlay, grid and mini window, and runs the decoder without power-saving hints. Takes effect immediately, no reconnect. Recording and streaming keep working if you start them. Stabilized frames are not recorded or streamed while it is on. Orientation, crop and zoom stay as set.")
-                .font(.caption).foregroundStyle(.secondary)
+        SettingsGroup("Race mode") {
+            SettingsToggleRow("Lowest-latency preview", isOn: $race,
+                help: "Bypasses stabilization, LUT, stats overlay and power-saving hints.",
+                info: "One switch for flying: bypasses stabilization, drops the preview LUT and colour adjustments, hides the stats overlay, grid and mini window, and runs the decoder without power-saving hints. Takes effect immediately, no reconnect. Recording and streaming keep working if you start them. Stabilized frames are not recorded or streamed while it is on. Orientation, crop and zoom stay as set.")
         }
     }
 }

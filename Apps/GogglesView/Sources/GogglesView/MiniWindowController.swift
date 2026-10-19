@@ -123,11 +123,8 @@ struct MiniWindowSettingsSection: View {
     @AppStorage(MiniWindowPrefs.enabledKey) private var enabled = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Toggle("Floating mini window (picture in picture, ⇧⌘M)", isOn: $enabled)
-            Text("Always-on-top 16:9 video window; drag anywhere, resize from the edges, hover for the close button.")
-                .font(.caption).foregroundStyle(.secondary)
-        }
+        SettingsToggleRow("Floating mini window (picture in picture, ⇧⌘M)", isOn: $enabled,
+                          help: "Always-on-top 16:9 video window; drag anywhere, resize from the edges, hover for the close button.")
     }
 }
 #endif

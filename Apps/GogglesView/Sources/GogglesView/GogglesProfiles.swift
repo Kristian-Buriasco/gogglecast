@@ -140,31 +140,33 @@ struct ProfileSettingsSection: View {
     @State private var message: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Goggles profile").font(.headline)
+        SettingsGroup("Goggles profile") {
             if let serial = deviceSerial {
-                TextField("Nickname", text: $nickname)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(maxWidth: 260)
-                    .onSubmit { ProfileStore.shared.setNickname(nickname, for: serial) }
-                    .onChange(of: nickname) { ProfileStore.shared.setNickname($0, for: serial) }
-                    .accessibilityLabel(L("Nickname for goggles %@", serial))
-                    .accessibilityIdentifier("profileNicknameField")
-                HStack {
+                SettingsRow("Nickname", help: LocalizedStringKey("S/N \(serial)")) {
+                    TextField("Nickname", text: $nickname)
+                        .labelsHidden()
+                        .textFieldStyle(.roundedBorder)
+                        .frame(maxWidth: 260)
+                        .onSubmit { ProfileStore.shared.setNickname(nickname, for: serial) }
+                        .onChange(of: nickname) { ProfileStore.shared.setNickname($0, for: serial) }
+                        .accessibilityLabel(L("Nickname for goggles %@", serial))
+                        .accessibilityIdentifier("profileNicknameField")
+                }
+                SettingsRow("Settings", help: message.map { LocalizedStringKey($0) }) {
                     Button("Save current settings to this goggles") {
                         ProfileStore.shared.saveCurrentSettings(for: serial)
                         message = L("Saved.")
                     }
                     .accessibilityIdentifier("profileSaveButton")
-                    Toggle("Auto-apply on connect", isOn: $autoApply)
-                        .onChange(of: autoApply) { ProfileStore.shared.setAutoApply($0, for: serial) }
-                        .accessibilityIdentifier("profileAutoApplyToggle")
                 }
-                Text(verbatim: "S/N \(serial)").font(.caption).foregroundStyle(.secondary)
-                if let message { Text(message).font(.caption).foregroundStyle(.secondary) }
+                SettingsToggleRow("Auto-apply on connect", isOn: $autoApply)
+                    .onChange(of: autoApply) { ProfileStore.shared.setAutoApply($0, for: serial) }
+                    .accessibilityIdentifier("profileAutoApplyToggle")
             } else {
-                Text("Connect goggles to name them and save settings per device.")
-                    .font(.caption).foregroundStyle(.secondary)
+                SettingsRow("Device") {
+                    Text("Connect goggles to name them and save settings per device.")
+                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
             }
         }
         .onAppear(perform: load)

@@ -377,20 +377,17 @@ struct StabilizerSettingsSection: View {
     @ObservedObject private var status = StabilizerStatus.shared
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Live stabilization").font(.headline)
-            Toggle("Stabilize the live picture", isOn: $enabled)
-            HStack {
-                Text("Strength")
-                Slider(value: $strength, in: 0...1).disabled(!enabled)
-                Text(verbatim: "\(Int(strength * 100))%").monospacedDigit().frame(width: 40, alignment: .trailing)
-            }
+        SettingsGroup("Live stabilization") {
+            SettingsToggleRow("Stabilize the live picture", isOn: $enabled,
+                info: "Smooths shaky footage. Zooms in slightly (4 to 10%) to hide the edges and adds a tiny delay (a few ms). Applies to the preview, recordings and streams.")
+            SettingsSliderRow("Strength", value: $strength, range: 0...1, scale: 100, unit: "%", indented: true)
+                .disabled(!enabled)
             if status.paused {
-                Text("Stabilization is paused because this Mac can't keep up with the frame rate. It tries again every few seconds.")
-                    .font(.caption).foregroundStyle(.orange)
+                SettingsRow("Status") {
+                    Text("Stabilization is paused because this Mac can't keep up with the frame rate. It tries again every few seconds.")
+                        .font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
+                }
             }
-            Text("Smooths shaky footage. Zooms in slightly (4 to 10%) to hide the edges and adds a tiny delay (a few ms). Applies to the preview, recordings and streams.")
-                .font(.caption).foregroundStyle(.secondary)
         }
     }
 }

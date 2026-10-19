@@ -37,20 +37,19 @@ struct OrientationSettingsSection: View {
     @AppStorage(OrientationPrefs.hideCursorKey) private var hideCursor = true
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Orientation and full screen").font(.headline)
-            Picker("Rotate", selection: $rotation) {
-                Text("0°").tag(0)
-                Text("90°").tag(90)
-                Text("180°").tag(180)
-                Text("270°").tag(270)
+        SettingsGroup("Orientation and full screen") {
+            SettingsRow("Rotate", help: "Orientation applies to the main and capture windows, not to recordings or screenshots.") {
+                Picker("Rotate", selection: $rotation) {
+                    Text("0°").tag(0)
+                    Text("90°").tag(90)
+                    Text("180°").tag(180)
+                    Text("270°").tag(270)
+                }
+                .pickerStyle(.segmented).labelsHidden().frame(width: 260)
             }
-            .pickerStyle(.segmented)
-            Toggle("Flip horizontally", isOn: $flipH)
-            Toggle("Flip vertically", isOn: $flipV)
-            Toggle("Hide cursor when idle in full screen", isOn: $hideCursor)
-            Text("Orientation applies to the main and capture windows, not to recordings or screenshots.")
-                .font(.caption2).foregroundStyle(.secondary)
+            SettingsToggleRow("Flip horizontally", isOn: $flipH)
+            SettingsToggleRow("Flip vertically", isOn: $flipV)
+            SettingsToggleRow("Hide cursor when idle in full screen", isOn: $hideCursor)
         }
     }
 }

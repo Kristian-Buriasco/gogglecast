@@ -53,7 +53,6 @@ struct WebViewerSettingsSection: View {
     @AppStorage(WebViewerPrefs.portKey) private var port = WebViewerPrefs.defaultPort
     @AppStorage(WebViewerPrefs.lanKey) private var lan = false
     @KeychainSecret(WebViewerPrefs.tokenKey) private var token
-    @FocusState private var tokenFocused: Bool
 
     private var effectivePort: Int { (1...65535).contains(port) ? port : WebViewerPrefs.defaultPort }
 
@@ -62,8 +61,9 @@ struct WebViewerSettingsSection: View {
     }
 
     private func urlRow(_ value: String, label: String) -> some View {
-        HStack {
+        SettingsRow(LocalizedStringKey(label), indented: true) {
             Text(value).font(.system(.caption, design: .monospaced)).textSelection(.enabled)
+                .lineLimit(2).fixedSize(horizontal: false, vertical: true)
             Button("Copy URL") {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(value, forType: .string)
@@ -73,49 +73,52 @@ struct WebViewerSettingsSection: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Web Viewer").font(.headline)
-            Toggle("Enable local web viewer", isOn: $enabled)
+        SettingsGroup("Web Viewer",
+                      info: "Off by default. Anyone on your network can watch while it is on. There is no encryption (plain HTTP) and the token is sent in the URL, so keep it off on untrusted networks. It only listens on this Mac unless 'Allow other devices' is on.\n\nSafari on iPad, iPhone and Mac plays the page directly. Other browsers: open the URL's live.m3u8 in VLC. Latency comes from 1 s segments and Safari's start-up buffer; expect a few seconds behind live, not real time (not yet measured on hardware). The page shows its own estimate.") {
+            SettingsToggleRow("Enable local web viewer", isOn: $enabled)
                 .onChange(of: enabled) { old, new in
                     if new && !old && _token.load().isEmpty { token = WebViewerPrefs.existingOrNewToken() }
                 }
-            TextField("Port", value: $port, format: .number.grouping(.never))
-            Toggle("Allow other devices on the network", isOn: $lan)
-                .onChange(of: lan) { _, new in if new && _token.load().isEmpty { token = WebViewerPrefs.existingOrNewToken() } }
-            HStack {
-                TextField("Access token", text: $token)
-                    .focused($tokenFocused)
-                    .onChange(of: tokenFocused) { _, f in if f { _token.load() } }
-                Button("Generate") { token = WebViewerPrefs.generateToken() }
+            Group {
+                SettingsRow("Port", indented: true) {
+                    TextField("Port", value: $port, format: .number.grouping(.never)).labelsHidden()
+                        .settingsField(width: 100, valid: (1...65535).contains(port))
+                }
+                SettingsToggleRow("Allow other devices on the network", isOn: $lan,
+                                  help: LocalizedStringKey(lan ? L("A token is required while other devices are allowed.") : L("With the token empty only this Mac can connect, and only through localhost.")),
+                                  indented: true)
+                    .onChange(of: lan) { _, new in if new && _token.load().isEmpty { token = WebViewerPrefs.existingOrNewToken() } }
+                SettingsRow("Access token", indented: true) {
+                    SettingsSecretField(title: "Access token", text: $token, width: 160, onReveal: { _token.load() })
+                    Button("Generate") { token = WebViewerPrefs.generateToken() }
+                }
             }
-            Text(lan ? L("A token is required while other devices are allowed.") : L("With the token empty only this Mac can connect, and only through localhost."))
-                .font(.caption).foregroundStyle(.secondary)
+            .disabled(!enabled)
             urlRow(url, label: lan ? L("This Mac (.local)") : L("This Mac"))
             if lan {
                 if let ip = WebViewerAddress.preferredIPv4(from: WebHostPolicy.localAddresses()) {
                     let ipURL = WebViewerPrefs.viewerURL(host: ip, port: effectivePort, token: token)
                     urlRow(ipURL, label: L("IP address"))
-                    HStack(alignment: .top, spacing: 12) {
+                    SettingsRow("QR code", help: "Scan with the iPad or phone camera to open the viewer. The QR code contains the access token, so do not share a screenshot of it.",
+                                info: "Scan with the iPad or phone camera to open the viewer. Safari there can use Share > Add to Home Screen for a full-screen app. The device must be on the same network. The QR code contains the access token, so do not share a screenshot of it.") {
                         if let qr = WebViewerQR.image(for: ipURL) {
                             Image(decorative: qr, scale: 1).interpolation(.none).resizable()
-                                .frame(width: 140, height: 140)
+                                .frame(width: 120, height: 120)
                                 .accessibilityLabel("QR code of the viewer address")
                         }
-                        Text("Scan with the iPad or phone camera to open the viewer. Safari there can use Share > Add to Home Screen for a full-screen app. The device must be on the same network. The QR code contains the access token, so do not share a screenshot of it.")
-                            .font(.caption).foregroundStyle(.secondary)
                     }
                 } else {
-                    Text("No local network address found. Connect this Mac to Wi-Fi or Ethernet.")
-                        .font(.caption).foregroundStyle(.secondary)
+                    SettingsRow("IP address") {
+                        Text("No local network address found. Connect this Mac to Wi-Fi or Ethernet.")
+                            .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    }
                 }
             } else {
-                Text("To watch on an iPad or phone, turn on 'Allow other devices on the network'. A QR code appears here.")
-                    .font(.caption).foregroundStyle(.secondary)
+                SettingsRow("QR code") {
+                    Text("To watch on an iPad or phone, turn on 'Allow other devices on the network'. A QR code appears here.")
+                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
             }
-            Text("Off by default. Anyone on your network can watch while it is on. There is no encryption (plain HTTP) and the token is sent in the URL, so keep it off on untrusted networks. It only listens on this Mac unless 'Allow other devices' is on.")
-                .font(.caption).foregroundStyle(.secondary)
-            Text("Safari on iPad, iPhone and Mac plays the page directly. Other browsers: open the URL's live.m3u8 in VLC. Latency comes from 1 s segments and Safari's start-up buffer; expect a few seconds behind live, not real time (not yet measured on hardware). The page shows its own estimate.")
-                .font(.caption).foregroundStyle(.secondary)
         }
         .onAppear { if enabled { _token.load() } }
     }

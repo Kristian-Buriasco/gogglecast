@@ -38,20 +38,17 @@ struct RTMPSettingsSection: View {
     @AppStorage(RTMPPrefs.urlKey) private var url = ""
     @KeychainSecret(RTMPPrefs.streamKeyKey) private var key
     @AppStorage(RTMPPrefs.autoStartKey) private var autoStart = false
-    @FocusState private var keyFocused: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("RTMP Push (Twitch / YouTube / custom)").font(.headline)
-            TextField("Server URL", text: $url, prompt: Text("rtmp://live.twitch.tv/app"))
-            SecureField("Stream key", text: $key)
-                .focused($keyFocused)
-                .onChange(of: keyFocused) { _, f in if f { _key.load() } } // Keychain read waits for the click
-            Toggle("Start automatically", isOn: $autoStart)
-            Text("The stream key is stored in the macOS Keychain and is never logged. Changes apply on next start.")
-                .font(.caption).foregroundStyle(.secondary)
-            Text("Twitch and YouTube prefer 8 Mbps or less with a keyframe every 2 s. Goggles video is passed through unchanged, so the stream may be rejected or look worse. Not yet tested against a live service.")
-                .font(.caption).foregroundStyle(.secondary)
+        SettingsGroup("RTMP Push (Twitch / YouTube / custom)") {
+            SettingsRow("Server URL") {
+                TextField("Server URL", text: $url, prompt: Text("rtmp://live.twitch.tv/app")).labelsHidden().settingsField()
+            }
+            SettingsRow("Stream key", help: "Stored in the macOS Keychain, never logged.",
+                        info: "The stream key is stored in the macOS Keychain and is never logged. Changes apply on next start.\n\nTwitch and YouTube prefer 8 Mbps or less with a keyframe every 2 s. Goggles video is passed through unchanged, so the stream may be rejected or look worse. Not yet tested against a live service.") {
+                SettingsSecretField(title: "Stream key", text: $key, onReveal: { _key.load() }) // Keychain read waits for the click
+            }
+            SettingsToggleRow("Start automatically", isOn: $autoStart)
         }
     }
 }

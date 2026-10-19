@@ -205,17 +205,20 @@ struct ReencodeSettingsSection: View {
     @AppStorage(ReencodePrefs.halfRateKey) private var halfRate = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Keyframes for replay and streams").font(.headline)
-            Toggle("Re-encode with regular keyframes", isOn: $enabled)
-            Stepper(L("Bitrate: %lld Mbps", bitrate), value: $bitrate, in: ReencodePrefs.bitrateRange)
+        SettingsGroup("Keyframes for replay and streams") {
+            SettingsToggleRow("Re-encode with regular keyframes", isOn: $enabled,
+                info: "The goggles send one keyframe when Share Liveview starts and none after, so instant replay, UDP, RTMP, SRT and the web viewer can't start cleanly later. This re-encodes the picture with a keyframe every second (hardware encoder, runs only while one of those is active). Turn it off to pass the goggles' stream through untouched; clips and late-joining viewers may then show grey until the next keyframe.")
+            SettingsRow("Bitrate", indented: true) {
+                Stepper(value: $bitrate, in: ReencodePrefs.bitrateRange) {
+                    Text(verbatim: "\(bitrate) Mbps").monospacedDigit()
+                }
+                .accessibilityLabel(Text(verbatim: L("Bitrate: %lld Mbps", bitrate)))
+                .fixedSize()
+            }
+            .disabled(!enabled)
+            SettingsToggleRow("Re-encode at 30 fps (lighter, for several goggles)", isOn: $halfRate,
+                info: "Each goggles window with a recording or stream uses its own hardware encoder, and a Mac can only encode a limited number of frames per second in total (about 150 on an M1 Pro). At 30 fps, recordings and streams are half as smooth, but twice as many goggles fit. The live view stays at full frame rate.", indented: true)
                 .disabled(!enabled)
-            Toggle("Re-encode at 30 fps (lighter, for several goggles)", isOn: $halfRate)
-                .disabled(!enabled)
-            Text("Each goggles window with a recording or stream uses its own hardware encoder, and a Mac can only encode a limited number of frames per second in total (about 150 on an M1 Pro). At 30 fps, recordings and streams are half as smooth, but twice as many goggles fit. The live view stays at full frame rate.")
-                .font(.caption).foregroundStyle(.secondary)
-            Text("The goggles send one keyframe when Share Liveview starts and none after, so instant replay, UDP, RTMP, SRT and the web viewer can't start cleanly later. This re-encodes the picture with a keyframe every second (hardware encoder, runs only while one of those is active). Turn it off to pass the goggles' stream through untouched; clips and late-joining viewers may then show grey until the next keyframe.")
-                .font(.caption).foregroundStyle(.secondary)
         }
     }
 }

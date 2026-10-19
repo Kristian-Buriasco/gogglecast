@@ -195,9 +195,8 @@ enum SelfTestWindow {
 /// Settings > General: open the self-test.
 struct SelfTestSettingsSection: View {
     var body: some View {
-        HStack {
+        SettingsRow("Self-test") {
             Button("Run self-test…") { SelfTestWindow.show() }
-            Spacer()
         }
     }
 }

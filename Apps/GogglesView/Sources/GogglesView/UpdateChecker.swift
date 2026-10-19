@@ -125,19 +125,17 @@ struct UpdateSettingsSection: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Updates").font(.headline)
-            Text(status).font(.callout).foregroundStyle(.secondary)
-            HStack(spacing: 10) {
+        SettingsGroup("Updates") {
+            SettingsRow("Status") {
+                Text(status).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 primaryButton
                 if case .available(_, let url) = checker.result {
                     Button("Release notes") { NSWorkspace.shared.open(url) }
                 }
             }
-            Toggle("Check for updates daily", isOn: $enabled)
-            Toggle("Install updates automatically", isOn: $autoInstall)
-            Text("Updates are downloaded from this project's GitHub releases, checked against their SHA-256 and against the signing identity of this app (builds without a developer identity open the releases page instead), and applied when you quit (or when you choose Install & Restart). Never while recording or streaming.")
-                .font(.caption).foregroundStyle(.secondary)
+            SettingsToggleRow("Check for updates daily", isOn: $enabled)
+            SettingsToggleRow("Install updates automatically", isOn: $autoInstall,
+                info: "Updates are downloaded from this project's GitHub releases, checked against their SHA-256 and against the signing identity of this app (builds without a developer identity open the releases page instead), and applied when you quit (or when you choose Install & Restart). Never while recording or streaming.")
         }
     }
 

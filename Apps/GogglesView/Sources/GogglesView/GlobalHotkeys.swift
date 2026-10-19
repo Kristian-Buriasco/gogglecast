@@ -229,13 +229,10 @@ struct GlobalHotkeysSettingsSection: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Global hotkeys").font(.headline)
-            Toggle("Work while another app is focused", isOn: $enabled)
+        SettingsGroup("Global hotkeys") {
+            SettingsToggleRow("Work while another app is focused", isOn: $enabled)
             ForEach(GlobalHotkeyAction.allCases, id: \.rawValue) { a in
-                HStack {
-                    Text(a.title)
-                    Spacer()
+                SettingsRow(LocalizedStringKey(a.title), indented: true) {
                     Button(recording == a ? L("Press keys… (esc cancels)") : (combos[a]?.display ?? a.combo.display)) {
                         message = nil
                         recording = recording == a ? nil : a
@@ -255,18 +252,16 @@ struct GlobalHotkeysSettingsSection: View {
                         }
                     }.frame(width: 0, height: 0))
                 }
-                .font(.caption)
+                .disabled(!enabled)
             }
-            Button("Reset to defaults") {
-                GlobalHotkeyAction.allCases.forEach { GlobalHotkeyBindings.reset($0) }
-                message = nil
-                reload()
-                hotkeys.apply()
-            }
-            .controlSize(.small)
-            if let message { Text(message).font(.caption).foregroundStyle(.orange) }
-            if let err = hotkeys.lastError {
-                Text(err).font(.caption).foregroundStyle(.red)
+            SettingsRow("Defaults", help: message.map { LocalizedStringKey($0) }) {
+                Button("Reset to defaults") {
+                    GlobalHotkeyAction.allCases.forEach { GlobalHotkeyBindings.reset($0) }
+                    message = nil
+                    reload()
+                    hotkeys.apply()
+                }
+                if let err = hotkeys.lastError { Text(err).font(.caption).foregroundStyle(.red) }
             }
         }
         .onAppear { reload() }

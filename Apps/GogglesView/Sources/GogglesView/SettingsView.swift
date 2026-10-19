@@ -23,12 +23,16 @@ struct SettingsView: View {
     @ObservedObject private var profileContext = ProfileContext.shared
 
     enum Tab: String, CaseIterable, Identifiable {
-        case general = "General", display = "Display", recording = "Recording", streaming = "Streaming", advanced = "Advanced"
+        case general = "General", display = "Display", picture = "Picture", recording = "Recording", streaming = "Streaming"
+        case outputs = "Outputs", integrations = "Integrations", advanced = "Advanced"
         var id: String { rawValue }
         var title: String {
             switch self {
             case .general: return L("General")
             case .display: return L("Display")
+            case .picture: return L("Picture")
+            case .outputs: return L("Outputs")
+            case .integrations: return L("Integrations")
             case .recording: return L("Recording")
             case .streaming: return L("Streaming")
             case .advanced: return L("Advanced")
@@ -38,6 +42,9 @@ struct SettingsView: View {
             switch self {
             case .general: return "gearshape"
             case .display: return "display"
+            case .picture: return "wand.and.stars"
+            case .outputs: return "tv.and.mediabox"
+            case .integrations: return "puzzlepiece.extension"
             case .recording: return "record.circle"
             case .streaming: return "antenna.radiowaves.left.and.right"
             case .advanced: return "wrench.and.screwdriver"
@@ -61,50 +68,50 @@ struct SettingsView: View {
                         .padding(.bottom, 2)
                     switch tab.wrappedValue {
                     case .general:
-                        card { TroubleshootingSection(viewModel: viewModel) }
-                        card { helperStatusSection }
-                        card { launchAtLoginSection }
-                        card { AutoOpenSettingsSection() }
-                        card { PresetsSettingsSection() }
-                        card { SettingsBackupSection() }
-                        card { ProfileSettingsSection(deviceSerial: profileContext.serial) }
-                        card { UpdateSettingsSection() }
-                        card { MenuBarItemSettingsToggle() }
+                        startupSection
+                        UpdateSettingsSection()
+                        PresetsSettingsSection()
+                        ProfileSettingsSection(deviceSerial: profileContext.serial)
+                        SettingsBackupSection()
                     case .display:
-                        card { appearanceSection }
-                        card { osdSection }
-                        card { StabilizerSettingsSection() }
-                        card { EnhanceSettingsSection() }
-                        card { FramingSettingsSection() }
-                        card { OutputFramingSettingsSection() }
-                        card { LookSettingsSection() }
-                        card { ExposureSettingsSection() }
-                        card { OrientationSettingsSection() }
-                        card { captureWindowSection }
-                        card { ProgramOutputSettingsSection() }
-                        card { MiniWindowSettingsSection() }
-                        card { RaceModeSettingsSection() }
+                        appearanceSection
+                        RaceModeSettingsSection()
+                        osdSection
+                        OrientationSettingsSection()
+                        ExposureSettingsSection()
+                        windowsSection
+                    case .picture:
+                        StabilizerSettingsSection()
+                        EnhanceSettingsSection()
+                        FramingSettingsSection()
+                        LookSettingsSection()
                     case .recording:
-                        card { recordingSection }
-                        card { RecordingExtrasSettingsSection() }
-                        card { AutoMarkerSettingsSection() }
-                        card { ReplaySettingsSection() }
-                        card { BurnInSettingsSection() }
-                        card { GallerySettingsRow() }
+                        recordingSection
+                        RecordingExtrasSettingsSection()
+                        AutoMarkerSettingsSection()
+                        ReplaySettingsSection()
+                        BurnInSettingsSection()
+                        OutputFramingSettingsSection()
+                        GallerySettingsRow()
                     case .streaming:
-                        card { ReencodeSettingsSection() }
-                        card { NetworkStreamSettingsSection() }
-                        card { RTMPSettingsSection() }
-                        card { WebViewerSettingsSection() }
-                        card { SRTSettingsSection() }
-                        card { NDISettingsSection() }
-                        card { OBSSettingsSection() }
+                        ReencodeSettingsSection()
+                        NetworkStreamSettingsSection()
+                    case .outputs:
+                        RTMPSettingsSection()
+                        SRTSettingsSection()
+                        NDISettingsSection()
+                        WebViewerSettingsSection()
+                        ProgramOutputSettingsSection()
+                    case .integrations:
+                        OBSSettingsSection()
+                        EventHooksSettingsSection()
+                        AutomationSettingsSection()
+                        AutoOpenSettingsSection()
                     case .advanced:
-                        card { GlobalHotkeysSettingsSection() }
-                        card { EventHooksSettingsSection() }
-                        card { AutomationSettingsSection() }
-                        card { SignalAlertSettingsSection() }
-                        card { developerToolsSection }
+                        TroubleshootingSection(viewModel: viewModel)
+                        GlobalHotkeysSettingsSection()
+                        SignalAlertSettingsSection()
+                        developerToolsSection
                     }
                 }
                 .padding(.horizontal, 24)
@@ -113,7 +120,7 @@ struct SettingsView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .frame(width: 780, height: Self.heightOverride ?? 580, alignment: .topLeading)
+        .frame(width: 780, height: Self.heightOverride ?? 680, alignment: .topLeading)
         .background(AppChrome.backgroundColor)
         .foregroundStyle(.primary)
         .onAppear { viewModel.refresh() }
@@ -156,43 +163,22 @@ struct SettingsView: View {
             .overlay(RoundedRectangle(cornerRadius: 12).stroke(AppChrome.cardStroke))
     }
 
-    private var launchAtLoginSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Startup").font(.headline)
-            Toggle(isOn: Binding(
+    private var startupSection: some View {
+        SettingsGroup("Startup") {
+            SettingsToggleRow("Launch GogglesView at login", isOn: Binding(
                 get: { viewModel.isLaunchAtLoginEnabled },
                 set: { viewModel.setLaunchAtLogin($0) }
-            )) {
-                Text("Launch GogglesView at login")
-            }
+            ), help: viewModel.actionMessage.map { LocalizedStringKey($0) })
             .accessibilityIdentifier("launchAtLoginToggle")
-
-            if let message = viewModel.actionMessage {
-                Text(message)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .accessibilityIdentifier("settingsActionMessage")
-            }
-        }
-    }
-
-    private var helperStatusSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Background service").font(.headline)
-            HStack(spacing: 8) {
-                Circle()
-                    .fill(viewModel.statusColor)
-                    .frame(width: 8, height: 8)
-                    .accessibilityHidden(true)
+            MenuBarItemSettingsToggle()
+            SettingsRow("Background service") {
+                Circle().fill(viewModel.statusColor).frame(width: 8, height: 8).accessibilityHidden(true)
                 Text(viewModel.statusDescription)
-                    .font(.caption)
                     .accessibilityIdentifier("helperStatusText")
-            }
-            if viewModel.showsReRegisterButton {
-                Button("Re-register") {
-                    viewModel.reRegister()
+                if viewModel.showsReRegisterButton {
+                    Button("Re-register") { viewModel.reRegister() }
+                        .accessibilityIdentifier("reRegisterButton")
                 }
-                .accessibilityIdentifier("reRegisterButton")
             }
         }
     }
@@ -213,42 +199,36 @@ struct SettingsView: View {
     @AppStorage(AppearancePreference.key) private var appearanceRaw = AppearancePreference.system.rawValue
 
     private var appearanceSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Appearance").font(.headline)
-            Picker("Appearance", selection: $appearanceRaw) {
-                ForEach(AppearancePreference.allCases) { Text($0.title).tag($0.rawValue) }
+        SettingsGroup("Appearance") {
+            SettingsRow("Appearance") {
+                Picker("Appearance", selection: $appearanceRaw) {
+                    ForEach(AppearancePreference.allCases) { Text($0.title).tag($0.rawValue) }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden().frame(width: 260)
+                .onChange(of: appearanceRaw) { _, _ in AppearancePreference.applyStored() }
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .onChange(of: appearanceRaw) { _, _ in AppearancePreference.applyStored() }
         }
     }
 
     private var osdSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("On-screen display").font(.headline)
-            Toggle("Show stats over the video", isOn: $osdEnabled)
-            Group {
-                Toggle("Resolution", isOn: $osdResolution)
-                Toggle("Framerate", isOn: $osdFps)
-                Toggle("Bitrate", isOn: $osdBitrate)
-                Toggle("Latency (stream in to decoded picture)", isOn: $osdLatency)
-                Toggle("Dropped frames", isOn: $osdDrops)
-                Toggle("Goggles battery", isOn: $osdBattery)
-            }
-            .padding(.leading, 16)
-            .disabled(!osdEnabled)
+        SettingsGroup("On-screen display") {
+            SettingsToggleRow("Show stats over the video", isOn: $osdEnabled)
+            SettingsToggleRow("Resolution", isOn: $osdResolution, indented: true).disabled(!osdEnabled)
+            SettingsToggleRow("Framerate", isOn: $osdFps, indented: true).disabled(!osdEnabled)
+            SettingsToggleRow("Bitrate", isOn: $osdBitrate, indented: true).disabled(!osdEnabled)
+            SettingsToggleRow("Latency (stream in to decoded picture)", isOn: $osdLatency, indented: true).disabled(!osdEnabled)
+            SettingsToggleRow("Dropped frames", isOn: $osdDrops, indented: true).disabled(!osdEnabled)
+            SettingsToggleRow("Goggles battery", isOn: $osdBattery, indented: true).disabled(!osdEnabled)
         }
     }
 
     private var recordingSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Recording").font(.headline)
-            HStack {
+        SettingsGroup("Recording") {
+            SettingsRow("Folder", help: "Records the goggles' stream as-is (no re-encoding), so quality is whatever the goggles send.") {
                 Text(recordingFolder.isEmpty ? Recorder.defaultDirectory.path : recordingFolder)
                     .font(.caption).foregroundStyle(.secondary)
-                    .lineLimit(1).truncationMode(.middle)
-                Spacer()
+                    .lineLimit(1).truncationMode(.middle).frame(maxWidth: 100, alignment: .leading)
                 Button("Open") { RecordingPrefs.openFolder() }
                 Button("Choose…") {
                     let panel = NSOpenPanel()
@@ -258,38 +238,37 @@ struct SettingsView: View {
                     if panel.runModal() == .OK, let url = panel.url { recordingFolder = url.path }
                 }
             }
-            Picker("Format", selection: $recordingContainer) {
-                ForEach(RecordingPrefs.Container.allCases) { Text(verbatim: ".\($0.ext)").tag($0.rawValue) }
+            SettingsRow("Format") {
+                Picker("Format", selection: $recordingContainer) {
+                    ForEach(RecordingPrefs.Container.allCases) { Text(verbatim: ".\($0.ext)").tag($0.rawValue) }
+                }
+                .pickerStyle(.segmented).labelsHidden().frame(width: 160)
             }
-            .pickerStyle(.segmented)
-            TextField("File name prefix", text: $recordingPrefix, prompt: Text("GogglesView"))
-            Toggle("Start recording automatically when live", isOn: $recordingAutoStart)
-            Text("Records the goggles' stream as-is (no re-encoding), so quality is whatever the goggles send.")
-                .font(.caption2).foregroundStyle(.secondary)
+            SettingsRow("File name prefix") {
+                TextField("File name prefix", text: $recordingPrefix, prompt: Text("GogglesView"))
+                    .labelsHidden().settingsField(width: 240, mono: false)
+            }
+            SettingsToggleRow("Start recording automatically when live", isOn: $recordingAutoStart)
         }
     }
 
-    private var captureWindowSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Capture window").font(.headline)
-            Toggle("Show capture window (for OBS Window Capture)", isOn: $viewModel.captureWindowEnabled)
+    private var windowsSection: some View {
+        SettingsGroup("Windows") {
+            SettingsToggleRow("Show capture window (for OBS Window Capture)", isOn: $viewModel.captureWindowEnabled)
                 .disabled(viewModel.captureWindowHandler == nil)
                 .accessibilityIdentifier("captureWindowToggle")
-            Toggle("Keep on top", isOn: $viewModel.captureWindowOnTop)
+            SettingsToggleRow("Keep on top", isOn: $viewModel.captureWindowOnTop, indented: true)
                 .accessibilityIdentifier("captureWindowOnTopToggle")
+            MiniWindowSettingsSection()
         }
     }
 
     private var developerToolsSection: some View {
-        DisclosureGroup("Developer tools") {
-            VStack(alignment: .leading, spacing: 16) {
-                BenchmarkSettingsSection()
-                SelfTestSettingsSection()
-                SessionLogSettingsSection()
-            }
-            .padding(.top, 8)
+        SettingsGroup("Developer tools") {
+            BenchmarkSettingsSection()
+            SelfTestSettingsSection()
+            SessionLogSettingsSection()
         }
-        .font(.headline)
         .accessibilityIdentifier("developerToolsGroup")
     }
 }
@@ -301,28 +280,25 @@ struct TroubleshootingSection: View {
     private let timer = Timer.publish(every: 2, on: .main, in: .common).autoconnect()
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Troubleshooting").font(.headline)
-            HStack(spacing: 8) {
+        SettingsGroup("Troubleshooting") {
+            SettingsRow("Health") {
                 Circle()
                     .fill(model.isComplete ? Color.green : Color.orange)
                     .frame(width: 8, height: 8)
                     .accessibilityHidden(true)
                 Text(SetupDiagnosis.healthLine(model.steps))
-                    .font(.caption)
                     .accessibilityIdentifier("healthLineText")
             }
-            HStack {
+            SettingsRow("Setup") {
                 Button("Open setup assistant") { OnboardingWindow.show() }
                     .accessibilityHint("Opens a guided checklist for the background service, USB connection and video")
                     .accessibilityIdentifier("openSetupAssistantButton")
+            }
+            SettingsRow("Connection", help: viewModel.reconnectHandler == nil ? LocalizedStringKey(L("No device selected yet.")) : nil) {
                 Button("Reconnect") { viewModel.reconnectHandler?() }
                     .disabled(viewModel.reconnectHandler == nil)
                     .accessibilityIdentifier("settingsReconnectButton")
                 Button("Connection health") { HealthWindow.show() }
-            }
-            if viewModel.reconnectHandler == nil {
-                Text("No device selected yet.").font(.caption).foregroundStyle(.secondary)
             }
             DiagnosticsSettingsSection()
         }

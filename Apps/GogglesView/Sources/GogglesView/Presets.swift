@@ -81,9 +81,8 @@ struct PresetsSettingsSection: View {
     @State private var message: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Presets").font(.headline)
-            HStack {
+        SettingsGroup("Presets") {
+            SettingsRow("Preset", help: LocalizedStringKey(selection.summary)) {
                 Picker("", selection: $selection) {
                     ForEach(SettingsPreset.allCases) { Text($0.title).tag($0) }
                 }
@@ -91,10 +90,10 @@ struct PresetsSettingsSection: View {
                 .accessibilityLabel("Preset")
                 .frame(width: 140)
                 Button("Apply") { selection.apply(); message = L("Applied %@.", selection.title) }
+            }
+            SettingsRow("Defaults", help: message.map { LocalizedStringKey($0) }) {
                 Button("Reset all to defaults") { SettingsPreset.resetAll(); message = L("Reset to defaults.") }
             }
-            Text(selection.summary).font(.caption).foregroundStyle(.secondary)
-            if let message { Text(message).font(.caption).foregroundStyle(.secondary) }
         }
     }
 }

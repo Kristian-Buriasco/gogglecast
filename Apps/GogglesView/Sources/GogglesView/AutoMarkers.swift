@@ -176,20 +176,14 @@ struct AutoMarkerSettingsSection: View {
     @AppStorage(AutoMarkerPrefs.raceKey) private var race = true
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Automatic markers").font(.headline)
-            Toggle("Add markers to recordings automatically", isOn: $enabled)
+        SettingsGroup("Automatic markers") {
+            SettingsToggleRow("Add markers to recordings automatically", isOn: $enabled,
+                info: "Markers appear in the clip's .markers.json and as chapters in QuickTime Player, Final Cut, Resolve and VLC. They are drawn in a different colour from your own markers when you trim.")
                 .accessibilityIdentifier("autoMarkersToggle")
-            VStack(alignment: .leading, spacing: 4) {
-                Toggle("Signal lost and restored", isOn: $signal)
-                Toggle("Goggles battery low (once per recording)", isOn: $battery)
-                Toggle("Replay saved and screenshot taken", isOn: $captures)
-                Toggle("Race mode turned on or off", isOn: $race)
-            }
-            .padding(.leading, 16)
-            .disabled(!enabled)
-            Text("Markers appear in the clip's .markers.json and as chapters in QuickTime Player, Final Cut, Resolve and VLC. They are drawn in a different colour from your own markers when you trim.")
-                .font(.caption2).foregroundStyle(.secondary)
+            SettingsToggleRow("Signal lost and restored", isOn: $signal, indented: true).disabled(!enabled)
+            SettingsToggleRow("Goggles battery low (once per recording)", isOn: $battery, indented: true).disabled(!enabled)
+            SettingsToggleRow("Replay saved and screenshot taken", isOn: $captures, indented: true).disabled(!enabled)
+            SettingsToggleRow("Race mode turned on or off", isOn: $race, indented: true).disabled(!enabled)
         }
     }
 }

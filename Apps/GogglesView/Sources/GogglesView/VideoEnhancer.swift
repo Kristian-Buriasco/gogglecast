@@ -448,27 +448,27 @@ struct EnhanceSettingsSection: View {
     @AppStorage(EnhancePrefs.upscaleFactorKey) private var factor = EnhancePrefs.defaultUpscaleFactor
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Picture enhancement").font(.headline)
+        SettingsGroup("Picture enhancement") {
             if !EnhanceSupport.upscale {
-                Text("Upscaling needs a Mac with Apple silicon.")
-                    .font(.caption).foregroundStyle(.orange)
+                SettingsRow("Status") {
+                    Text("Upscaling needs a Mac with Apple silicon.")
+                        .font(.caption).foregroundStyle(.orange)
+                }
             }
-            Toggle("Reduce noise (low light, high ISO)", isOn: $denoise).disabled(!EnhanceSupport.denoise)
-            HStack {
-                Text("Strength")
-                Slider(value: $strength, in: 0...1).disabled(!denoise || !EnhanceSupport.denoise)
-                Text(verbatim: "\(Int(strength * 100))%").monospacedDigit().frame(width: 40, alignment: .trailing)
+            SettingsToggleRow("Reduce noise (low light, high ISO)", isOn: $denoise,
+                info: "Reducing noise blends each picture with the ones before it, so a moving subject can leave a faint trail at high strength. Upscaling makes the picture larger and sharper with Apple's MetalFX scaler. The goggles still send 1080p, so it helps most for recordings and large displays; it does not add detail that was never captured. Both run on the GPU, add no frames of delay, switch themselves off when the Mac cannot keep up, and are off in race mode. They apply to the preview, recordings and streams.")
+                .disabled(!EnhanceSupport.denoise)
+            SettingsSliderRow("Strength", value: $strength, range: 0...1, scale: 100, unit: "%", indented: true)
+                .disabled(!denoise || !EnhanceSupport.denoise)
+            SettingsToggleRow("Upscale the picture", isOn: $upscale).disabled(!EnhanceSupport.upscale)
+            SettingsRow("Scale", indented: true) {
+                Picker("Scale", selection: $factor) {
+                    Text(verbatim: "1.5x").tag(1.5)
+                    Text(verbatim: "2x").tag(2.0)
+                }
+                .pickerStyle(.segmented).labelsHidden().frame(width: 160)
             }
-            Toggle("Upscale the picture", isOn: $upscale).disabled(!EnhanceSupport.upscale)
-            Picker("Scale", selection: $factor) {
-                Text(verbatim: "1.5x").tag(1.5)
-                Text(verbatim: "2x").tag(2.0)
-            }
-            .pickerStyle(.segmented)
             .disabled(!upscale || !EnhanceSupport.upscale)
-            Text("Reducing noise blends each picture with the ones before it, so a moving subject can leave a faint trail at high strength. Upscaling makes the picture larger and sharper with Apple's MetalFX scaler. The goggles still send 1080p, so it helps most for recordings and large displays; it does not add detail that was never captured. Both run on the GPU, add no frames of delay, switch themselves off when the Mac cannot keep up, and are off in race mode. They apply to the preview, recordings and streams.")
-                .font(.caption).foregroundStyle(.secondary)
         }
     }
 }

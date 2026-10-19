@@ -250,6 +250,10 @@ struct GalleryButton: View {
 /// Insert in the Capture tab of SettingsView.
 struct GallerySettingsRow: View {
     var body: some View {
-        Button("Open clip gallery") { ClipGalleryWindowController.shared.show() }
+        SettingsGroup("Clip gallery") {
+            SettingsRow("Gallery") {
+                Button("Open clip gallery") { ClipGalleryWindowController.shared.show() }
+            }
+        }
     }
 }

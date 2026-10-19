@@ -97,12 +97,16 @@ struct ReplaySettingsSection: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Instant replay").font(.headline)
-            Toggle("Keep a replay buffer (⇧⌘P saves it)", isOn: $enabled)
-            Stepper(L("Window: %lld s", seconds), value: $seconds, in: ReplayPrefs.secondsRange, step: 5)
-                .disabled(!enabled)
-            Text(caption).font(.caption).foregroundStyle(.secondary)
+        SettingsGroup("Instant replay") {
+            SettingsToggleRow("Keep a replay buffer (⇧⌘P saves it)", isOn: $enabled, help: LocalizedStringKey(caption))
+            SettingsRow("Window", indented: true) {
+                Stepper(value: $seconds, in: ReplayPrefs.secondsRange, step: 5) {
+                    Text(verbatim: "\(seconds) s").monospacedDigit()
+                }
+                .accessibilityLabel(Text(verbatim: L("Window: %lld s", seconds)))
+                .fixedSize()
+            }
+            .disabled(!enabled)
         }
     }
 }

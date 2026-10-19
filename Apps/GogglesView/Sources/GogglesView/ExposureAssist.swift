@@ -214,32 +214,32 @@ struct ExposureSettingsSection: View {
     private var levelText: String { level >= 100 ? "100%" : "\(level)%" }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Exposure and focus aids").font(.headline)
-            Toggle("Zebra stripes", isOn: $zebra)
-            HStack {
-                Text("Stripes from").frame(width: 80, alignment: .leading)
-                Slider(value: Binding(get: { Double(level) }, set: { level = Int($0.rounded()) }), in: 50...100, step: 5)
-                    .disabled(!zebra)
-                Text(verbatim: levelText).monospacedDigit().frame(width: 44, alignment: .trailing)
-            }
-            Toggle("Focus peaking", isOn: $peaking)
-            HStack {
+        SettingsGroup("Exposure and focus aids") {
+            SettingsToggleRow("Zebra stripes", isOn: $zebra,
+                info: "Stripes mark areas that are close to white, so you can see where highlights clip. Peaking colours sharp edges. Both only appear in the preview; recordings and streams are not changed. Race mode turns them off.")
+            SettingsSliderRow("Stripes from", value: Binding(get: { Double(level) }, set: { level = Int($0.rounded()) }),
+                              range: 50...100, format: "%.0f", unit: "%", indented: true)
+                .disabled(!zebra)
+            SettingsToggleRow("Focus peaking", isOn: $peaking)
+            SettingsRow("Sensitivity", indented: true) {
                 Picker("Sensitivity", selection: $sensitivity) {
                     Text("Low").tag(PeakingSensitivity.low.rawValue)
                     Text("Medium").tag(PeakingSensitivity.medium.rawValue)
                     Text("High").tag(PeakingSensitivity.high.rawValue)
                 }
+                .labelsHidden().frame(width: 120)
+            }
+            .disabled(!peaking)
+            SettingsRow("Colour", indented: true) {
                 Picker("Colour", selection: $color) {
                     Text("Red").tag(PeakingColor.red.rawValue)
                     Text("Green").tag(PeakingColor.green.rawValue)
                     Text("Yellow").tag(PeakingColor.yellow.rawValue)
                     Text("White").tag(PeakingColor.white.rawValue)
                 }
+                .labelsHidden().frame(width: 120)
             }
             .disabled(!peaking)
-            Text("Stripes mark areas that are close to white, so you can see where highlights clip. Peaking colours sharp edges. Both only appear in the preview; recordings and streams are not changed. Race mode turns them off.")
-                .font(.caption).foregroundStyle(.secondary)
         }
     }
 }
