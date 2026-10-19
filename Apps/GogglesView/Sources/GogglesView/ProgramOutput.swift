@@ -30,7 +30,13 @@ enum ProgramOutputPrefs {
     static let outputsKey = "programOutputList"          // JSON [ProgramOutputConfig]
     static let feedNamesKey = "programOutputFeedNames"  // [deviceId: custom name]
     static let openAtLaunchKey = "programOutputOpenAtLaunch"
+    static let cleanKey = "programOutputClean"            // no names, NO SIGNAL text, warnings or red border
+    static let stabilizeKey = "programOutputStabilize"    // run the stabilizer while the outputs are shown, even in race mode
     static let maxOutputs = 4
+
+    static func clean(_ d: UserDefaults = .standard) -> Bool { d.bool(forKey: cleanKey) }
+    /// The stabilizer sits in the shared decode path, so this stabilizes the preview too.
+    static func stabilizeActive(_ d: UserDefaults = .standard) -> Bool { enabled(d) && d.bool(forKey: stabilizeKey) }
 
     /// The program outputs are full-screen windows. Unless the user asked for them at launch, start with them off,
     /// so a Mac that quit with them on does not come back hidden behind a full-screen picture.
@@ -222,6 +228,7 @@ private struct ProgramOutputView: View {
     let feeds: [ProgramFeed]
     let showNames: Bool
     let multiview: Bool
+    let clean: Bool
 
     var body: some View {
         GeometryReader { geo in
@@ -229,7 +236,7 @@ private struct ProgramOutputView: View {
                 Color.black
                 ForEach(Array(feeds.enumerated()), id: \.element.id) { i, feed in
                     let r = ProgramLayoutMath.tile(index: i, count: feeds.count, in: geo.size)
-                    ProgramTile(feed: feed, showName: showNames && multiview, showSignal: multiview)
+                    ProgramTile(feed: feed, showName: showNames && multiview && !clean, showSignal: multiview && !clean)
                         .frame(width: r.width, height: r.height)
                         .offset(x: r.minX, y: r.minY)
                 }
@@ -318,11 +325,12 @@ final class ProgramOutputController: ObservableObject {
                 let chosen = output.feed.isEmpty ? active()?.deviceId : output.feed
                 feeds = feeds.filter { $0.id == chosen }
             }
-            let key = "\(displayID)|\(screen.frame)|\(output.layout)|\(output.showNames)|" + feeds.map { "\($0.id):\($0.name)" }.joined(separator: ",")
+            let clean = ProgramOutputPrefs.clean()
+            let key = "\(displayID)|\(screen.frame)|\(output.layout)|\(output.showNames)|\(clean)|" + feeds.map { "\($0.id):\($0.name)" }.joined(separator: ",")
             guard key != shownKeys[output.id] else { continue }
             shownKeys[output.id] = key
 
-            let host = NSHostingView(rootView: ProgramOutputView(feeds: feeds, showNames: output.showNames, multiview: output.isGrid))
+            let host = NSHostingView(rootView: ProgramOutputView(feeds: feeds, showNames: output.showNames, multiview: output.isGrid, clean: clean))
             let container = ProgramContainerView(frame: NSRect(origin: .zero, size: screen.frame.size))
             host.frame = container.bounds
             host.autoresizingMask = [.width, .height]
@@ -348,6 +356,8 @@ struct ProgramOutputSettingsSection: View {
     @ObservedObject private var controller = ProgramOutputController.shared
     @AppStorage(ProgramOutputPrefs.enabledKey) private var enabled = false
     @AppStorage(ProgramOutputPrefs.openAtLaunchKey) private var openAtLaunch = false
+    @AppStorage(ProgramOutputPrefs.cleanKey) private var clean = false
+    @AppStorage(ProgramOutputPrefs.stabilizeKey) private var stabilize = false
     @State private var outputs = ProgramOutputPrefs.outputs()
     @State private var screens = ProgramOutputController.screenInfos()
 
@@ -356,6 +366,8 @@ struct ProgramOutputSettingsSection: View {
             Text("Program output (HDMI)").font(.headline)
             Toggle("Show the program outputs", isOn: $enabled)
             Toggle("Open the program outputs when the app starts", isOn: $openAtLaunch)
+            Toggle("Clean output: hide all names, warnings and the no-signal marker", isOn: $clean)
+            Toggle("Stabilize the program output (also stabilizes the preview, works in race mode)", isOn: $stabilize)
             ForEach($outputs) { $o in
                 OutputRow(output: $o, screens: screens, feeds: controller.available,
                           canRemove: outputs.count > 1) { outputs.removeAll { $0.id == o.id } }

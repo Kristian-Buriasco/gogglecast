@@ -928,3 +928,6 @@
 "Minimize" = "Minimize";
 "Bring All to Front" = "Bring All to Front";
 "Help" = "Help";
+
+"Clean output: hide all names, warnings and the no-signal marker" = "Clean output: hide all names, warnings and the no-signal marker";
+"Stabilize the program output (also stabilizes the preview, works in race mode)" = "Stabilize the program output (also stabilizes the preview, works in race mode)";

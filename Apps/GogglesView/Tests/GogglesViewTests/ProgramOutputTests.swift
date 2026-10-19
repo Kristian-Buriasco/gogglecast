@@ -119,4 +119,15 @@ import CoreGraphics
         let outs = [ProgramOutputConfig(), ProgramOutputConfig(), ProgramOutputConfig()]
         #expect(ProgramDisplayChoice.assign(outputs: outs, screens: three) == [7, 8, nil])
     }
+
+    @Test func stabilizingTheOutputNeedsTheOutputsShown() {
+        let d = UserDefaults(suiteName: "ProgramOutputStabilizeTests")!
+        d.removePersistentDomain(forName: "ProgramOutputStabilizeTests")
+        #expect(!ProgramOutputPrefs.stabilizeActive(d))
+        d.set(true, forKey: ProgramOutputPrefs.stabilizeKey)
+        #expect(!ProgramOutputPrefs.stabilizeActive(d), "off while the outputs are hidden")
+        d.set(true, forKey: ProgramOutputPrefs.enabledKey)
+        #expect(ProgramOutputPrefs.stabilizeActive(d))
+        #expect(!ProgramOutputPrefs.clean(d))
+    }
 }

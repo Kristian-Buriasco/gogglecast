@@ -944,3 +944,6 @@
 "Appearance" = "Aspetto";
 "Stop" = "Ferma";
 "Connect the goggles and turn on Share Liveview to record" = "Collega gli occhiali e attiva Share Liveview per registrare";
+
+"Clean output: hide all names, warnings and the no-signal marker" = "Clean output: hide all names, warnings and the no-signal marker";
+"Stabilize the program output (also stabilizes the preview, works in race mode)" = "Stabilize the program output (also stabilizes the preview, works in race mode)";

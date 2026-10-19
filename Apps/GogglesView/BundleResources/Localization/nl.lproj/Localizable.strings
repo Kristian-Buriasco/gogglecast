@@ -873,3 +873,6 @@
 "Appearance" = "Weergave";
 "Stop" = "Stop";
 "Connect the goggles and turn on Share Liveview to record" = "Verbind de bril en zet Share Liveview aan om op te nemen";
+
+"Clean output: hide all names, warnings and the no-signal marker" = "Clean output: hide all names, warnings and the no-signal marker";
+"Stabilize the program output (also stabilizes the preview, works in race mode)" = "Stabilize the program output (also stabilizes the preview, works in race mode)";
