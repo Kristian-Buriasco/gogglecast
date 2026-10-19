@@ -261,6 +261,9 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         let raceItem = item(L("Race Mode")) { RaceModeController.shared.toggle() }
         raceItem.state = RaceModePrefs.enabled ? .on : .off
         menu.addItem(raceItem)
+        let awayItem = item(L("Away mode (remote alerts)")) { AlertPrefs.setAway(!AlertPrefs.away()) }
+        awayItem.state = AlertPrefs.away() ? .on : .off
+        menu.addItem(awayItem)
         if let onOpenSettings {
             menu.addItem(item(L("Settings…")) {
                 NSApp.activate(ignoringOtherApps: true)

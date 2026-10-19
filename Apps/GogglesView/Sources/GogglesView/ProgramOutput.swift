@@ -252,6 +252,8 @@ final class ProgramOutputController: ObservableObject {
 
     /// Open goggles with the name each one would get; the settings card lists them.
     @Published private(set) var available: [ProgramFeedInfo] = []
+    /// Enabled program outputs with no display to show on (HDMI unplugged), for the remote alerts.
+    private(set) var missingOutputs: [String] = []
 
     private var sessions: () -> [GogglesSession] = { [] }
     private var active: () -> GogglesSession? = { nil }
@@ -312,9 +314,10 @@ final class ProgramOutputController: ObservableObject {
 
         let outputs = ProgramOutputPrefs.outputs()
         for id in Set(windows.keys).subtracting(outputs.map(\.id)) { close(id) }
-        guard ProgramOutputPrefs.enabled() else { for id in Array(windows.keys) { close(id) }; return }
+        guard ProgramOutputPrefs.enabled() else { missingOutputs = []; for id in Array(windows.keys) { close(id) }; return }
 
         let assigned = ProgramDisplayChoice.assign(outputs: outputs, screens: Self.screenInfos())
+        missingOutputs = zip(outputs.indices, assigned).filter { $0.1 == nil }.map { L("Program output %lld", $0.0 + 1) }
         let allFeeds: [ProgramFeed] = zip(all, names).map {
             ProgramFeed(id: $0.deviceId, name: $1, session: $0.decodeSession, coordinator: $0.coordinator)
         }

@@ -16,7 +16,7 @@ struct RTMPStreamControl: View {
         .help(publisher.lastError.map { "RTMP: \($0)" } ?? "RTMP: \(publisher.status)")
         .accessibilityLabel("RTMP stream")
         .accessibilityValue(publisher.lastError ?? (publisher.isLive ? L("Live") : publisher.isStreaming ? L("Connecting") : L("Stopped")))
-        .onAppear { if autoStart { start() } }
+        .onAppear { SessionControlBoard.shared.register(rtmp: publisher, for: session); if autoStart { start() } }
         .onDisappear { stop() }
     }
 

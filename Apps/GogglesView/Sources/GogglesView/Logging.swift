@@ -26,4 +26,6 @@ enum Logging {
     static let decode = Logger(subsystem: subsystem, category: "Decode")
     /// Recorder lifecycle: armed, writer created, failures.
     static let recorder = Logger(subsystem: subsystem, category: "Recorder")
+    /// Remote alerts (ntfy): host and status only, never topic, token or message text.
+    static let alerts = Logger(subsystem: subsystem, category: "Alerts")
 }
