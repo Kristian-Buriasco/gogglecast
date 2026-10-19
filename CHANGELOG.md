@@ -4,6 +4,17 @@ All notable changes to this project are documented here. Format based on [Keep a
 
 ## [Unreleased]
 
+## [0.10.2] - 2026-10-19
+
+Two options for the HDMI program output.
+
+### Added
+- Program output: a "Clean output" option hides every name, the no-signal marker, the issue warnings and the red border on all outputs, leaving only the video.
+- Program output: a "Stabilize the program output" option runs the stabilizer while the outputs are shown, including in race mode, where stabilization was always off. The stabilizer sits in the shared decode path, so the preview is stabilized too.
+
+### Fixed
+- CI: the 1080p enhancer timing check no longer fails on the virtual GPU of the GitHub runners.
+
 ## [0.10.1] - 2026-10-17
 
 A light theme, a clearer Record button and fewer keychain prompts.
