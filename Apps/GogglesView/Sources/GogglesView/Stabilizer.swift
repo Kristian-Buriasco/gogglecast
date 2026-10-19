@@ -175,7 +175,9 @@ final class Stabilizer {
     /// Dev probe: the raw measured motion of every frame, in order (full-size pixels), for offline tuning.
     private(set) var motionLog: [CGPoint] = []
     func takeMotionLog() -> [CGPoint] { statLock.lock(); defer { statLock.unlock() }; let l = motionLog; motionLog = []; return l }
-    private let ci = CIContext(options: [.cacheIntermediates: false])
+    /// One context for every feed (a context per feed kept its own Core Image caches, which grew with the feed count).
+    private static let sharedContext = CIContext(options: [.cacheIntermediates: false])
+    private var ci: CIContext { Self.sharedContext }
     private var smoother = PathSmoother(strength: StabilizerPrefs.defaultStrength)
     private var previousSmall: CVPixelBuffer?
     private var outPool: CVPixelBufferPool?
@@ -236,7 +238,12 @@ final class Stabilizer {
         if changed { StabilizerStatus.shared.set(ObjectIdentifier(self), paused: on) }
     }
 
+    /// Drain the autoreleased Core Image / Vision objects after each picture (the decoder's thread does not).
     func process(_ input: CVPixelBuffer, strength: Double) -> CVPixelBuffer {
+        autoreleasepool { processUnpooled(input, strength: strength) }
+    }
+
+    private func processUnpooled(_ input: CVPixelBuffer, strength: Double) -> CVPixelBuffer {
         lock.lock(); defer { lock.unlock() }
         statLock.lock()
         let doReset = resetRequested
