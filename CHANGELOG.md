@@ -4,6 +4,18 @@ All notable changes to this project are documented here. Format based on [Keep a
 
 ## [Unreleased]
 
+## [0.11.1] - 2026-10-20
+
+A dedicated HDMI tab, an emergency way to close program outputs and two layout fixes.
+
+### Added
+- Settings has a new HDMI tab for the program outputs: the master switches, a table of connected displays (main or external, resolution, which output uses it) and one group per output with a status line.
+- Emergency close: press Control-Option-Command-period in any app to close all program outputs, for example when one landed on your only screen. Active only while an output is shown.
+
+### Fixed
+- Settings > General: the Check Now button was clipped; it keeps its full width now.
+- Settings > Advanced > Remote alerts: the card now says what is needed to switch it on (server and topic), and the Send test button is no longer clipped.
+
 ## [0.11.0] - 2026-10-19
 
 A redesigned Settings window and two new stabilizer modes.
