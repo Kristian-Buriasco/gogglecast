@@ -4,6 +4,19 @@ All notable changes to this project are documented here. Format based on [Keep a
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-10-19
+
+A redesigned Settings window and two new stabilizer modes.
+
+### Changed
+- Settings is now eight sidebar tabs (General, Display, Picture, Recording, Streaming, Outputs, Integrations, Advanced) with aligned label and control rows. Every field has a visible label and units, long help text moved into info popovers, and text inputs have a new look with a focus outline. Secret fields have a show/hide button and are still read from the keychain only when needed.
+
+### Added
+- Stabilization mode (Settings > Picture): "Translation only" (the default, as before), "Translation and roll (tiles)" and "Translation and roll (homography)". The two new modes also correct roll. They were measured only on synthetic clips so far, so they are opt-in.
+
+### Fixed
+- The stabilizer shares one Core Image context and frees its temporary objects after each picture, like the noise reducer already did.
+
 ## [0.10.3] - 2026-10-19
 
 Remote alerts, so you can step away from the Mac during an event.
