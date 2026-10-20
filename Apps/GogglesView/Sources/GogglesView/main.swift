@@ -445,6 +445,13 @@ if args.contains("--run") || !args.dropFirst().contains(where: { $0.hasPrefix("-
     let programMenuItem = NSMenuItem(title: L("Program Output"), action: #selector(MenuActionTarget.invoke), keyEquivalent: "")
     programMenuItem.target = programMenuTarget
     gogglesMenu.addItem(programMenuItem)
+    let previewMenuTarget = MenuActionTarget {
+        UserDefaults.standard.set(!UserDefaults.standard.bool(forKey: PreviewPolicy.hdmiOnlyKey), forKey: PreviewPolicy.hdmiOnlyKey)
+    }
+    let previewMenuItem = NSMenuItem(title: L("Preview on this Mac"), action: #selector(MenuActionTarget.invoke), keyEquivalent: "")
+    previewMenuItem.target = previewMenuTarget
+    previewMenuItem.setAccessibilityLabel(L("Preview on this Mac"))
+    gogglesMenu.addItem(previewMenuItem)
     let zebraMenuTarget = MenuActionTarget { UserDefaults.standard.set(!ExposurePrefs.zebra(), forKey: ExposurePrefs.zebraKey) }
     let zebraMenuItem = NSMenuItem(title: L("Zebra Stripes"), action: #selector(MenuActionTarget.invoke), keyEquivalent: "")
     zebraMenuItem.target = zebraMenuTarget
@@ -457,6 +464,7 @@ if args.contains("--run") || !args.dropFirst().contains(where: { $0.hasPrefix("-
         zebraMenuItem.state = ExposurePrefs.zebra() ? .on : .off
         peakingMenuItem.state = ExposurePrefs.peaking() ? .on : .off
         programMenuItem.state = ProgramOutputPrefs.enabled() ? .on : .off
+        previewMenuItem.state = UserDefaults.standard.bool(forKey: PreviewPolicy.hdmiOnlyKey) ? .off : .on
     }
     syncExposureMenu()
     NotificationCenter.default.addObserver(forName: UserDefaults.didChangeNotification, object: nil, queue: .main) { _ in syncExposureMenu() }

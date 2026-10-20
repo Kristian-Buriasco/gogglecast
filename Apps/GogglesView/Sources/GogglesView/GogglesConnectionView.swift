@@ -464,7 +464,7 @@ struct GogglesConnectionView: View {
     @ViewBuilder
     private var content: some View {
         ZStack {
-            GogglesVideoView(session: session)
+            PreviewVideoView(session: session)
                 .opacity(videoOpacity)
             OSDOverlay(stats: coordinator.stats, resolution: resolutionText, latencyMs: session.decodeLatencyMs ?? session.latencyMs,
                        batteryPercent: coordinator.batteryPercent)
