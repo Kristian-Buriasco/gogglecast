@@ -82,7 +82,7 @@ private struct MiniWindowContent: View {
     @State private var hovering = false
 
     var body: some View {
-        GogglesVideoView(session: session, isSecondary: true)
+        PreviewVideoView(session: session, isSecondary: true)
             .background(Color.black)
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             .overlay(alignment: .topLeading) {

@@ -44,7 +44,7 @@ final class CaptureWindowController: NSObject, NSWindowDelegate {
         }
         // Fresh hosting view each time so a new display layer registers with the session;
         // it shows garbage until the next keyframe arrives.
-        let host = NSHostingController(rootView: GogglesVideoView(session: session, isSecondary: true))
+        let host = NSHostingController(rootView: PreviewVideoView(session: session, isSecondary: true))
         host.sizingOptions = []
         let window = CaptureWindow(
             contentRect: NSRect(x: 0, y: 0, width: 1280, height: 720),

@@ -191,12 +191,14 @@ struct GogglesVideoView: NSViewRepresentable {
     /// `true` for additional windows (e.g. the capture window): registers as
     /// an extra consumer instead of replacing the primary renderer.
     var isSecondary = false
+    /// A program output tile: keeps receiving frames while the on-Mac preview is off.
+    var isProgram = false
 
     func makeNSView(context: Context) -> SampleBufferHostView {
         let view = SampleBufferHostView()
         view.displayLayer.freezeState = session.freezeState
         if isSecondary {
-            session.addConsumer(view.displayLayer)
+            session.addConsumer(view.displayLayer, program: isProgram)
         } else {
             session.attach(renderer: view.displayLayer)
         }

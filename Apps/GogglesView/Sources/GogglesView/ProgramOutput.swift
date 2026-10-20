@@ -209,7 +209,7 @@ private struct ProgramTile: View {
     var body: some View {
         ZStack(alignment: .topLeading) {
             Color.black
-            GogglesVideoView(session: feed.session, isSecondary: true)
+            GogglesVideoView(session: feed.session, isSecondary: true, isProgram: true)
             if showSignal && coordinator.uiState.kind != .live {
                 Color.black.opacity(0.6)
                 Text(verbatim: L("NO SIGNAL")).font(.system(size: 28, weight: .bold)).foregroundStyle(.red)
@@ -286,6 +286,12 @@ final class ProgramOutputController: ObservableObject {
     /// picture covers the controls. Registered only while an output is on screen.
     static let panicCombo = HotkeyCombo(keyCode: UInt32(kVK_ANSI_Period), carbonModifiers: UInt32(controlKey | optionKey | cmdKey))
     private static let panicID = EventHotKeyID(signature: OSType(0x47565050), id: 1) // 'GVPP'
+
+    /// Panic hotkey + preview state follow whether an output window is on screen (so the preview always returns when they close).
+    private func settle() {
+        updatePanicHotkey()
+        PreviewState.shared.update(hdmiOnly: UserDefaults.standard.bool(forKey: PreviewPolicy.hdmiOnlyKey), outputsShown: !windows.isEmpty)
+    }
 
     private func updatePanicHotkey() {
         guard !windows.isEmpty else { removePanicHotkey(); return }
@@ -365,7 +371,7 @@ final class ProgramOutputController: ObservableObject {
 
         let outputs = ProgramOutputPrefs.outputs()
         for id in Set(windows.keys).subtracting(outputs.map(\.id)) { close(id) }
-        guard ProgramOutputPrefs.enabled() else { missingOutputs = []; for id in Array(windows.keys) { close(id) }; updatePanicHotkey(); return }
+        guard ProgramOutputPrefs.enabled() else { missingOutputs = []; for id in Array(windows.keys) { close(id) }; settle(); return }
 
         let assigned = ProgramDisplayChoice.assign(outputs: outputs, screens: Self.screenInfos())
         missingOutputs = zip(outputs.indices, assigned).filter { $0.1 == nil }.map { L("Program output %lld", $0.0 + 1) }
@@ -403,7 +409,7 @@ final class ProgramOutputController: ObservableObject {
             w.orderFrontRegardless()
             windows[output.id] = w
         }
-        updatePanicHotkey()
+        settle()
     }
 }
 
@@ -413,6 +419,8 @@ struct ProgramOutputSettingsSection: View {
     @AppStorage(ProgramOutputPrefs.openAtLaunchKey) private var openAtLaunch = false
     @AppStorage(ProgramOutputPrefs.cleanKey) private var clean = false
     @AppStorage(ProgramOutputPrefs.stabilizeKey) private var stabilize = false
+    @AppStorage(PreviewPolicy.hdmiOnlyKey) private var previewHdmiOnly = false
+    private var previewOnMac: Binding<Bool> { Binding(get: { !previewHdmiOnly }, set: { previewHdmiOnly = !$0 }) }
     @State private var outputs = ProgramOutputPrefs.outputs()
     @State private var screens = ProgramOutputController.screenInfos()
 
@@ -424,6 +432,7 @@ struct ProgramOutputSettingsSection: View {
                 SettingsToggleRow("Open the program outputs when the app starts", isOn: $openAtLaunch)
                 SettingsToggleRow("Clean output", isOn: $clean, help: "Hides all names, warnings and the no-signal marker.")
                 SettingsToggleRow("Stabilize output", isOn: $stabilize, help: "Also stabilizes the preview. Works in race mode.")
+                SettingsToggleRow("Preview in the app", isOn: previewOnMac, help: "Draw the picture on the HDMI outputs only, to lighten the Mac.")
                 SettingsRow("Emergency close") {
                     Text("Stuck behind a full-screen output? Press ⌃⌥⌘. in any app to close all program outputs.")
                         .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)

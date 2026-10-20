@@ -986,3 +986,8 @@
 "Hides all names, warnings and the no-signal marker." = "Hides all names, warnings and the no-signal marker.";
 "Stabilize output" = "Stabilize output";
 "Also stabilizes the preview. Works in race mode." = "Also stabilizes the preview. Works in race mode.";
+"Preview off, showing on HDMI only" = "Preview off, showing on HDMI only";
+"To bring it back: Goggles menu > Preview on this Mac." = "To bring it back: Goggles menu > Preview on this Mac.";
+"Preview on this Mac" = "Preview on this Mac";
+"Preview in the app" = "Preview in the app";
+"Draw the picture on the HDMI outputs only, to lighten the Mac." = "Draw the picture on the HDMI outputs only, to lighten the Mac.";

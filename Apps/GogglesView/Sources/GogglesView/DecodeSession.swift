@@ -57,7 +57,11 @@ final class DecodeSession: ObservableObject {
 
     private struct WeakConsumer {
         weak var value: SampleBufferRendering?
+        /// Program output layers keep receiving pictures while the on-Mac preview is off.
+        var program = false
     }
+    /// Whether preview windows should be fed; tests swap it.
+    var isPreviewActive: () -> Bool = { PreviewState.shared.isActive }
     /// Real stream size from the SPS, nil until the first parameter set.
     @Published private(set) var dimensions: CMVideoDimensions?
     /// Smoothed delay from the helper stamping a NAL to it being handed to the
@@ -190,11 +194,11 @@ final class DecodeSession: ObservableObject {
     /// Adds an extra sample-buffer consumer (second display window,
     /// recorder) that receives every slice alongside the primary renderer.
     /// Held weakly, same as the primary.
-    func addConsumer(_ consumer: SampleBufferRendering) {
+    func addConsumer(_ consumer: SampleBufferRendering, program: Bool = false) {
         consumerLock.lock()
         defer { consumerLock.unlock() }
         extraConsumers.removeAll { $0.value == nil || $0.value === consumer }
-        extraConsumers.append(WeakConsumer(value: consumer))
+        extraConsumers.append(WeakConsumer(value: consumer, program: program))
     }
 
     func removeConsumer(_ consumer: SampleBufferRendering) {
@@ -415,7 +419,8 @@ final class DecodeSession: ObservableObject {
             image = picture
         }
         frameLock.lock(); latestDecoded = image; decodedCount &+= 1; lastPictureAt = DispatchTime.now().uptimeNanoseconds; frameLock.unlock()
-        updateExposureAids(image)
+        let preview = isPreviewActive()
+        if preview { updateExposureAids(image) }
         var fd: CMVideoFormatDescription?
         guard CMVideoFormatDescriptionCreateForImageBuffer(allocator: nil, imageBuffer: image, formatDescriptionOut: &fd) == noErr,
               let fd else { return }
@@ -427,9 +432,9 @@ final class DecodeSession: ObservableObject {
         try? DecodeSession.markDisplayImmediately(sample)
         consecutiveFailures = 0
         recordDecodeLatency(stampNs: pts.value)
-        if let layer = renderer as? AVSampleBufferDisplayLayer { layer.enqueue(sample) }
+        if preview, let layer = renderer as? AVSampleBufferDisplayLayer { layer.enqueue(sample) }
         consumerLock.lock()
-        let layers = extraConsumers.compactMap { $0.value as? AVSampleBufferDisplayLayer }
+        let layers = extraConsumers.compactMap { c in (preview || c.program) ? c.value as? AVSampleBufferDisplayLayer : nil }
         consumerLock.unlock()
         for layer in layers where layer !== renderer { layer.enqueue(sample) }
     }
