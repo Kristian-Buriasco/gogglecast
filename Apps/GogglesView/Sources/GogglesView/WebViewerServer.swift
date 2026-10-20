@@ -281,6 +281,32 @@ final class WebViewerServer: ObservableObject, SampleBufferRendering {
     private var allowLAN = false
     private var connections = Set<ObjectIdentifier>()
 
+    /// Called on the server queue: true when a viewer starts asking for the page or stream, false after
+    /// `idleSeconds` without a request. The host feeds the server encoded pictures only while this is true.
+    var onDemand: ((Bool) -> Void)?
+    static let idleSeconds: TimeInterval = 10
+    private var demand = false
+    private var lastDemandAt = Date.distantPast
+
+    private func noteDemand() {
+        lastDemandAt = Date()
+        guard !demand else { return }
+        demand = true
+        onDemand?(true)
+        scheduleIdleCheck()
+    }
+
+    private func scheduleIdleCheck() {
+        queue.asyncAfter(deadline: .now() + Self.idleSeconds) { [self] in
+            guard demand else { return }
+            if Date().timeIntervalSince(lastDemandAt) >= Self.idleSeconds {
+                demand = false
+                segmenter = HLSSegmenter() // pictures from before the pause would be stale
+                onDemand?(false)
+            } else { scheduleIdleCheck() }
+        }
+    }
+
     func start(port: Int, allowLAN: Bool, token: String) {
         queue.async { [self] in
             stopLocked()
@@ -326,6 +352,7 @@ final class WebViewerServer: ObservableObject, SampleBufferRendering {
         listener?.cancel()
         listener = nil
         connections.removeAll()
+        if demand { demand = false; onDemand?(false) }
         DispatchQueue.main.async { self.isRunning = false }
     }
 
@@ -385,14 +412,16 @@ final class WebViewerServer: ObservableObject, SampleBufferRendering {
         }
         let tok = currentToken()
         switch WebRequest.route(req, token: tok) {
-        case .page: reply(c, 200, "OK", "text/html; charset=utf-8", Data(WebViewerPage.html(token: tok).utf8))
+        case .page: noteDemand(); reply(c, 200, "OK", "text/html; charset=utf-8", Data(WebViewerPage.html(token: tok).utf8))
         case .statusPage: reply(c, 200, "OK", "text/html; charset=utf-8", Data(WebStatusPage.html(token: tok).utf8))
         case .statusJSON: reply(c, 200, "OK", "application/json", WebStatusStore.latest)
         case .playlist:
+            noteDemand()
             if let pl = segmenter.window.playlist(token: tok) {
                 reply(c, 200, "OK", "application/vnd.apple.mpegurl", Data(pl.utf8))
             } else { reply(c, 404, "Not Found", "text/plain", Data("No segments yet".utf8)) }
         case .segment(let n):
+            noteDemand()
             if let d = segmenter.window.data(forSequence: n) { reply(c, 200, "OK", "video/mp2t", d) }
             else { reply(c, 404, "Not Found", "text/plain", Data("Gone".utf8)) }
         case .manifest:

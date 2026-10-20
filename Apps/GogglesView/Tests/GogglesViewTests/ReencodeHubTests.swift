@@ -90,6 +90,45 @@ struct ReencodeHubTests {
         #expect(ReencodePrefs.halfRate)
     }
 
+    private func yuv(_ seed: UInt8) -> CVPixelBuffer { frame(format: kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange, seed: seed) }
+
+    @Test func noEncoderWithoutConsumers() {
+        let hub = ReencodeHub(source: { self.yuv(1) })
+        for _ in 0..<5 { hub.pollOnce() }
+        #expect(!hub.hasEncoderSession)
+        #expect(hub.framesEncoded == 0)
+    }
+
+    @Test func twoConsumersShareOneEncoderAndItStopsAfterTheLastLeaves() async throws {
+        var seq: UInt64 = 0
+        let hub = ReencodeHub(source: { self.yuv(UInt8(truncatingIfNeeded: seq)) }, sequence: { seq }, bitrateMbps: { 8 }, grace: 0.2)
+        let a = Collector(), b = Collector()
+        hub.subscribe(a); hub.subscribe(b)
+        for _ in 0..<10 { seq += 1; hub.pollOnce(); try await Task.sleep(nanoseconds: 10_000_000) }
+        #expect(hub.hasEncoderSession)
+        try await Task.sleep(nanoseconds: 500_000_000)
+        #expect(a.count > 0 && a.count == b.count, "both consumers get the same encoded samples")
+        #expect(a.snapshot.first == true, "first picture is a keyframe")
+        hub.unsubscribe(a)
+        try await Task.sleep(nanoseconds: 500_000_000)
+        #expect(hub.hasEncoderSession, "one consumer left, encoder stays")
+        hub.unsubscribe(b)
+        // Within the grace nothing is encoded any more.
+        let n = hub.framesEncoded
+        seq += 1; hub.pollOnce()
+        #expect(hub.framesEncoded == n)
+        try await Task.sleep(nanoseconds: 600_000_000)
+        #expect(!hub.hasEncoderSession)
+    }
+
+    @Test func replayIsOffByDefault() {
+        let d = UserDefaults.standard
+        let saved = d.object(forKey: ReplayPrefs.enabledKey)
+        defer { if let saved { d.set(saved, forKey: ReplayPrefs.enabledKey) } }
+        d.removeObject(forKey: ReplayPrefs.enabledKey)
+        #expect(!ReplayPrefs.enabled, "replay off means ReplayControl never subscribes, so no continuous encode")
+    }
+
     @Test func stopsEncodingWhenLastSubscriberLeaves() {
         let hub = ReencodeHub(source: { self.frame(format: kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange, seed: 1) })
         let c = Collector()

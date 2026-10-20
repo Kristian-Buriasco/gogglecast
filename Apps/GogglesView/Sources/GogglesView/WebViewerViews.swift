@@ -39,7 +39,11 @@ struct WebViewerControl: View {
                 token = tok
             }
             if justEnabled { OverlayHint.noteStarted(.output) }
-            session.addKeyframeSafeConsumer(server)
+            // Encode only while a viewer is actually asking for the page or stream.
+            server.onDemand = { [weak server, weak session] on in
+                guard let server, let session else { return }
+                if on { session.addKeyframeSafeConsumer(server) } else { session.removeConsumer(server) }
+            }
             server.start(port: WebViewerPrefs.port, allowLAN: lan, token: tok)
         } else {
             session.removeConsumer(server)
