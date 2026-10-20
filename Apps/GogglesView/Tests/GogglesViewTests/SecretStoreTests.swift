@@ -70,10 +70,10 @@ struct SecretStoreTests {
 
     @Test func coversAllKnownSecrets() {
         let keys = SecretStore.allKeys
-        for k in [RTMPPrefs.streamKeyKey, SRTPrefs.passphraseKey, WebViewerPrefs.tokenKey, UpdatePrefs.tokenKey] {
+        for k in [RTMPPrefs.streamKeyKey, SRTPrefs.passphraseKey, WebViewerPrefs.tokenKey, UpdatePrefs.tokenKey, AlertPrefs.tokenKey] {
             #expect(keys.contains(k))
         }
         #expect(keys.contains(OBSPrefs.passwordKey))
-        #expect(keys.count == 5 + AppEvent.allCases.count)
+        #expect(keys.count == 6 + AppEvent.allCases.count)
     }
 }
