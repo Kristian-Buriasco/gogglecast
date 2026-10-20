@@ -133,6 +133,46 @@ struct AlertEngineTests {
         #expect(e.update([], config: cfg(), now: at(30)).isEmpty)
     }
 
+    @Test func connectionLossDefaultsToInstantAndStoredDelaysSurvive() {
+        for k in [AlertKind.signalLost, .outputFailed, .helperNotResponding] { #expect(k.defaultDelay == 0) }
+        #expect(AlertKind.pictureFrozen.defaultDelay == 20 && AlertKind.pictureBlack.defaultDelay == 20)
+        let d = UserDefaults(suiteName: "AlertPrefsDelay-\(UUID().uuidString)")!
+        let fresh = AlertPrefs.config(d)
+        for k in [AlertKind.signalLost, .outputFailed, .helperNotResponding] { #expect(fresh.setting(k).delay == 0) }
+        d.set(10, forKey: AlertPrefs.delayKey(.signalLost)); d.set(999, forKey: AlertPrefs.delayKey(.outputFailed))
+        let c = AlertPrefs.config(d)
+        #expect(c.setting(.signalLost).delay == 10 && c.setting(.outputFailed).delay == 120)
+    }
+
+    @Test func delayZeroAlertsInTheSameTickAndRecoveryStillFollows() {
+        let e = Eng()
+        let c = cfg(delay: 0)
+        #expect(e.update([cond(.signalLost)], config: c, now: at(0)).count == 1)
+        #expect(e.update([], config: c, now: at(0.1)).isEmpty)   // straight back: recovery hold running
+        let m = e.update([], config: c, now: at(5.1))
+        #expect(m.count == 1 && m[0].isRecovery)
+    }
+
+    @Test func flappingKeepsTheRecoveryForTheFinalUp() {
+        let e = Eng()
+        let c = cfg(delay: 0)
+        var msgs: [AlertMessage] = []
+        for (i, down) in [true, false, true, false, true, false].enumerated() {
+            msgs += e.update(down ? [cond(.signalLost)] : [], config: c, now: at(TimeInterval(i)))
+        }
+        msgs += e.update([], config: c, now: at(12))
+        #expect(msgs.filter { !$0.isRecovery }.count == 1)
+        #expect(msgs.last?.isRecovery == true)
+    }
+
+    @Test func delayAboveZeroIsStillHonoured() {
+        let e = Eng()
+        let c = cfg(delay: 7)
+        #expect(e.update([cond(.signalLost)], config: c, now: at(0)).isEmpty)
+        #expect(e.update([cond(.signalLost)], config: c, now: at(6)).isEmpty)
+        #expect(e.update([cond(.signalLost)], config: c, now: at(7)).count == 1)
+    }
+
     @Test func defaultPrioritiesAndStoredOverrides() {
         #expect(AlertKind.signalLost.defaultPriority == 5 && AlertKind.outputFailed.defaultPriority == 5)
         #expect(AlertKind.batteryCritical.defaultPriority == 4 && AlertKind.pictureFrozen.defaultPriority == 4)
@@ -151,15 +191,12 @@ struct AlertInputsTests {
         AlertFeed(id: "dev-123", name: "Pilot cam", isLive: live, issues: issues, outputs: outputs)
     }
 
-    @Test func signalLostUsesTheDebounceAndNeverFiresForAFeedThatWasNeverLive() {
+    @Test func signalLostIsImmediateAndNeverFiresForAFeedThatWasNeverLive() {
         let i = Inp()
         #expect(i.conditions(feeds: [feed(false)], helperDown: false, missingPrograms: [], now: at(0)).conditions.isEmpty)
         #expect(i.conditions(feeds: [feed(false)], helperDown: false, missingPrograms: [], now: at(10)).conditions.isEmpty)
         _ = i.conditions(feeds: [feed(true)], helperDown: false, missingPrograms: [], now: at(11))
-        _ = i.conditions(feeds: [feed(true)], helperDown: false, missingPrograms: [], now: at(15))   // announced live
-        _ = i.conditions(feeds: [feed(false)], helperDown: false, missingPrograms: [], now: at(16))
-        #expect(i.conditions(feeds: [feed(false)], helperDown: false, missingPrograms: [], now: at(17)).conditions.isEmpty)   // < 3 s
-        let r = i.conditions(feeds: [feed(false)], helperDown: false, missingPrograms: [], now: at(20))
+        let r = i.conditions(feeds: [feed(false)], helperDown: false, missingPrograms: [], now: at(12))   // same tick, no 3 s debounce
         #expect(r.conditions.map(\.key.kind) == [.signalLost])
     }
 
@@ -244,7 +281,7 @@ struct NtfySenderTests {
         let f = Fake([nil, 500, 503, nil])
         let s = NtfySender(transport: f.transport, sleep: f.sleep, token: { "" })
         #expect(await s.deliver(req) == false)
-        #expect(f.requests.count == 4 && f.sleeps == [1, 2, 4])
+        #expect(f.requests.count == 4 && f.sleeps == [0.5, 1.5, 3])
     }
 
     @Test func succeedsOnARetry() async {
@@ -336,6 +373,24 @@ extension SecretStoreTests {
         c.update(feeds: feeds, helperDown: true, missingPrograms: [])                          // configured, Away off
         #expect(b.reads == 0)
         #expect(f.requests.isEmpty)
+    }
+
+    @Test func stateChangeReachesTheTransportInOneTick() async {
+        let (_, d, f) = alertFixture()
+        d.set(true, forKey: AlertPrefs.awayKey)
+        d.set("https://ntfy.example.com", forKey: AlertPrefs.serverKey); d.set("race", forKey: AlertPrefs.topicKey)
+        let c = AlertCenter(sender: NtfySender(transport: f.transport, sleep: f.sleep), defaults: d)   // default delays: signal lost = 0
+        let live = AlertFeed(id: "a", name: "Feed 1", isLive: true, issues: [], outputs: [])
+        let dead = AlertFeed(id: "a", name: "Feed 1", isLive: false, issues: [], outputs: [])
+        c.update(feeds: [live], helperDown: false, missingPrograms: [])
+        #expect(f.requests.isEmpty)
+        let start = ContinuousClock.now
+        c.update(feeds: [dead], helperDown: false, missingPrograms: [])   // the state change itself
+        for _ in 0..<2000 where f.requests.isEmpty { try? await Task.sleep(nanoseconds: 100_000) }
+        let ms = (ContinuousClock.now - start) / .milliseconds(1)
+        print("ALERT_LATENCY_MS state change -> transport call: \(ms)")
+        #expect(f.requests.count == 1 && f.requests[0].value(forHTTPHeaderField: "Priority") == "5")
+        #expect(ms < 500)
     }
 
     @Test func tokenIsReadOnlyWhenAMessageIsSent() async {

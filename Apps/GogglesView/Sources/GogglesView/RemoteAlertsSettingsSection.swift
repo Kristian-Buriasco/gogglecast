@@ -92,7 +92,7 @@ private struct AlertKindRow: View {
             Toggle(kind.title, isOn: $enabled).labelsHidden()
                 .accessibilityLabel(kind.title)
                 .accessibilityValue(AccessibilityLabels.onOff(enabled))
-            Stepper(L("after %lld s", delay), value: $delay, in: 0...600, step: 5)
+            Stepper(L("after %lld s", delay), value: $delay, in: AlertPrefs.delayRange, step: 5)
                 .disabled(!enabled)
                 .accessibilityLabel(L("%@: delay in seconds", kind.title))
             Picker("Priority", selection: $priority) {
