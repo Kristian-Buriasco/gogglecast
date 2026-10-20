@@ -103,6 +103,7 @@ struct SettingsView: View {
                         SRTSettingsSection()
                         NDISettingsSection()
                         WebViewerSettingsSection()
+                        WebControlSettingsSection()
                     case .hdmi:
                         ProgramOutputSettingsSection()
                     case .integrations:

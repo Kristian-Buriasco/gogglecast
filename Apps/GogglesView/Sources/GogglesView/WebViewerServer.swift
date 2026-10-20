@@ -155,9 +155,15 @@ struct WebRequest: Equatable {
     /// Value of the `Host` header, if present.
     var host: String? = nil
 
-    /// Parses the request line and the Host header.
-    static func parse(_ head: Data) -> WebRequest? {
-        guard let text = String(data: head.prefix(8192), encoding: .utf8),
+    /// Lower-cased headers other than Host (which is in `host`), first one wins.
+    var headers: [String: String] = [:]
+    var body = Data()
+
+    /// Parses the request line, the headers and (for POST) the bytes after the blank line.
+    static func parse(_ raw: Data) -> WebRequest? {
+        let split = raw.range(of: Data("\r\n\r\n".utf8))
+        let headData = split.map { raw[..<$0.lowerBound] } ?? raw
+        guard let text = String(data: headData.prefix(8192), encoding: .utf8),
               let line = text.components(separatedBy: "\r\n").first else { return nil }
         let parts = line.split(separator: " ", omittingEmptySubsequences: true)
         guard parts.count == 3, parts[2].hasPrefix("HTTP/"), parts[1].hasPrefix("/"),
@@ -165,12 +171,14 @@ struct WebRequest: Equatable {
         var q: [String: String] = [:]
         for item in c.queryItems ?? [] where q[item.name] == nil { q[item.name] = item.value ?? "" }
         var host: String?
+        var headers: [String: String] = [:]
         for h in text.components(separatedBy: "\r\n").dropFirst() {
-            guard let colon = h.firstIndex(of: ":"), h[..<colon].lowercased() == "host" else { continue }
-            host = h[h.index(after: colon)...].trimmingCharacters(in: .whitespaces)
-            break
+            guard let colon = h.firstIndex(of: ":") else { continue }
+            let name = h[..<colon].lowercased(), value = h[h.index(after: colon)...].trimmingCharacters(in: .whitespaces)
+            if name == "host" { host = host ?? value } else if headers[name] == nil { headers[name] = value }
         }
-        return WebRequest(method: String(parts[0]), path: c.path, query: q, host: host)
+        return WebRequest(method: String(parts[0]), path: c.path, query: q, host: host, headers: headers,
+                          body: split.map { Data(raw[$0.upperBound...]) } ?? Data())
     }
 
     static func route(_ r: WebRequest, token: String) -> WebRoute {
@@ -379,7 +387,15 @@ final class WebViewerServer: ObservableObject, SampleBufferRendering {
                 var buf = buffer
                 if let data { buf.append(data) }
                 if buf.range(of: Data("\r\n\r\n".utf8)) != nil {
-                    self.respond(c, to: WebRequest.parse(buf))
+                    let req = WebRequest.parse(buf)
+                    let want = req.flatMap { $0.method == "POST" ? Int($0.headers["content-length"] ?? "") : nil } ?? 0
+                    if want > ControlService.maxBody || want < 0 {
+                        self.reply(c, 413, "Payload Too Large", "text/plain", Data("Too large".utf8))
+                    } else if let req, req.body.count < want {
+                        if err != nil || done { c.cancel() } else { self.receive(c, buffer: buf) } // rest of the body is on its way
+                    } else {
+                        self.respond(c, to: req.map { var r = $0; r.body = r.body.prefix(want); return r })
+                    }
                 } else if err != nil || done || buf.count > 16_384 {
                     c.cancel()
                 } else {
@@ -405,12 +421,21 @@ final class WebViewerServer: ObservableObject, SampleBufferRendering {
         return live.isEmpty ? token : live
     }
 
+    var control = ControlService.shared
+
     private func respond(_ c: NWConnection, to req: WebRequest?) {
         guard let req else { return reply(c, 400, "Bad Request", "text/plain", Data("Bad request".utf8)) }
         guard hostAllowed(req.host) else {
             return reply(c, 421, "Misdirected Request", "text/plain", Data("Unexpected Host header".utf8))
         }
         let tok = currentToken()
+        if ControlService.owns(req.path) {
+            var remote = "?"
+            if case .hostPort(let h, _) = c.endpoint { remote = "\(h)" }
+            return control.handle(req, remote: remote, viewerToken: tok) { [weak self] r in
+                self?.reply(c, r.code, r.reason, r.type, r.body, headers: r.headers)
+            }
+        }
         switch WebRequest.route(req, token: tok) {
         case .page: noteDemand(); reply(c, 200, "OK", "text/html; charset=utf-8", Data(WebViewerPage.html(token: tok).utf8))
         case .statusPage: reply(c, 200, "OK", "text/html; charset=utf-8", Data(WebStatusPage.html(token: tok).utf8))
@@ -443,9 +468,10 @@ final class WebViewerServer: ObservableObject, SampleBufferRendering {
                                        hostnames: WebHostPolicy.hostnames(), localAddresses: WebHostPolicy.localAddresses())
     }
 
-    private func reply(_ c: NWConnection, _ code: Int, _ reason: String, _ type: String, _ body: Data) {
-        let head = "HTTP/1.1 \(code) \(reason)\r\nContent-Type: \(type)\r\nContent-Length: \(body.count)\r\n"
-            + "Cache-Control: no-cache, no-store\r\nConnection: close\r\nX-Content-Type-Options: nosniff\r\n\r\n"
+    private func reply(_ c: NWConnection, _ code: Int, _ reason: String, _ type: String, _ body: Data, headers: [String: String] = [:]) {
+        let extra = headers.map { "\($0.key): \($0.value)\r\n" }.joined()
+        let head = "HTTP/1.1 \(code) \(reason)\r\nContent-Type: \(type)\r\nContent-Length: \(body.count)\r\n" + extra
+            + "Cache-Control: no-cache, no-store\r\nConnection: close\r\nX-Content-Type-Options: nosniff\r\nReferrer-Policy: no-referrer\r\n\r\n"
         c.send(content: Data(head.utf8) + body, completion: .contentProcessed { _ in c.cancel() })
     }
 

@@ -127,3 +127,80 @@ struct WebViewerSettingsSection: View {
         .onAppear { if enabled { _token.load() } }
     }
 }
+
+/// Settings card for the browser control center. Off by default; shares the viewer's port and network rules.
+struct WebControlSettingsSection: View {
+    @AppStorage(ControlPrefs.enabledKey) private var enabled = false
+    @AppStorage(WebViewerPrefs.enabledKey) private var viewerOn = false
+    @AppStorage(WebViewerPrefs.portKey) private var port = WebViewerPrefs.defaultPort
+    @AppStorage(WebViewerPrefs.lanKey) private var lan = false
+    @KeychainSecret(ControlPrefs.tokenKey) private var token
+    @ObservedObject private var log = ControlLog.shared
+
+    private var effectivePort: Int { (1...65535).contains(port) ? port : WebViewerPrefs.defaultPort }
+
+    private func link(host: String) -> String { ControlPrefs.link(host: host, port: effectivePort, token: token) }
+
+    private static func time(_ d: Date) -> String { d.formatted(date: .omitted, time: .standard) }
+
+    var body: some View {
+        SettingsGroup("Browser control",
+                      footer: "Off by default. When on, anyone with the control link can start and stop recordings and switch outputs from a browser on your network. It uses its own token, separate from the viewer token, and plain HTTP without encryption, so use it only on a network you trust. Requires the web viewer to be on. Opening the link stores the token in the browser and removes it from the address.") {
+            SettingsToggleRow("Allow control from the browser", isOn: $enabled, accessibilityName: "Allow control from the browser")
+                .onChange(of: enabled) { old, new in
+                    if new && !old && _token.load().isEmpty { token = WebViewerPrefs.generateToken() }
+                }
+            if enabled {
+                if !viewerOn {
+                    SettingsRow("Status") {
+                        Text("Turn on the local web viewer above; the control page is served by it.")
+                            .font(.callout).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                SettingsRow("Control link", indented: true) {
+                    let host = lan ? (WebViewerAddress.preferredIPv4(from: WebHostPolicy.localAddresses()) ?? WebViewerPrefs.localHostname) : "localhost"
+                    Text(verbatim: link(host: host)).font(.system(.caption, design: .monospaced)).textSelection(.enabled)
+                        .lineLimit(2).fixedSize(horizontal: false, vertical: true)
+                    Button("Copy link") {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(link(host: host), forType: .string)
+                    }
+                    .accessibilityLabel("Copy control link")
+                }
+                if lan, let ip = WebViewerAddress.preferredIPv4(from: WebHostPolicy.localAddresses()),
+                   let qr = WebViewerQR.image(for: link(host: ip)) {
+                    SettingsRow("QR code", help: "Scan with the iPad or phone camera. The QR code contains the control token, so do not share a screenshot of it.", indented: true) {
+                        Image(decorative: qr, scale: 1).interpolation(.none).resizable().frame(width: 120, height: 120)
+                            .accessibilityLabel("QR code of the control link")
+                    }
+                } else if !lan {
+                    SettingsRow("QR code", indented: true) {
+                        Text("To control from an iPad or phone, turn on 'Allow other devices on the network' in the web viewer.")
+                            .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                SettingsRow("Control token", indented: true) {
+                    Button("Reset control token") { token = WebViewerPrefs.generateToken() }
+                        .accessibilityLabel("Reset control token")
+                }
+                SettingsRow("Last actions", indented: true) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        let rows = log.recent(8, kind: .action)
+                        if rows.isEmpty {
+                            Text("No actions yet").font(.caption).foregroundStyle(.secondary)
+                        }
+                        ForEach(Array(rows.enumerated()), id: \.offset) { _, e in
+                            Text(verbatim: "\(Self.time(e.time))  \(e.who)  \(e.text)")
+                                .font(.system(.caption, design: .monospaced))
+                                .foregroundStyle(e.ok ? Color.primary : Color.orange)
+                                .lineLimit(1).truncationMode(.tail)
+                        }
+                    }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("Last browser actions")
+                }
+            }
+        }
+        .onAppear { if enabled { _token.load() } }
+    }
+}

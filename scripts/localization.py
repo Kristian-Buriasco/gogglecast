@@ -45,6 +45,7 @@ EXCLUDED_FILES = {
     "DocShots.swift",
     "ShortcutsIntents.swift",
     "WebViewerPage.swift",
+    "WebControlPage.swift",
 }
 
 SWIFTUI_CALLS = (

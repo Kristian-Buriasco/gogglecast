@@ -18,6 +18,8 @@ struct OverviewRow: Equatable, Identifiable {
     var elapsed: TimeInterval
     var issues: [FeedIssue] = []
     var outputs: [OutputChip] = []
+    var drops: Int? = nil
+    var bitrateKbps: Int? = nil
 }
 
 enum OverviewLogic {
@@ -134,7 +136,8 @@ final class EventStatus: ObservableObject {
                 health: EventRules.combine(connection: OverviewLogic.health(for: kind), issues: issues), isLive: live,
                 fps: c.stats?.fps, battery: c.batteryPercent,
                 isRecording: rec?.isRecording ?? false, elapsed: rec?.elapsed ?? 0,
-                issues: issues, outputs: SessionControlBoard.shared.outputChips(for: s.decodeSession))
+                issues: issues, outputs: SessionControlBoard.shared.outputChips(for: s.decodeSession),
+                drops: c.stats?.drops, bitrateKbps: c.stats.map { Int($0.bitrateKbps) })
         }
         AlertCenter.shared.update(
             feeds: zip(all, next).map { s, r in
@@ -147,6 +150,7 @@ final class EventStatus: ObservableObject {
             rows = next
             WebStatusStore.set(EventStatusJSON.data(rows: next, now: now))
         }
+        ControlFeeder.shared.publish(rows: next, sessions: all, now: now)
         if before != worst { NotificationCenter.default.post(name: .eventStatusChanged, object: nil) }
         let folder = RecordingPrefs.directory
         freeBytes = Recorder.volumeCapacity(at: folder)

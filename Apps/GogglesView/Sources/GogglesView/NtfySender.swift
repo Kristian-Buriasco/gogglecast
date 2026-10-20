@@ -145,7 +145,7 @@ final class AlertCenter: ObservableObject {
 
     private var server: String { defaults.string(forKey: AlertPrefs.serverKey) ?? "" }
     private var topic: String { defaults.string(forKey: AlertPrefs.topicKey) ?? "" }
-    private var configured: Bool { NtfyRequest.url(server: server, topic: topic) != nil }
+    var configured: Bool { NtfyRequest.url(server: server, topic: topic) != nil }
 
     func update(feeds: [AlertFeed], helperDown: Bool, missingPrograms: [String]) {
         let config = AlertPrefs.config(defaults)
@@ -170,6 +170,7 @@ final class AlertCenter: ObservableObject {
         let host = URL(string: server)?.host ?? "?"
         sender.send(m, server: server, topic: topic) { [weak self] ok in
             if !ok { Logging.alerts.error("ntfy send failed (host \(host, privacy: .public), priority \(m.priority))") }
+            ControlLog.shared.add(.alert, who: "system", text: (ok ? "Alert sent: " : "Alert failed: ") + m.title, ok: ok)
             DispatchQueue.main.async { self?.lastSend = Status(ok: ok, at: Date()) }
         }
     }
