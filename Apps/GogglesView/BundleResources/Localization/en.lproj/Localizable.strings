@@ -650,6 +650,9 @@
 "Display" = "Display";
 "Automatic (next external display)" = "Automatic (next external display)";
 "main display" = "main display";
+"Output resolution" = "Output resolution";
+"Lowers the load on the Mac when the display is 4K." = "Lowers the load on the Mac when the display is 4K.";
+"Display default" = "Display default";
 "Show" = "Show";
 "All feeds in a grid" = "All feeds in a grid";
 "One feed" = "One feed";
@@ -658,8 +661,13 @@
 "Follow the active window" = "Follow the active window";
 "Remove output" = "Remove output";
 "No display connected" = "No display connected";
+"Showing on %@ at %@" = "Showing on %@ at %@";
+"Showing on %@. Resolution not changed: the main display is never changed." = "Showing on %@. Resolution not changed: the main display is never changed.";
+"Showing on %@. Resolution not changed: no %@ mode on this display." = "Showing on %@. Resolution not changed: no %@ mode on this display.";
+"Showing on %@. Resolution not changed: macOS refused the change." = "Showing on %@. Resolution not changed: macOS refused the change.";
 "Showing on %@" = "Showing on %@";
 "Main display: it will cover your controls" = "Main display: it will cover your controls";
+"The main display's resolution is never changed." = "The main display's resolution is never changed.";
 /* RTMPPublisher.swift */
 "Invalid RTMP URL (expected rtmp://host/app)" = "Invalid RTMP URL (expected rtmp://host/app)";
 "Stream key is empty" = "Stream key is empty";

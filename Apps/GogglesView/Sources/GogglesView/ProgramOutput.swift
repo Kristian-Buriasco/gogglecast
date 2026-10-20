@@ -22,7 +22,10 @@ struct ProgramOutputConfig: Codable, Equatable, Identifiable {
     /// deviceId for a single feed, "" = follow the active window.
     var feed = ""
     var showNames = true
+    /// OutputResolution raw value; nil (older saved JSON) = "default" = never change the display.
+    var resolution: String?
 
+    var outputResolution: OutputResolution { resolution.flatMap(OutputResolution.init(rawValue:)) ?? .displayDefault }
     var isGrid: Bool { layout != "single" }
 }
 
@@ -279,6 +282,9 @@ final class ProgramOutputController: ObservableObject {
     private var shownKeys: [String: String] = [:]
     private var observers: [AnyCancellable] = []
     private var pending: DispatchWorkItem?
+    private let resolutions = DisplayResolutionManager(configurator: CoreGraphicsDisplayConfigurator())
+    /// Per output id: what happened with its resolution request (shown in the status line).
+    @Published private(set) var resolutionResults: [String: ResolutionResult] = [:]
     private var panicRef: EventHotKeyRef?
     private var panicHandler: EventHandlerRef?
 
@@ -316,6 +322,9 @@ final class ProgramOutputController: ObservableObject {
         self.active = active
         ProgramOutputPrefs.resetAtLaunch()
         observers = [
+            // forAppOnly already covers crashes; this puts the mode back on a normal quit.
+            NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)
+                .sink { [weak self] _ in self?.resolutions.restoreAll() },
             NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)
                 .sink { [weak self] _ in self?.scheduleRefresh() },
             NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
@@ -357,6 +366,13 @@ final class ProgramOutputController: ObservableObject {
         shownKeys[outputId] = nil
     }
 
+    private func syncResolutions(_ desired: [UInt32: OutputResolution], outputs: [(id: String, display: UInt32?)]) {
+        let byDisplay = resolutions.sync(desired)
+        var results: [String: ResolutionResult] = [:]
+        for o in outputs { if let d = o.display, let r = byDisplay[d] { results[o.id] = r } }
+        if results != resolutionResults { resolutionResults = results }
+    }
+
     func refresh() {
         let all = sessions()
         let names = ProgramFeedNaming.names(deviceIds: all.map(\.deviceId), custom: ProgramOutputPrefs.feedNames())
@@ -365,10 +381,13 @@ final class ProgramOutputController: ObservableObject {
 
         let outputs = ProgramOutputPrefs.outputs()
         for id in Set(windows.keys).subtracting(outputs.map(\.id)) { close(id) }
-        guard ProgramOutputPrefs.enabled() else { missingOutputs = []; for id in Array(windows.keys) { close(id) }; updatePanicHotkey(); return }
+        guard ProgramOutputPrefs.enabled() else { missingOutputs = []; for id in Array(windows.keys) { close(id) }; syncResolutions([:], outputs: []); updatePanicHotkey(); return }
 
         let assigned = ProgramDisplayChoice.assign(outputs: outputs, screens: Self.screenInfos())
         missingOutputs = zip(outputs.indices, assigned).filter { $0.1 == nil }.map { L("Program output %lld", $0.0 + 1) }
+        var desired: [UInt32: OutputResolution] = [:]
+        for (output, displayID) in zip(outputs, assigned) { if let displayID { desired[displayID] = output.outputResolution } }
+        syncResolutions(desired, outputs: zip(outputs, assigned).map { (id: $0.id, display: $1) })
         let allFeeds: [ProgramFeed] = zip(all, names).map {
             ProgramFeed(id: $0.deviceId, name: $1, session: $0.decodeSession, coordinator: $0.coordinator)
         }
@@ -437,7 +456,8 @@ struct ProgramOutputSettingsSection: View {
             }
             ForEach($outputs) { $o in
                 OutputGroup(index: outputs.firstIndex { $0.id == o.id } ?? 0, output: $o, outputs: outputs, screens: screens, enabled: enabled,
-                            feeds: controller.available, canRemove: outputs.count > 1) { outputs.removeAll { $0.id == o.id } }
+                            feeds: controller.available, canRemove: outputs.count > 1,
+                            resolutionResult: controller.resolutionResults[o.id]) { outputs.removeAll { $0.id == o.id } }
             }
             if outputs.count < ProgramOutputPrefs.maxOutputs {
                 Button(L("Add output (%lld of %lld)", outputs.count + 1, ProgramOutputPrefs.maxOutputs)) {
@@ -486,6 +506,7 @@ private struct OutputGroup: View {
     let enabled: Bool
     let feeds: [ProgramFeedInfo]
     let canRemove: Bool
+    var resolutionResult: ResolutionResult?
     let remove: () -> Void
 
     private var status: ProgramOutputStatus {
@@ -503,6 +524,16 @@ private struct OutputGroup: View {
                     }
                 }
                 .labelsHidden().frame(width: 260)
+            }
+            SettingsRow("Output resolution", help: "Lowers the load on the Mac when the display is 4K.") {
+                Picker("Output resolution", selection: Binding(get: { output.outputResolution },
+                                                               set: { output.resolution = $0 == .displayDefault ? nil : $0.rawValue })) {
+                    Text("Display default").tag(OutputResolution.displayDefault)
+                    Text(verbatim: "1080p").tag(OutputResolution.p1080)
+                    Text(verbatim: "720p").tag(OutputResolution.p720)
+                }
+                .labelsHidden().frame(width: 260)
+                .accessibilityLabel(Text("Output resolution"))
             }
             SettingsRow("Show") {
                 Picker("Show", selection: $output.layout) {
@@ -533,8 +564,17 @@ private struct OutputGroup: View {
             switch status {
             case .off: return (.gray, L("Off"))
             case .noDisplay: return (.orange, L("No display connected"))
-            case .showing(let n): return (.green, L("Showing on %@", n))
-            case .onMain: return (.orange, L("Main display: it will cover your controls"))
+            case .showing(let n):
+                switch resolutionResult {
+                case .applied(let r)?: return (.green, L("Showing on %@ at %@", n, r))
+                case .refusedMain?: return (.orange, L("Showing on %@. Resolution not changed: the main display is never changed.", n))
+                case .noMatchingMode(let r)?: return (.orange, L("Showing on %@. Resolution not changed: no %@ mode on this display.", n, r))
+                case .failed?: return (.orange, L("Showing on %@. Resolution not changed: macOS refused the change.", n))
+                case nil: return (.green, L("Showing on %@", n))
+                }
+            case .onMain:
+                let base = L("Main display: it will cover your controls")
+                return (.orange, resolutionResult == .refusedMain ? base + " " + L("The main display's resolution is never changed.") : base)
             }
         }()
         return HStack(spacing: 8) {
