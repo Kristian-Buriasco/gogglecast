@@ -74,6 +74,7 @@ struct SecretStoreTests {
             #expect(keys.contains(k))
         }
         #expect(keys.contains(OBSPrefs.passwordKey))
-        #expect(keys.count == 5 + AppEvent.allCases.count)
+        #expect(keys.contains(ControlPrefs.tokenKey) && keys.contains(AlertPrefs.tokenKey))
+        #expect(keys.count == 7 + AppEvent.allCases.count)
     }
 }

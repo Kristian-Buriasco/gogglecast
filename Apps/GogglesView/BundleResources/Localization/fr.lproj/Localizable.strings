@@ -988,3 +988,20 @@
 "Hides all names, warnings and the no-signal marker." = "Hides all names, warnings and the no-signal marker.";
 "Stabilize output" = "Stabilize output";
 "Also stabilizes the preview. Works in race mode." = "Also stabilizes the preview. Works in race mode.";
+
+/* TODO: translate (English placeholder) */
+"Browser control" = "Browser control";
+"Off by default. When on, anyone with the control link can start and stop recordings and switch outputs from a browser on your network. It uses its own token, separate from the viewer token, and plain HTTP without encryption, so use it only on a network you trust. Requires the web viewer to be on. Opening the link stores the token in the browser and removes it from the address." = "Off by default. When on, anyone with the control link can start and stop recordings and switch outputs from a browser on your network. It uses its own token, separate from the viewer token, and plain HTTP without encryption, so use it only on a network you trust. Requires the web viewer to be on. Opening the link stores the token in the browser and removes it from the address.";
+"Allow control from the browser" = "Allow control from the browser";
+"Turn on the local web viewer above; the control page is served by it." = "Turn on the local web viewer above; the control page is served by it.";
+"Control link" = "Control link";
+"Copy link" = "Copy link";
+"Copy control link" = "Copy control link";
+"Scan with the iPad or phone camera. The QR code contains the control token, so do not share a screenshot of it." = "Scan with the iPad or phone camera. The QR code contains the control token, so do not share a screenshot of it.";
+"QR code of the control link" = "QR code of the control link";
+"To control from an iPad or phone, turn on 'Allow other devices on the network' in the web viewer." = "To control from an iPad or phone, turn on 'Allow other devices on the network' in the web viewer.";
+"Control token" = "Control token";
+"Reset control token" = "Reset control token";
+"Last actions" = "Last actions";
+"No actions yet" = "No actions yet";
+"Last browser actions" = "Last browser actions";

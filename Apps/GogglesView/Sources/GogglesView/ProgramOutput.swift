@@ -330,6 +330,12 @@ final class ProgramOutputController: ObservableObject {
 
     func sessionsChanged() { scheduleRefresh() }
 
+    /// One chip per configured output (on screen / no display), or a single "off" chip, for the browser control page.
+    var outputChips: [OutputChip] {
+        guard ProgramOutputPrefs.enabled() else { return [OutputChip(name: "HDMI", state: .off)] }
+        return ProgramOutputPrefs.outputs().enumerated().map { OutputChip(name: "HDMI \($0.offset + 1)", state: windows[$0.element.id] != nil ? .on : .error) }
+    }
+
     private func scheduleRefresh() {
         pending?.cancel()
         let work = DispatchWorkItem { [weak self] in self?.refresh() }
