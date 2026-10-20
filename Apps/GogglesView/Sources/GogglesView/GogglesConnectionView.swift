@@ -50,6 +50,7 @@ struct GogglesConnectionView: View {
     @State private var screenshotNoteURL: URL?
     @State private var noteHovered = false
     @State private var noteGeneration = 0
+    @State private var autoStartToken = 0
 
     /// Shows the note for 3 s (longer while the pointer is over it).
     private func showNote(_ text: String, revealing url: URL? = nil, for seconds: TimeInterval = 3) {
@@ -172,11 +173,9 @@ struct GogglesConnectionView: View {
             BurnInRecordControl(session: session, isLive: isLive, info: { BurnInInfo(fps: coordinator.stats?.fps, bitrateKbps: coordinator.stats?.bitrateKbps, resolution: resolutionText) })
             MarkerControl(recorder: recorder)
         }
-        .onAppear { SessionControlBoard.shared.register(recorder: recorder, for: session) }
+        .onAppear { SessionControlBoard.shared.register(recorder: recorder, for: session); if isLive { armAutoStart() } }
         .onChange(of: isLive) { live in
-            guard live, RecordingPrefs.autoStart, !recorder.isRecording else { return }
-            // Only for real video: wait until a picture was decoded in the last second.
-            session.whenPictureFlowing { if isLive && !recorder.isRecording { startRecording() } }
+            if live { armAutoStart() } else { autoStartToken += 1 }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
             stopRecording(wait: true)
@@ -238,6 +237,17 @@ struct GogglesConnectionView: View {
     private func noteSaved(_ url: URL) {
         let folder = (url.deletingLastPathComponent().path as NSString).abbreviatingWithTildeInPath
         showNote(L("Saved to %@", folder), revealing: url, for: 8)
+    }
+
+    /// Auto-start: wait for a picture that is really changing (not a static or black frame), however long it
+    /// takes while the feed stays live. A newer arm, a lost feed, a manual start or the setting going off cancels it.
+    private func armAutoStart() {
+        guard RecordingPrefs.autoStart, !recorder.isRecording else { return }
+        autoStartToken += 1
+        let token = autoStartToken
+        session.whenPictureChanging(isCancelled: { token != autoStartToken || !isLive || recorder.isRecording || !RecordingPrefs.autoStart }) {
+            if isLive && !recorder.isRecording { startRecording() }
+        }
     }
 
     private func startRecording() {

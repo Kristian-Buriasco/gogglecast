@@ -4,6 +4,11 @@ All notable changes to this project are documented here. Format based on [Keep a
 
 ## [Unreleased]
 
+## [0.11.2] - 2026-10-20
+
+### Fixed
+- Auto-start recording now waits for a picture that is really changing, however long that takes, instead of giving up after 5 seconds. A static menu frame or a black picture no longer starts a recording, and it starts by itself once the goggles show live video (including after you switch Share Liveview on late).
+
 ## [0.11.1] - 2026-10-20
 
 A dedicated HDMI tab, an emergency way to close program outputs and two layout fixes.
