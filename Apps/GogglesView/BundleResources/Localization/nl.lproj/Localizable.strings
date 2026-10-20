@@ -991,3 +991,13 @@
 "Preview on this Mac" = "Preview on this Mac";
 "Preview in the app" = "Preview in the app";
 "Draw the picture on the HDMI outputs only, to lighten the Mac." = "Draw the picture on the HDMI outputs only, to lighten the Mac.";
+
+/* TODO: translate (English placeholder) */
+"Output resolution" = "Output resolution";
+"Lowers the load on the Mac when the display is 4K." = "Lowers the load on the Mac when the display is 4K.";
+"Display default" = "Display default";
+"Showing on %@ at %@" = "Showing on %@ at %@";
+"Showing on %@. Resolution not changed: the main display is never changed." = "Showing on %@. Resolution not changed: the main display is never changed.";
+"Showing on %@. Resolution not changed: no %@ mode on this display." = "Showing on %@. Resolution not changed: no %@ mode on this display.";
+"Showing on %@. Resolution not changed: macOS refused the change." = "Showing on %@. Resolution not changed: macOS refused the change.";
+"The main display's resolution is never changed." = "The main display's resolution is never changed.";
