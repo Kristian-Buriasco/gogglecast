@@ -850,6 +850,16 @@ if args.contains("--enhance-probe") {
     exit(0)
 }
 
+// Dev: real recorded footage through the stabilizer (see StabHarness.swift).
+if args.contains("--stab-study") { StabHarness.study(args: args); exit(0) }
+if args.contains("--stab-ref") { StabHarness.refStudy(args: args); exit(0) }
+if args.contains("--stab-selftest") { StabHarness.selfTest(args: args); exit(0) }
+if args.contains("--stab-file") { StabHarness.fileRun(args: args); exit(0) }
+if args.contains("--stab-measure") { StabHarness.measureVideo(args: args); exit(0) }
+if args.contains("--stab-bench") { StabHarness.bench(args: args); exit(0) }
+if args.contains("--stab-sim") { StabHarness.simCommand(args: args); exit(0) }
+if args.contains("--stab-scan") { StabHarness.scan(args: args); exit(0) }
+
 if args.contains("--stab-probe") {
     // Dev probe: run the real helper stream through the stabilizer for a few seconds (forced on, in this process
     // only) and print per second how much motion it measured and how much it corrected. Hold the camera still,

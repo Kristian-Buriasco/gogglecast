@@ -58,11 +58,29 @@ enum StabilizerPrefs {
 
 /// Low-pass filter of the cumulative camera path. Pure math, no images.
 struct PathSmoother {
+    /// How the path is low-passed. `ema` is the original filter; the others are speed-aware variants.
+    enum Kind: Equatable {
+        case ema
+        /// EMA whose alpha falls from the strength alpha to `aMin` as the (low-passed) pan speed rises to `vHi` px/frame.
+        case adaptive(aMin: Double, vHi: Double)
+        /// Level + trend (no lag on a steady pan); `b` is the trend gain.
+        case holt(b: Double)
+        /// One-euro filter: cutoff `fMin` Hz raised by `beta` Hz per px/s of speed (at an assumed 35 fps).
+        case oneEuro(fMin: Double, beta: Double)
+        case doubleEma
+    }
+
     var strength: Double
+    var kind: Kind = .ema
+    /// Pixels per unit of the filtered quantity (1 for translation, ~960 for roll in radians), so speed thresholds mean the same for both.
+    var unitPx = 1.0
     private(set) var path = CGPoint.zero
     private(set) var smooth = CGPoint.zero
+    private var vlp = CGPoint.zero
+    private var trend = CGPoint.zero
+    private var stage = CGPoint.zero
 
-    init(strength: Double) { self.strength = strength }
+    init(strength: Double, kind: Kind = .ema, unitPx: Double = 1) { self.strength = strength; self.kind = kind; self.unitPx = unitPx }
 
     /// `motion` is how far the picture content moved since the previous frame; `limit` is the
     /// largest correction that can be shown without revealing the frame edge. Returns the shift to
@@ -70,8 +88,34 @@ struct PathSmoother {
     mutating func step(motion: CGPoint, limit: CGSize) -> CGPoint {
         path.x += motion.x; path.y += motion.y
         let alpha = CGFloat(0.5 + 0.48 * min(max(strength, 0), 1))
-        smooth.x = alpha * smooth.x + (1 - alpha) * path.x
-        smooth.y = alpha * smooth.y + (1 - alpha) * path.y
+        switch kind {
+        case .ema:
+            smooth.x = alpha * smooth.x + (1 - alpha) * path.x
+            smooth.y = alpha * smooth.y + (1 - alpha) * path.y
+        case let .adaptive(aMin, vHi):
+            vlp.x = 0.8 * vlp.x + 0.2 * motion.x; vlp.y = 0.8 * vlp.y + 0.2 * motion.y
+            let k = CGFloat(min(1, Double(hypot(vlp.x, vlp.y)) * unitPx / max(vHi, 1e-6)))
+            let a = alpha + (CGFloat(aMin) - alpha) * k
+            smooth.x = a * smooth.x + (1 - a) * path.x
+            smooth.y = a * smooth.y + (1 - a) * path.y
+        case let .holt(b):
+            let nx = alpha * (smooth.x + trend.x) + (1 - alpha) * path.x
+            let ny = alpha * (smooth.y + trend.y) + (1 - alpha) * path.y
+            trend.x = CGFloat(b) * (nx - smooth.x) + (1 - CGFloat(b)) * trend.x
+            trend.y = CGFloat(b) * (ny - smooth.y) + (1 - CGFloat(b)) * trend.y
+            smooth = CGPoint(x: nx, y: ny)
+        case let .oneEuro(fMin, beta):
+            let dt = 1.0 / 35.0
+            let ad = CGFloat(1 / (1 + 1 / (2 * Double.pi * 1.0 * dt)))
+            vlp.x += ad * (motion.x - vlp.x); vlp.y += ad * (motion.y - vlp.y)
+            let speed = Double(hypot(vlp.x, vlp.y)) * unitPx / dt
+            let fc = fMin + beta * speed
+            let a = CGFloat(1 / (1 + 1 / (2 * Double.pi * fc * dt)))
+            smooth.x += a * (path.x - smooth.x); smooth.y += a * (path.y - smooth.y)
+        case .doubleEma:
+            stage.x = alpha * stage.x + (1 - alpha) * path.x; stage.y = alpha * stage.y + (1 - alpha) * path.y
+            smooth.x = alpha * smooth.x + (1 - alpha) * stage.x; smooth.y = alpha * smooth.y + (1 - alpha) * stage.y
+        }
         var c = CGPoint(x: smooth.x - path.x, y: smooth.y - path.y)
         // Past the limit the smoothed path is dragged along so the picture follows a real pan.
         if abs(c.x) > limit.width { c.x = c.x < 0 ? -limit.width : limit.width; smooth.x = path.x + c.x }
@@ -79,7 +123,7 @@ struct PathSmoother {
         return c
     }
 
-    mutating func reset() { path = .zero; smooth = .zero }
+    mutating func reset() { path = .zero; smooth = .zero; vlp = .zero; trend = .zero; stage = .zero }
 }
 
 /// Spots a break in the frame timeline (the clock went backwards, or frames stopped for a while),
@@ -177,6 +221,19 @@ struct StabilizerStats: Equatable {
     var meanCorrectionPx: Double { frames > 0 ? sumCorrectionPx / Double(frames) : 0 }
 }
 
+/// Knobs of the motion measurement and the path filter, kept together so the dev harness can sweep them on recorded footage.
+struct StabilizerTuning: Equatable {
+    /// Width (px) the analysis image is scaled to.
+    var analysisWidth = 640
+    /// Central fraction of the frame that is analysed (1 = whole frame). Edge overlays (OSD) and lens vignetting stay out of the measurement.
+    var analysisROI = 1.0
+    /// Largest believable per-frame motion as a fraction of the frame width (see `Stabilizer.maxPlausibleMotion`).
+    var gate = Stabilizer.maxPlausibleMotion
+    var smoother = PathSmoother.Kind.ema
+    /// Overrides the strength-derived EMA alpha of the smoother when set (dev sweeps).
+    var alphaOverride: Double?
+}
+
 final class Stabilizer {
     private let lock = NSLock()
     /// Guards the small cross-thread state below, so readers never wait for a frame to finish.
@@ -200,12 +257,13 @@ final class Stabilizer {
     private var ci: CIContext { Self.sharedContext }
     private var smoother = PathSmoother(strength: StabilizerPrefs.defaultStrength)
     /// Roll (radians) rides on the x axis of its own smoother.
-    private var rollSmoother = PathSmoother(strength: StabilizerPrefs.defaultStrength)
+    private var rollSmoother = PathSmoother(strength: StabilizerPrefs.defaultStrength, unitPx: 960)
     private var previousSmall: CVPixelBuffer?
     private var outPool: CVPixelBufferPool?
     private var smallPool: CVPixelBufferPool?
-    private var poolKey: (w: Int, h: Int, fmt: OSType)?
-    private static let analysisWidth = 640
+    private var poolKey: (w: Int, h: Int, fmt: OSType, aw: Int)?
+    /// Dev/tuning knobs; changing `analysisWidth` or `analysisROI` between frames is fine (pools are rebuilt).
+    var tuning = StabilizerTuning()
 
     deinit { StabilizerStatus.shared.set(ObjectIdentifier(self), paused: false) }
 
@@ -279,19 +337,23 @@ final class Stabilizer {
         let w = CVPixelBufferGetWidth(input), h = CVPixelBufferGetHeight(input)
         guard w > 64, h > 64 else { return input }
         let fmt = CVPixelBufferGetPixelFormatType(input)
-        if poolKey?.w != w || poolKey?.h != h || poolKey?.fmt != fmt {
+        if poolKey?.w != w || poolKey?.h != h || poolKey?.fmt != fmt || poolKey?.aw != tuning.analysisWidth {
             makePools(w: w, h: h, fmt: fmt)
             previousSmall = nil
             smoother.reset(); rollSmoother.reset()
         }
         smoother.strength = strength; rollSmoother.strength = strength
+        smoother.kind = tuning.smoother; rollSmoother.kind = tuning.smoother
+        if let a = tuning.alphaOverride { smoother.strength = (a - 0.5) / 0.48; rollSmoother.strength = smoother.strength }
         guard let outPool, let smallPool,
               let small = makeBuffer(from: smallPool),
               let out = makeBuffer(from: outPool) else { return input }
 
-        let scale = CGFloat(Self.analysisWidth) / CGFloat(w)
+        let roi = min(max(tuning.analysisROI, 0.3), 1)
+        let scale = CGFloat(tuning.analysisWidth) / (CGFloat(w) * CGFloat(roi))
         let image = CIImage(cvPixelBuffer: input)
-        ci.render(image.transformed(by: CGAffineTransform(scaleX: scale, y: scale)), to: small)
+        let crop = CGRect(x: CGFloat(w) * CGFloat(1 - roi) / 2, y: CGFloat(h) * CGFloat(1 - roi) / 2, width: CGFloat(w) * CGFloat(roi), height: CGFloat(h) * CGFloat(roi))
+        ci.render(image.cropped(to: crop).transformed(by: CGAffineTransform(translationX: -crop.minX, y: -crop.minY).concatenating(CGAffineTransform(scaleX: scale, y: scale))), to: small)
 
         var motion = CGPoint.zero
         var rollMotion = 0.0
@@ -299,7 +361,7 @@ final class Stabilizer {
         var outlier = false
         if let prev = previousSmall {
             if let m = Stabilizer.measure(from: prev, to: small, mode: mode) {
-                let gated = Stabilizer.gate(CGPoint(x: m.t.x / scale, y: m.t.y / scale), width: CGFloat(w))
+                let gated = Stabilizer.gate(CGPoint(x: m.t.x / scale, y: m.t.y / scale), width: CGFloat(w), limit: tuning.gate)
                 motion = gated.motion
                 outlier = gated.rejected
                 if !outlier, abs(m.roll) <= Self.maxPlausibleRoll { rollMotion = m.roll } else { outlier = true }
@@ -341,10 +403,11 @@ final class Stabilizer {
                   colorSpace: image.colorSpace ?? CGColorSpace(name: CGColorSpace.itur_709))
         copyAttachments(from: input, to: out)
         if Self.probeResidual, let probeSmall = makeBuffer(from: smallPool) {
-            ci.render(CIImage(cvPixelBuffer: out).transformed(by: CGAffineTransform(scaleX: scale, y: scale)), to: probeSmall)
+            let probeScale = CGFloat(tuning.analysisWidth) / CGFloat(w)
+            ci.render(CIImage(cvPixelBuffer: out).transformed(by: CGAffineTransform(scaleX: probeScale, y: probeScale)), to: probeSmall)
             if let prevOut = previousOutSmall, let r = Stabilizer.measure(from: prevOut, to: probeSmall) {
                 statLock.lock()
-                _stats.sumResidualPx += Double(hypot(r.x / scale, r.y / scale)); _stats.residualFrames += 1
+                _stats.sumResidualPx += Double(hypot(r.x / probeScale, r.y / probeScale)); _stats.residualFrames += 1
                 statLock.unlock()
             }
             previousOutSmall = probeSmall
@@ -369,8 +432,8 @@ final class Stabilizer {
     static let maxPlausibleRoll = 0.15
 
     /// Returns `motion`, or zero when it is implausibly large for a frame `width` pixels wide.
-    static func gate(_ motion: CGPoint, width: CGFloat) -> (motion: CGPoint, rejected: Bool) {
-        hypot(motion.x, motion.y) > maxPlausibleMotion * width ? (.zero, true) : (motion, false)
+    static func gate(_ motion: CGPoint, width: CGFloat, limit: Double = maxPlausibleMotion) -> (motion: CGPoint, rejected: Bool) {
+        hypot(motion.x, motion.y) > limit * width ? (.zero, true) : (motion, false)
     }
 
     /// How far the content of `to` moved relative to `from`, in pixels of those buffers (y up).
@@ -423,22 +486,22 @@ final class Stabilizer {
             CVPixelBufferCreateWithBytes(nil, tw, th, kCVPixelFormatType_32BGRA, base, bpr, nil, nil, nil, &t)
             return t
         }
-        // Vision request creation is not thread-safe (crashes in VNSession), so build serially and only perform concurrently.
+        // Vision request creation is not thread-safe (crashes in VNSession).
         var jobs: [(i: Int, j: Int, req: VNTranslationalImageRegistrationRequest, handler: VNImageRequestHandler)] = []
         for k in 0..<9 {
             let i = k % 3, j = k / 3
             guard let tf = tile(from, i, j), let tt = tile(to, i, j) else { continue }
             jobs.append((i, j, VNTranslationalImageRegistrationRequest(targetedCVPixelBuffer: tt), VNImageRequestHandler(cvPixelBuffer: tf, options: [:])))
         }
+        // Performed serially: concurrent perform() calls raced inside VisionCore (NSRangeException in its weak-object
+        // collection, seen after ~1000 frames on real footage).
         var slots = [(r: SIMD2<Double>, d: SIMD2<Double>)?](repeating: nil, count: jobs.count)
-        let slotLock = NSLock()
-        DispatchQueue.concurrentPerform(iterations: jobs.count) { k in
+        for k in 0..<jobs.count {
             let (i, j, req, handler) = jobs[k]
             guard (try? handler.perform([req])) != nil,
-                  let o = req.results?.first as? VNImageTranslationAlignmentObservation else { return }
-            let e = (r: SIMD2((Double(i) + 0.5) / 3 * w - w / 2, (Double(j) + 0.5) / 3 * h - h / 2),
-                     d: SIMD2(-o.alignmentTransform.tx, -o.alignmentTransform.ty))
-            slotLock.lock(); slots[k] = e; slotLock.unlock()
+                  let o = req.results?.first as? VNImageTranslationAlignmentObservation else { continue }
+            slots[k] = (r: SIMD2((Double(i) + 0.5) / 3 * w - w / 2, (Double(j) + 0.5) / 3 * h - h / 2),
+                        d: SIMD2(-o.alignmentTransform.tx, -o.alignmentTransform.ty))
         }
         let samples = slots.compactMap { $0 }
         func fit(_ s: [(r: SIMD2<Double>, d: SIMD2<Double>)]) -> (t: SIMD2<Double>, roll: Double) {
@@ -475,10 +538,10 @@ final class Stabilizer {
             CVPixelBufferPoolCreate(nil, nil, attrs as CFDictionary, &p)
             return p
         }
-        let sw = Self.analysisWidth, sh = max(2, Int((Double(h) / Double(w) * Double(sw)).rounded()))
+        let sw = tuning.analysisWidth, sh = max(2, Int((Double(h) / Double(w) * Double(sw)).rounded()))
         outPool = pool(w, h, fmt)
         smallPool = pool(sw, sh, kCVPixelFormatType_32BGRA)
-        poolKey = (w, h, fmt)
+        poolKey = (w, h, fmt, tuning.analysisWidth)
     }
 
     private func makeBuffer(from pool: CVPixelBufferPool) -> CVPixelBuffer? {
