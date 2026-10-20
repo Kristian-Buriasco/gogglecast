@@ -52,12 +52,17 @@ enum NtfyRequest {
 typealias AlertTransport = @Sendable (URLRequest) async -> Int?
 
 enum AlertURLSession {
-    static let transport: AlertTransport = { req in
+    /// One session for the whole app: keep-alive and HTTP/2 connection reuse (a new TLS handshake per
+    /// alert cost 100-300 ms), so the connection the heartbeat opened is already warm.
+    private static let session: URLSession = {
         let cfg = URLSessionConfiguration.ephemeral
         cfg.timeoutIntervalForRequest = NtfyRequest.timeout
         cfg.timeoutIntervalForResource = NtfyRequest.timeout
-        let session = URLSession(configuration: cfg)
-        defer { session.finishTasksAndInvalidate() }
+        cfg.waitsForConnectivity = false
+        return URLSession(configuration: cfg)
+    }()
+
+    static let transport: AlertTransport = { req in
         guard let (_, resp) = try? await session.data(for: req) else { return nil }
         return (resp as? HTTPURLResponse)?.statusCode
     }
@@ -69,11 +74,12 @@ final class NtfySender: @unchecked Sendable {
     private let token: @Sendable () -> String
     let backoff: [TimeInterval]
 
-    /// One try plus `backoff.count` retries (3 by default: 1 s, 2 s, 4 s).
+    /// One try plus `backoff.count` retries (3 by default: 0.5 s, 1.5 s, 3 s). The token comes from
+    /// SecretStore, which caches it in memory after the first (lazy) Keychain read.
     init(transport: @escaping AlertTransport = AlertURLSession.transport,
          sleep: @escaping @Sendable (TimeInterval) async -> Void = { try? await Task.sleep(nanoseconds: UInt64($0 * 1e9)) },
          token: @escaping @Sendable () -> String = { SecretStore.get(AlertPrefs.tokenKey) },
-         backoff: [TimeInterval] = [1, 2, 4]) {
+         backoff: [TimeInterval] = [0.5, 1.5, 3]) {
         self.transport = transport; self.sleep = sleep; self.token = token; self.backoff = backoff
     }
 
@@ -90,7 +96,7 @@ final class NtfySender: @unchecked Sendable {
 
     /// Fire and forget; `done` runs on a background thread.
     func send(_ m: AlertMessage, server: String, topic: String, done: @escaping @Sendable (Bool) -> Void) {
-        Task.detached(priority: .utility) { [self] in
+        Task.detached(priority: .userInitiated) { [self] in
             guard let req = NtfyRequest.make(server: server, topic: topic, message: m, token: token()) else { done(false); return }
             done(await deliver(req))
         }

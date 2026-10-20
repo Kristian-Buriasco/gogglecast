@@ -44,12 +44,12 @@ enum AlertKind: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Seconds a condition must last before the first alert (on top of the 3 s stream debounce).
+    /// Seconds a condition must last before the first alert. Connection loss is instant (0); a user
+    /// delay > 0 is the only flap protection left for it. Stored delays are only written when the user
+    /// edits the stepper, so installs that never touched it pick up this default.
     var defaultDelay: Int {
         switch self {
-        case .batteryLow, .batteryCritical: return 0
-        case .signalLost, .outputFailed: return 10
-        case .helperNotResponding: return 15
+        case .batteryLow, .batteryCritical, .signalLost, .outputFailed, .helperNotResponding: return 0
         case .pictureFrozen, .pictureBlack: return 20
         case .outputStalled: return 30
         }
@@ -191,25 +191,22 @@ struct AlertFeed {
     let outputs: [OutputChip]
 }
 
-/// Turns app state into conditions. Signal lost reuses `StreamEventDebouncer`: a feed that was never
-/// announced live never alerts, and a flapping signal does not flip the condition.
+/// Turns app state into conditions. Signal lost is immediate: a feed that was seen live and is not live
+/// now. A feed that was never live never alerts. No debounce here (it cost 3 s); the per-kind delay and
+/// the engine's recovery hold absorb flapping.
 struct AlertInputs {
-    private var debouncers: [String: StreamEventDebouncer] = [:]
-    private var lost = Set<String>()
+    private var seenLive = Set<String>()
 
     /// Feeds that disappeared (window closed by the user) so the engine can forget them.
     mutating func conditions(feeds: [AlertFeed], helperDown: Bool, missingPrograms: [String], now: Date) -> (conditions: [AlertCondition], gone: [String]) {
         let ids = Set(feeds.map(\.id))
-        let gone = Set(debouncers.keys).subtracting(ids)
-        for id in gone { debouncers[id] = nil; lost.remove(id) }
+        let gone = seenLive.subtracting(ids)
+        seenLive.subtract(gone)
         var out: [AlertCondition] = []
         for f in feeds {
-            var d = debouncers[f.id] ?? StreamEventDebouncer()
-            d.observe(f.isLive ? .live : .stalled, at: now)
-            if let e = d.tick(at: now) { if e == .streamLost { lost.insert(f.id) } else { lost.remove(f.id) } }
-            debouncers[f.id] = d
+            if f.isLive { seenLive.insert(f.id) }
             func add(_ k: AlertKind, _ detail: String = "") { out.append(AlertCondition(key: AlertKey(kind: k, feedID: f.id, detail: detail), name: f.name)) }
-            if lost.contains(f.id) { add(.signalLost) }
+            if !f.isLive, seenLive.contains(f.id) { add(.signalLost) }
             for i in f.issues {
                 switch i {
                 case .lowBattery: add(.batteryLow)
@@ -243,6 +240,7 @@ enum AlertPrefs {
     static let heartbeatKey = "remoteAlertsHeartbeatURL"
     static let tokenKey = "remoteAlertsToken"
     static let repeatRange = 0...60
+    static let delayRange = 0...120
 
     static func enabledKey(_ k: AlertKind) -> String { "remoteAlerts.\(k.rawValue).enabled" }
     static func delayKey(_ k: AlertKind) -> String { "remoteAlerts.\(k.rawValue).delay" }
@@ -257,7 +255,7 @@ enum AlertPrefs {
         c.repeatMinutes = min(max(d.object(forKey: repeatKey) as? Int ?? 2, repeatRange.lowerBound), repeatRange.upperBound)
         for k in AlertKind.allCases {
             c.settings[k] = .init(enabled: d.object(forKey: enabledKey(k)) as? Bool ?? true,
-                                  delay: min(max(d.object(forKey: delayKey(k)) as? Int ?? k.defaultDelay, 0), 600),
+                                  delay: min(max(d.object(forKey: delayKey(k)) as? Int ?? k.defaultDelay, 0), delayRange.upperBound),
                                   priority: min(max(d.object(forKey: priorityKey(k)) as? Int ?? k.defaultPriority, 1), 5))
         }
         return c

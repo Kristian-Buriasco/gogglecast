@@ -303,6 +303,9 @@ enum EventHookInstaller {
         let debouncer = StreamDebouncerBox()
         coordinator.$uiState.sink { state in
             debouncer.value.observe(state.kind, at: Date())
+            // Remote alerts: evaluate on the change itself, not on the next 1 Hz poll. @Published fires
+            // before the value is stored, so hop to the next main-queue turn (same run-loop pass).
+            DispatchQueue.main.async { EventStatus.shared.refresh() }
         }.store(in: &bag)
         Timer.publish(every: 0.5, on: .main, in: .common).autoconnect().sink { _ in
             if let e = debouncer.value.tick(at: Date()) {
