@@ -132,8 +132,8 @@ struct MultiFeedSoakTests {
             let bytes = (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: [.fileSizeKey]))?
                 .reduce(0) { $0 + ((try? $1.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0) } ?? 0
             let cpu = Double(ProcessSampler.cpuTimeNs() - cpu0) / 1e9 / Date().timeIntervalSince(t0) * 100
-            print(String(format: "soak %3d/%d  mem %.0f MB  cpu %.0f%%  disk %.0f MB  decoded %@  delivered %@  stalled %@",
-                         n, samples, mb, cpu, Double(bytes) / 1_048_576, now.map(String.init).joined(separator: "/"), rigs.map { String($0.fake.framesDelivered) }.joined(separator: "/"), stalled.map { String($0 + 1) }.joined(separator: ",")))
+            print(String(format: "soak %3d/%d  enc %d  mem %.0f MB  cpu %.0f%%  disk %.0f MB  decoded %@  delivered %@  stalled %@",
+                         n, samples, ReencodeHub.activeEncoderSessions, mb, cpu, Double(bytes) / 1_048_576, now.map(String.init).joined(separator: "/"), rigs.map { String($0.fake.framesDelivered) }.joined(separator: "/"), stalled.map { String($0 + 1) }.joined(separator: ",")))
             #expect(stalled.isEmpty, "feeds \(stalled.map { $0 + 1 }) stopped decoding at sample \(n)")
         }
 

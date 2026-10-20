@@ -28,6 +28,20 @@ enum ReencodePrefs {
 }
 
 final class ReencodeHub {
+    /// Encoder sessions alive right now across all hubs (tests, diagnostics): 0 means nothing is being encoded.
+    private static let activeLock = NSLock()
+    private static var activeCount = 0
+    static var activeEncoderSessions: Int { activeLock.lock(); defer { activeLock.unlock() }; return activeCount }
+    private static func bumpActive(_ d: Int) { activeLock.lock(); activeCount += d; activeLock.unlock() }
+    /// After the last subscriber leaves the hub keeps its session but encodes nothing for this long, so a
+    /// stream stop/start does not tear the encoder down and rebuild it.
+    static let idleGrace: TimeInterval = 2
+    /// True while this hub holds a VideoToolbox session (0 or 1 per goggles window).
+    var hasEncoderSession: Bool { lock.lock(); defer { lock.unlock() }; return session != nil }
+    private let grace: TimeInterval
+    /// First picture after the hub was idle is forced to a keyframe so a returning subscriber starts clean.
+    private var forceKey = false
+    private var idleSinceLastSubscriber = false
     /// Picture currently on screen. Called on the main queue by the timer, or by `pollOnce()` in tests.
     private let source: () -> CVPixelBuffer?
     private let bitrateMbps: () -> Int
@@ -56,7 +70,8 @@ final class ReencodeHub {
     init(source: @escaping () -> CVPixelBuffer?, sequence: (() -> UInt64)? = nil,
          bitrateMbps: @escaping () -> Int = { ReencodePrefs.bitrateMbps },
          halfRate: @escaping () -> Bool = { ReencodePrefs.halfRate },
-         onIdle: @escaping () -> Void = {}) {
+         onIdle: @escaping () -> Void = {}, grace: TimeInterval = ReencodeHub.idleGrace) {
+        self.grace = grace
         self.source = source
         self.sequence = sequence
         self.onIdle = onIdle
@@ -74,7 +89,19 @@ final class ReencodeHub {
         subscribers.append(WeakSub(value: c))
         let first = subscribers.count == 1
         lock.unlock()
-        if first { DispatchQueue.main.async { self.startTimer() } }
+        if first {
+            DispatchQueue.main.async {
+                self.forceKey = true
+                if self.idleSinceLastSubscriber {
+                    // Back within the grace: output crop/look may have changed, so restart the picture stages
+                    // (the encoder itself is rebuilt by `pollOnce` if the size differs).
+                    self.idleSinceLastSubscriber = false
+                    self.lastSurface = nil; self.lastSequence = nil
+                    self.onIdle()
+                }
+                self.startTimer()
+            }
+        }
     }
 
     func unsubscribe(_ c: SampleBufferRendering) {
@@ -82,7 +109,10 @@ final class ReencodeHub {
         subscribers.removeAll { $0.value == nil || $0.value === c }
         let empty = subscribers.isEmpty
         lock.unlock()
-        if empty { DispatchQueue.main.async { self.stopTimer() } }
+        if empty {
+            DispatchQueue.main.async { self.idleSinceLastSubscriber = true }
+            DispatchQueue.main.asyncAfter(deadline: .now() + grace) { self.stopTimer() }
+        }
     }
 
     var subscriberCount: Int { lock.lock(); defer { lock.unlock() }; return subscribers.filter { $0.value != nil }.count }
@@ -104,6 +134,7 @@ final class ReencodeHub {
         teardownEncoder()
         lastSurface = nil
         lastSequence = nil
+        idleSinceLastSubscriber = false
         onIdle()
     }
 
@@ -111,6 +142,8 @@ final class ReencodeHub {
 
     /// Grabs the displayed picture and encodes it if it changed since the last call.
     func pollOnce() {
+        // Idle grace: nobody listens, so encode nothing (the session stays warm until stopTimer).
+        guard subscriberCount > 0 else { return }
         guard let buf = source() else { return }
         if let sequence {
             let n = sequence()
@@ -128,11 +161,12 @@ final class ReencodeHub {
         let pts = CMTime(value: Int64(clamping: DispatchTime.now().uptimeNanoseconds), timescale: 1_000_000_000)
         let status = VTCompressionSessionEncodeFrame(
             session, imageBuffer: input, presentationTimeStamp: pts, duration: .invalid,
-            frameProperties: nil, infoFlagsOut: nil
+            frameProperties: forceKey ? [kVTEncodeFrameOptionKey_ForceKeyFrame: kCFBooleanTrue] as CFDictionary : nil, infoFlagsOut: nil
         ) { [weak self] status, _, sample in
             guard status == noErr, let sample, let self else { return }
             self.fanOut(sample)
         }
+        if status == noErr { forceKey = false }
         if status != noErr { lastError = "encode failed (\(status))" }
     }
 
@@ -171,7 +205,8 @@ final class ReencodeHub {
         set(kVTCompressionPropertyKey_MaxKeyFrameInterval, NSNumber(value: 120))
         set(kVTCompressionPropertyKey_ExpectedFrameRate, NSNumber(value: 60))
         VTCompressionSessionPrepareToEncodeFrames(s)
-        session = s
+        lock.lock(); session = s; lock.unlock()
+        Self.bumpActive(1)
         encoderSize = (width, height)
 
         var t: VTPixelTransferSession?
@@ -192,9 +227,11 @@ final class ReencodeHub {
         if let s = session {
             VTCompressionSessionCompleteFrames(s, untilPresentationTimeStamp: .invalid)
             VTCompressionSessionInvalidate(s)
+            Self.bumpActive(-1)
         }
         if let t = transfer { VTPixelTransferSessionInvalidate(t) }
-        session = nil; transfer = nil; pool = nil; encoderSize = nil
+        lock.lock(); session = nil; lock.unlock()
+ transfer = nil; pool = nil; encoderSize = nil
     }
 }
 
