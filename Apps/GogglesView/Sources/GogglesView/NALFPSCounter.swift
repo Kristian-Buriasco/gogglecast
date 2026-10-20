@@ -38,7 +38,7 @@ import Foundation
 /// matches the idiom the rest of this codebase already uses for XPC-callback
 /// -driven mutable state (`HelperService.stateQueue`).
 final class NALFPSCounter {
-    private let queue = DispatchQueue(label: "\(Logging.subsystem).client.fpscounter")
+    private let queue = DispatchQueue(label: "\(Logging.subsystem).client.fpscounter", qos: .utility)
     private var frameCountThisSecond = 0
     private var cumulativeFrameCount = 0
     private var elapsedSeconds = 0

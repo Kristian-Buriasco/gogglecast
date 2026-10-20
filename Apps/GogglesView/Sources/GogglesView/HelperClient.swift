@@ -182,7 +182,7 @@ public final class HelperClient: NSObject {
     /// `NSXPCConnection`'s handlers (`invalidationHandler`,
     /// `interruptionHandler`) and the exported object's callback methods
     /// can all fire concurrently/off the calling thread.
-    private let stateQueue = DispatchQueue(label: "\(Logging.subsystem).client.helperclient.state")
+    private let stateQueue = DispatchQueue(label: "\(Logging.subsystem).client.helperclient.state", qos: .userInitiated)
 
     private var connection: NSXPCConnection?
     private var exportedClient: ExportedClient?

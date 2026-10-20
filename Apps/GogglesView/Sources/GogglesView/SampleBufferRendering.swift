@@ -20,6 +20,17 @@ import CoreMedia
 protocol SampleBufferRendering: AnyObject {
     func enqueue(_ sampleBuffer: CMSampleBuffer)
     func flush()
+    /// False while the renderer's queue is full (it is behind).
+    var isReadyForMoreMediaData: Bool { get }
+    /// True for display layers: they are fed decoded pictures, everything else gets the compressed stream.
+    var wantsDecodedPictures: Bool { get }
 }
 
-extension AVSampleBufferDisplayLayer: SampleBufferRendering {}
+extension SampleBufferRendering {
+    var isReadyForMoreMediaData: Bool { true }
+    var wantsDecodedPictures: Bool { false }
+}
+
+extension AVSampleBufferDisplayLayer: SampleBufferRendering {
+    var wantsDecodedPictures: Bool { true }
+}

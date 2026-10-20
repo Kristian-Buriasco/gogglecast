@@ -79,6 +79,32 @@ final class DecodeSession: ObservableObject {
     private let frameLock = NSLock()
     private var latestDecoded: CVPixelBuffer?
     private var decodedCount: UInt64 = 0
+    /// Frames handed to the decoder whose picture has not come back yet (guarded by `frameLock`).
+    private var inFlight = 0
+    private var latencyDrops = 0
+    /// Pictures skipped (after decoding, so references stay intact) because newer ones were already waiting.
+    @Published private(set) var latencyDroppedFrames = 0
+    /// Thread-safe count behind `latencyDroppedFrames`.
+    var latencyDroppedCount: Int { frameLock.lock(); defer { frameLock.unlock() }; return latencyDrops }
+    /// A picture older than this with a newer one already queued behind it is not worth processing or showing.
+    static let staleFrameMs = 100.0
+
+    static func isStale(ageMs: Double, newerPending: Int) -> Bool { newerPending > 0 && ageMs > staleFrameMs }
+
+    private func noteLatencyDrop() {
+        frameLock.lock(); latencyDrops += 1; let n = latencyDrops; frameLock.unlock()
+        DispatchQueue.main.async { [weak self] in self?.latencyDroppedFrames = n }
+    }
+
+    /// Newest wins: a layer whose queue is full is behind, so drop what it still holds and show this picture.
+    /// Returns true when stale queued pictures were dropped. Never holds more than the one sample being enqueued.
+    @discardableResult
+    static func deliver(_ sample: CMSampleBuffer, to layer: SampleBufferRendering) -> Bool {
+        let behind = !layer.isReadyForMoreMediaData
+        if behind { layer.flush() }
+        layer.enqueue(sample)
+        return behind
+    }
     private let stabilizer = Stabilizer()
     private let enhancer = VideoEnhancer()
     private(set) var teardownCount = 0
@@ -314,12 +340,12 @@ final class DecodeSession: ObservableObject {
         try DecodeSession.markDisplayImmediately(sampleBuffer)
         feedDecoder(sampleBuffer, avcc: avccData, format: formatDescription)
         // Display layers are fed decoded pictures (see `decoded`); every other consumer gets the stream.
-        if let renderer, !(renderer is AVSampleBufferDisplayLayer) { renderer.enqueue(sampleBuffer) }
+        if let renderer, !renderer.wantsDecodedPictures { renderer.enqueue(sampleBuffer) }
         recordLatency(hostTime: hostTime)
         consumerLock.lock()
         let extras = extraConsumers.compactMap { $0.value }
         consumerLock.unlock()
-        for consumer in extras where !(consumer is AVSampleBufferDisplayLayer) { consumer.enqueue(sampleBuffer) }
+        for consumer in extras where !consumer.wantsDecodedPictures { consumer.enqueue(sampleBuffer) }
     }
 
     // MARK: - Decoder
@@ -336,13 +362,19 @@ final class DecodeSession: ObservableObject {
             decoderReady = true
             setWaitingForKeyframe(false)
         }
+        frameLock.lock(); inFlight += 1; frameLock.unlock()
         let status = VTDecompressionSessionDecodeFrame(
             decoder, sampleBuffer: sample,
             flags: [._EnableAsynchronousDecompression, ._1xRealTimePlayback], infoFlagsOut: nil
         ) { [weak self] status, _, image, pts, _ in
-            self?.decoded(status: status, image: image, pts: pts)
+            guard let self else { return }
+            self.frameLock.lock(); self.inFlight -= 1; let newer = self.inFlight; self.frameLock.unlock()
+            self.decoded(status: status, image: image, pts: pts, newerPending: newer)
         }
-        if status != noErr { recordFailure(DecodeSessionError.decoderFailed(status)) }
+        if status != noErr {
+            frameLock.lock(); inFlight -= 1; frameLock.unlock()
+            recordFailure(DecodeSessionError.decoderFailed(status))
+        }
     }
 
     private func createDecoder(_ format: CMVideoFormatDescription) {
@@ -399,10 +431,19 @@ final class DecodeSession: ObservableObject {
     }
 
     /// Decoder output (VideoToolbox thread): remember the picture and hand it to every display layer.
-    private func decoded(status: OSStatus, image decodedImage: CVImageBuffer?, pts: CMTime) {
+    private func decoded(status: OSStatus, image decodedImage: CVImageBuffer?, pts: CMTime, newerPending: Int = 0) {
+        // Decode callback thread: interactive (idempotent; harmlessly refused on pool threads).
+        pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE, 0)
         guard status == noErr, var image = decodedImage else {
             if status != noErr { recordFailure(DecodeSessionError.decoderFailed(status)) }
             return
+        }
+        if pts.value > 0 {
+            let now = DispatchTime.now().uptimeNanoseconds
+            if now > UInt64(pts.value), DecodeSession.isStale(ageMs: DecodeSession.milliseconds(fromNanoseconds: now - UInt64(pts.value)), newerPending: newerPending) {
+                noteLatencyDrop()
+                return
+            }
         }
         if CFGetTypeID(image) == CVPixelBufferGetTypeID() {
             stabilizer.noteTimestamp(pts.value)
@@ -427,11 +468,13 @@ final class DecodeSession: ObservableObject {
         try? DecodeSession.markDisplayImmediately(sample)
         consecutiveFailures = 0
         recordDecodeLatency(stampNs: pts.value)
-        if let layer = renderer as? AVSampleBufferDisplayLayer { layer.enqueue(sample) }
+        var behind = false
+        if let layer = renderer, layer.wantsDecodedPictures { behind = DecodeSession.deliver(sample, to: layer) }
         consumerLock.lock()
-        let layers = extraConsumers.compactMap { $0.value as? AVSampleBufferDisplayLayer }
+        let layers = extraConsumers.compactMap { $0.value }.filter { $0.wantsDecodedPictures }
         consumerLock.unlock()
-        for layer in layers where layer !== renderer { layer.enqueue(sample) }
+        for layer in layers where layer !== renderer { behind = DecodeSession.deliver(sample, to: layer) || behind }
+        if behind { noteLatencyDrop() }
     }
 
     // MARK: - Exposure aids (zebra, focus peaking)
