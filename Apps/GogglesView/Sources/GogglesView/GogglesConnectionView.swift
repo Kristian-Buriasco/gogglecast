@@ -50,7 +50,7 @@ struct GogglesConnectionView: View {
     @State private var screenshotNoteURL: URL?
     @State private var noteHovered = false
     @State private var noteGeneration = 0
-    @State private var autoStartToken = 0
+    @State private var autoRecord = AutoRecordPolicy()
 
     /// Shows the note for 3 s (longer while the pointer is over it).
     private func showNote(_ text: String, revealing url: URL? = nil, for seconds: TimeInterval = 3) {
@@ -173,10 +173,8 @@ struct GogglesConnectionView: View {
             BurnInRecordControl(session: session, isLive: isLive, info: { BurnInInfo(fps: coordinator.stats?.fps, bitrateKbps: coordinator.stats?.bitrateKbps, resolution: resolutionText) })
             MarkerControl(recorder: recorder)
         }
-        .onAppear { SessionControlBoard.shared.register(recorder: recorder, for: session); if isLive { armAutoStart() } }
-        .onChange(of: isLive) { live in
-            if live { armAutoStart() } else { autoStartToken += 1 }
-        }
+        .onAppear { SessionControlBoard.shared.register(recorder: recorder, for: session) }
+        .onReceive(Timer.publish(every: 0.25, on: .main, in: .common).autoconnect()) { _ in autoRecordTick() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
             stopRecording(wait: true)
         }
@@ -239,14 +237,16 @@ struct GogglesConnectionView: View {
         showNote(L("Saved to %@", folder), revealing: url, for: 8)
     }
 
-    /// Auto-start: wait for a picture that is really changing (not a static or black frame), however long it
-    /// takes while the feed stays live. A newer arm, a lost feed, a manual start or the setting going off cancels it.
-    private func armAutoStart() {
-        guard RecordingPrefs.autoStart, !recorder.isRecording else { return }
-        autoStartToken += 1
-        let token = autoStartToken
-        session.whenPictureChanging(isCancelled: { token != autoStartToken || !isLive || recorder.isRecording || !RecordingPrefs.autoStart }) {
-            if isLive && !recorder.isRecording { startRecording() }
+    /// Auto record (every 0.25 s while the setting is on): see `AutoRecordPolicy`.
+    private func autoRecordTick() {
+        let enabled = RecordingPrefs.autoStart
+        let fps = coordinator.stats?.fps
+        let needSample = enabled && !recorder.isRecording && (fps ?? 0) > AutoRecordPolicy.startFps
+        switch autoRecord.observe(fps: fps, sample: needSample ? session.currentPictureSample() : nil,
+                                  recording: recorder.isRecording, enabled: enabled, now: Date()) {
+        case .start: if isLive && !recorder.isRecording { startRecording() }
+        case .stop: if recorder.isRecording { stopRecording(wait: false) }
+        case .none: break
         }
     }
 

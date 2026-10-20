@@ -151,19 +151,11 @@ final class DecodeSession: ObservableObject {
         DispatchQueue.main.async { poll() }
     }
 
-    /// Runs `action` (main queue) once the picture is really changing: decoded frames keep arriving and the
-    /// sampled picture differs from one sample to the next (a static menu or a black picture does not count).
-    /// Waits as long as it takes; `isCancelled` (main queue) ends the wait. Used for automatic recording.
-    func whenPictureChanging(isCancelled: @escaping () -> Bool, _ action: @escaping () -> Void) {
-        var gate = PictureChangeGate()
-        func poll() {
-            if isCancelled() { return }
-            var buffer: CVPixelBuffer?
-            if hasRecentPicture() { frameLock.lock(); buffer = latestDecoded; frameLock.unlock() }
-            if gate.observe(buffer.flatMap { PictureWatch.sample($0) }) { action(); return }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { poll() }
-        }
-        DispatchQueue.main.async { poll() }
+    /// A coarse look at the newest decoded picture (nil when none arrived in the last second). Main queue.
+    func currentPictureSample() -> PictureWatch.Sample? {
+        guard hasRecentPicture() else { return nil }
+        frameLock.lock(); let buffer = latestDecoded; frameLock.unlock()
+        return buffer.flatMap { PictureWatch.sample($0) }
     }
 
     /// Input was dropped upstream (backlog): the decoder must restart at the next IDR.

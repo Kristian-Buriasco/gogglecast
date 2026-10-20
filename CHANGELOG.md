@@ -6,8 +6,8 @@ All notable changes to this project are documented here. Format based on [Keep a
 
 ## [0.11.2] - 2026-10-20
 
-### Fixed
-- Auto-start recording now waits for a picture that is really changing, however long that takes, instead of giving up after 5 seconds. A static menu frame or a black picture no longer starts a recording, and it starts by itself once the goggles show live video (including after you switch Share Liveview on late).
+### Changed
+- Auto recording (Settings > Recording > "Start recording automatically when live") now follows the frame rate: it starts once the rate holds above 10 fps for a second and the picture is really changing, stops when the rate sits at 0 for 2 seconds, and starts a new recording when the feed comes back. It only stops recordings it started, and after you stop one by hand it waits for the feed to go away and return before starting again.
 
 ## [0.11.1] - 2026-10-20
 
