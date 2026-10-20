@@ -19,6 +19,8 @@ struct OSDOverlay: View {
     var resolution: String?
     var latencyMs: Double?
     var batteryPercent: Int?
+    /// Pictures the app skipped to stay on the newest frame (added to the helper's drops).
+    var latencyDrops = 0
 
     @AppStorage(OSDPrefs.enabledKey) private var enabled = false
     @AppStorage(RaceModePrefs.key) private var race = false
@@ -32,14 +34,14 @@ struct OSDOverlay: View {
     static func lines(
         stats: StreamStats, resolution: String?, fps: Bool, bitrate: Bool, showResolution: Bool, drops: Bool,
         latencyMs: Double? = nil, showLatency: Bool = false,
-        batteryPercent: Int? = nil, showBattery: Bool = false
+        batteryPercent: Int? = nil, showBattery: Bool = false, latencyDrops: Int = 0
     ) -> [String] {
         var out: [String] = []
         if showResolution, let resolution { out.append(resolution) }
         if fps { out.append("\(stats.fps) fps") }
         if bitrate { out.append(String(format: "%.1f Mbps", stats.bitrateKbps / 1000)) }
         if showLatency, let latencyMs { out.append(String(format: "%.0f ms", latencyMs)) }
-        if drops { out.append(L("%lld dropped", Int(stats.cumulativeDrops))) }
+        if drops { out.append(L("%lld dropped", Int(stats.cumulativeDrops) + latencyDrops)) }
         if showBattery, let batteryPercent { out.append(L("Goggles %lld%%", batteryPercent)) }
         return out
     }
@@ -49,7 +51,7 @@ struct OSDOverlay: View {
             let lines = Self.lines(stats: stats, resolution: resolution, fps: showFps, bitrate: showBitrate,
                                    showResolution: showResolution, drops: showDrops,
                                    latencyMs: latencyMs, showLatency: showLatency,
-                                   batteryPercent: batteryPercent, showBattery: showBattery)
+                                   batteryPercent: batteryPercent, showBattery: showBattery, latencyDrops: latencyDrops)
             if !lines.isEmpty {
                 VStack(alignment: .leading, spacing: 2) {
                     ForEach(lines, id: \.self) { Text($0) }

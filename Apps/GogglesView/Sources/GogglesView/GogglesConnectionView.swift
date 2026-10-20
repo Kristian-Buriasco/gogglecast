@@ -467,7 +467,7 @@ struct GogglesConnectionView: View {
             PreviewVideoView(session: session)
                 .opacity(videoOpacity)
             OSDOverlay(stats: coordinator.stats, resolution: resolutionText, latencyMs: session.decodeLatencyMs ?? session.latencyMs,
-                       batteryPercent: coordinator.batteryPercent)
+                       batteryPercent: coordinator.batteryPercent, latencyDrops: session.latencyDroppedFrames)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 .opacity(videoOpacity)
             RaceBadge()

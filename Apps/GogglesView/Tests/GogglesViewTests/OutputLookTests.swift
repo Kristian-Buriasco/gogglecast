@@ -240,4 +240,43 @@ final class OutputLookTests: XCTestCase {
         for _ in 0..<5 { XCTAssertNil(LUTLibrary.currentFilter()) }
         XCTAssertEqual(LUTLibrary.parseCount - beforeBad, 1, "invalid file is read once, not per frame")
     }
+
+    /// The cached look filter must render the same pixels as a filter built straight from the cube (the old path).
+    func testCachedLookMatchesDirectFilterPixel() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("luts-\(UUID().uuidString)")
+        let savedDir = LUTLibrary.directory
+        let d = UserDefaults.standard
+        let keys = [LookPrefs.nameKey, LookPrefs.intensityKey]
+        let saved = keys.map { d.object(forKey: $0) }
+        LUTLibrary.directory = dir
+        defer {
+            LUTLibrary.directory = savedDir; try? FileManager.default.removeItem(at: dir)
+            for (k, v) in zip(keys, saved) { if let v { d.set(v, forKey: k) } else { d.removeObject(forKey: k) } }
+        }
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        var text = "LUT_3D_SIZE 2\n" // inverting look: out = 1 - in
+        for b in 0..<2 { for g in 0..<2 { for r in 0..<2 { text += "\(1 - r) \(1 - g) \(1 - b)\n" } } }
+        try text.write(to: dir.appendingPathComponent("Inv.cube"), atomically: true, encoding: .utf8)
+        d.set("Inv", forKey: LookPrefs.nameKey); d.set(1.0, forKey: LookPrefs.intensityKey)
+
+        let lut = try CubeLUT.parse(text)
+        let direct = try XCTUnwrap(CIFilter(name: "CIColorCubeWithColorSpace"))
+        direct.setValue(lut.size, forKey: "inputCubeDimension")
+        direct.setValue(lut.cubeData(intensity: 1), forKey: "inputCubeData")
+        direct.setValue(CGColorSpace(name: CGColorSpace.itur_709), forKey: "inputColorSpace")
+        let look = try XCTUnwrap(LUTLibrary.currentLook())
+        let cached = try XCTUnwrap(look.filter.copy() as? CIFilter)
+
+        let ctx = CIContext()
+        func pixel(_ f: CIFilter) -> [UInt8] {
+            f.setValue(CIImage(color: CIColor(red: 0.8, green: 0.25, blue: 0.5)).cropped(to: CGRect(x: 0, y: 0, width: 1, height: 1)), forKey: kCIInputImageKey)
+            var px = [UInt8](repeating: 0, count: 4)
+            ctx.render(f.outputImage!, toBitmap: &px, rowBytes: 4, bounds: CGRect(x: 0, y: 0, width: 1, height: 1), format: .RGBA8, colorSpace: CGColorSpace(name: CGColorSpace.itur_709))
+            return px
+        }
+        let a = pixel(direct), b = pixel(cached)
+        XCTAssertEqual(a, b)
+        XCTAssertNotEqual(a[0], 204, "look changed the pixel")
+        XCTAssertTrue(LUTLibrary.currentLook()?.filter === look.filter, "built once, shared")
+    }
 }

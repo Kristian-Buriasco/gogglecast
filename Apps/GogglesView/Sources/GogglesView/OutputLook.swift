@@ -179,23 +179,39 @@ enum LUTLibrary {
         return loadLocked(name, k)
     }
 
-    /// A ready-to-use CIFilter for the selected look, nil when none is selected or it can't be read.
-    /// The configured filter is cached per (file version, intensity); callers get their own copy so
-    /// setting the input image is safe across threads.
-    static func currentFilter() -> CIFilter? {
+    private static var statCache: (name: String, dir: String, key: (url: URL, key: String), at: UInt64)?
+
+    /// `key(for:)` without a disk stat on every call: the file's mtime is re-checked at most once a second.
+    private static func throttledKey(for name: String) -> (url: URL, key: String) {
+        let now = DispatchTime.now().uptimeNanoseconds
+        if let c = statCache, c.name == name, c.dir == directory.path, now &- c.at < 1_000_000_000 { return c.key }
+        let k = key(for: name)
+        statCache = (name, directory.path, k, now)
+        return k
+    }
+
+    /// The shared, already-configured look filter (cube built once per file version and intensity) with a
+    /// token that changes when it does. Do not set an input image on it: copy it, or use `currentFilter()`.
+    /// nil when none is selected or it can't be read.
+    static func currentLook() -> (token: String, filter: CIFilter)? {
         let name = LookPrefs.name, intensity = LookPrefs.intensity
         guard !name.isEmpty else { return nil }
-        let k = key(for: name)
         lock.lock(); defer { lock.unlock() }
+        let k = throttledKey(for: name)
         guard let lut = loadLocked(name, k) else { return nil }
         let fkey = "\(k.key)#\(intensity)"
-        if let c = filterCache, c.key == fkey { return c.filter.copy() as? CIFilter }
+        if let c = filterCache, c.key == fkey { return (fkey, c.filter) }
         guard let f = CIFilter(name: "CIColorCubeWithColorSpace") else { return nil }
         f.setValue(lut.size, forKey: "inputCubeDimension")
         f.setValue(lut.cubeData(intensity: Float(intensity)), forKey: "inputCubeData")
         f.setValue(CGColorSpace(name: CGColorSpace.itur_709), forKey: "inputColorSpace")
         filterCache = (fkey, f)
-        return f.copy() as? CIFilter
+        return (fkey, f)
+    }
+
+    /// A private copy of the look filter, for a caller that sets its own input image (e.g. a layer's filter list).
+    static func currentFilter() -> CIFilter? {
+        currentLook()?.filter.copy() as? CIFilter
     }
 }
 
@@ -252,6 +268,8 @@ final class OutputProcessor {
     private var pool: CVPixelBufferPool?
     private var poolSize: (w: Int, h: Int)?
     private var lockedRatio: CGFloat??
+    private var lutFilter: CIFilter?
+    private var lutToken: String?
     private var lastKey: (id: UInt32, seed: UInt32)?
 
     func reset() { lock.lock(); lockedRatio = nil; lastKey = nil; lock.unlock() }
@@ -281,9 +299,13 @@ final class OutputProcessor {
         guard let pool, CVPixelBufferPoolCreatePixelBuffer(nil, pool, &out) == kCVReturnSuccess, let out else { return input }
 
         var image = CIImage(cvPixelBuffer: input)
-        if LookPrefs.applyOutput, let f = LUTLibrary.currentFilter() {
-            f.setValue(image, forKey: kCIInputImageKey)
-            image = f.outputImage ?? image
+        if LookPrefs.applyOutput, let look = LUTLibrary.currentLook() {
+            // One filter instance per look (not a copy per frame), so Core Image keeps the cube it built.
+            if look.token != lutToken { lutFilter = look.filter.copy() as? CIFilter; lutToken = look.token }
+            if let f = lutFilter {
+                f.setValue(image, forKey: kCIInputImageKey)
+                image = f.outputImage ?? image
+            }
         }
         let r = plan.rect
         let sx = plan.out.width / r.width, sy = plan.out.height / r.height
