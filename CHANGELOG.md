@@ -6,6 +6,9 @@ All notable changes to this project are documented here. Format based on [Keep a
 
 ## [0.11.2] - 2026-10-20
 
+### Added
+- Settings > HDMI > "Keep displays awake" (on by default): while the program outputs are shown, the Mac no longer lets its displays go to sleep, which used to blank the HDMI feed after a couple of minutes of no input. A locked Mac still covers every display.
+
 ### Changed
 - Auto recording (Settings > Recording > "Start recording automatically when live") now follows the frame rate: it starts once the rate holds above 10 fps for a second and the picture is really changing, stops when the rate sits at 0 for 2 seconds, and starts a new recording when the feed comes back. It only stops recordings it started, and after you stop one by hand it waits for the feed to go away and return before starting again.
 

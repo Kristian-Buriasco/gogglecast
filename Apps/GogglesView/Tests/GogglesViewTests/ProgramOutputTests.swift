@@ -146,3 +146,15 @@ import CoreGraphics
         #expect(s(0, false) == .off)
     }
 }
+
+@Suite struct KeepDisplaysAwakeTests {
+    @Test func onByDefaultButOnlyWhileTheOutputsAreShown() {
+        let d = UserDefaults(suiteName: "KeepAwakeTests")!
+        d.removePersistentDomain(forName: "KeepAwakeTests")
+        #expect(!ProgramOutputPrefs.keepDisplaysAwake(d), "outputs off: nothing to keep awake")
+        d.set(true, forKey: ProgramOutputPrefs.enabledKey)
+        #expect(ProgramOutputPrefs.keepDisplaysAwake(d), "default on while shown")
+        d.set(false, forKey: ProgramOutputPrefs.keepAwakeKey)
+        #expect(!ProgramOutputPrefs.keepDisplaysAwake(d), "the user can turn it off")
+    }
+}

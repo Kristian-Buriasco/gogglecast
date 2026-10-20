@@ -35,9 +35,14 @@ enum ProgramOutputPrefs {
     static let feedNamesKey = "programOutputFeedNames"  // [deviceId: custom name]
     static let openAtLaunchKey = "programOutputOpenAtLaunch"
     static let cleanKey = "programOutputClean"            // no names, NO SIGNAL text, warnings or red border
+    static let keepAwakeKey = "programOutputKeepAwake"    // hold the displays awake while the outputs are shown (default on)
     static let stabilizeKey = "programOutputStabilize"    // run the stabilizer while the outputs are shown, even in race mode
     static let maxOutputs = 4
 
+    /// A sleeping display takes every display with it, including the HDMI feed to the mixer.
+    static func keepDisplaysAwake(_ d: UserDefaults = .standard) -> Bool {
+        enabled(d) && (d.object(forKey: keepAwakeKey) as? Bool ?? true)
+    }
     static func clean(_ d: UserDefaults = .standard) -> Bool { d.bool(forKey: cleanKey) }
     /// The stabilizer sits in the shared decode path, so this stabilizes the preview too.
     static func stabilizeActive(_ d: UserDefaults = .standard) -> Bool { enabled(d) && d.bool(forKey: stabilizeKey) }
@@ -438,6 +443,7 @@ struct ProgramOutputSettingsSection: View {
     @AppStorage(ProgramOutputPrefs.openAtLaunchKey) private var openAtLaunch = false
     @AppStorage(ProgramOutputPrefs.cleanKey) private var clean = false
     @AppStorage(ProgramOutputPrefs.stabilizeKey) private var stabilize = false
+    @AppStorage(ProgramOutputPrefs.keepAwakeKey) private var keepAwake = true
     @AppStorage(PreviewPolicy.hdmiOnlyKey) private var previewHdmiOnly = false
     private var previewOnMac: Binding<Bool> { Binding(get: { !previewHdmiOnly }, set: { previewHdmiOnly = !$0 }) }
     @State private var outputs = ProgramOutputPrefs.outputs()
@@ -451,6 +457,7 @@ struct ProgramOutputSettingsSection: View {
                 SettingsToggleRow("Open the program outputs when the app starts", isOn: $openAtLaunch)
                 SettingsToggleRow("Clean output", isOn: $clean, help: "Hides all names, warnings and the no-signal marker.")
                 SettingsToggleRow("Stabilize output", isOn: $stabilize, help: "Also stabilizes the preview. Works in race mode.")
+                SettingsToggleRow("Keep displays awake", isOn: $keepAwake, help: "While the outputs are shown, so the HDMI feed does not go dark. A locked Mac still covers every display.")
                 SettingsToggleRow("Preview in the app", isOn: previewOnMac, help: "Draw the picture on the HDMI outputs only, to lighten the Mac.")
                 SettingsRow("Emergency close") {
                     Text("Stuck behind a full-screen output? Press ⌃⌥⌘. in any app to close all program outputs.")

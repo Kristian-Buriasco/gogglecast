@@ -1047,3 +1047,5 @@
 "Preview on this Mac" = "Preview on this Mac";
 "Preview in the app" = "Preview in the app";
 "Draw the picture on the HDMI outputs only, to lighten the Mac." = "Draw the picture on the HDMI outputs only, to lighten the Mac.";
+"Keep displays awake" = "Keep displays awake";
+"While the outputs are shown, so the HDMI feed does not go dark. A locked Mac still covers every display." = "While the outputs are shown, so the HDMI feed does not go dark. A locked Mac still covers every display.";

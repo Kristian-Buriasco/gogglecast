@@ -1001,3 +1001,5 @@
 "Showing on %@. Resolution not changed: no %@ mode on this display." = "Showing on %@. Resolution not changed: no %@ mode on this display.";
 "Showing on %@. Resolution not changed: macOS refused the change." = "Showing on %@. Resolution not changed: macOS refused the change.";
 "The main display's resolution is never changed." = "The main display's resolution is never changed.";
+"Keep displays awake" = "Keep displays awake";
+"While the outputs are shown, so the HDMI feed does not go dark. A locked Mac still covers every display." = "While the outputs are shown, so the HDMI feed does not go dark. A locked Mac still covers every display.";
