@@ -852,12 +852,8 @@ if args.contains("--enhance-probe") {
 
 // Dev: real recorded footage through the stabilizer (see StabHarness.swift).
 if args.contains("--stab-study") { StabHarness.study(args: args); exit(0) }
-if args.contains("--stab-ref") { StabHarness.refStudy(args: args); exit(0) }
-if args.contains("--stab-selftest") { StabHarness.selfTest(args: args); exit(0) }
 if args.contains("--stab-file") { StabHarness.fileRun(args: args); exit(0) }
 if args.contains("--stab-measure") { StabHarness.measureVideo(args: args); exit(0) }
-if args.contains("--stab-bench") { StabHarness.bench(args: args); exit(0) }
-if args.contains("--stab-sim") { StabHarness.simCommand(args: args); exit(0) }
 if args.contains("--stab-scan") { StabHarness.scan(args: args); exit(0) }
 
 if args.contains("--stab-probe") {
