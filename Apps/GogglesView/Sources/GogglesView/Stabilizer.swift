@@ -15,6 +15,9 @@ import SwiftUI
 /// How the camera motion is measured. `translation` is the original behaviour (no roll correction).
 enum StabilizerMode: String, CaseIterable {
     case translation
+    /// The measurement `translation` used before it was tuned on real footage (translational registration of the whole
+    /// frame). Kept selectable to compare against the new default; on real footage it was slightly shakier than no stabilization.
+    case translationPrevious = "translation-previous"
     case similarityHomography = "similarity-homography"
     /// Never the default: on real footage it was about 14% shakier than no stabilization, with roll errors near 5 degrees (garbage tile fits).
     case similarityTiles = "similarity-tiles"
@@ -408,6 +411,7 @@ final class Stabilizer {
         // Translation only, but measured with the homography registration: on real footage the translational request
         // returned garbage jumps and made the picture shakier than the input, the homography one did not.
         case .translation: return measureHomography(from: from, to: to).map { ($0.t, 0) }
+        case .translationPrevious: return Stabilizer.measure(from: from, to: to).map { ($0, 0.0) }
         case .similarityHomography: return measureHomography(from: from, to: to)
         case .similarityTiles: return measureTiles(from: from, to: to)
         }
@@ -531,6 +535,7 @@ struct StabilizerSettingsSection: View {
             SettingsRow("Stabilization mode", indented: true) {
                 Picker("Stabilization mode", selection: $mode) {
                     Text("Translation only").tag(StabilizerMode.translation.rawValue)
+                    Text("Translation only (previous method)").tag(StabilizerMode.translationPrevious.rawValue)
                     Text("Translation and roll (homography)").tag(StabilizerMode.similarityHomography.rawValue)
                     Text("Translation and roll (tiles)").tag(StabilizerMode.similarityTiles.rawValue)
                 }.labelsHidden().disabled(!enabled)
