@@ -50,6 +50,7 @@ struct GogglesConnectionView: View {
     @State private var screenshotNoteURL: URL?
     @State private var noteHovered = false
     @State private var noteGeneration = 0
+    @State private var autoRecord = AutoRecordPolicy()
 
     /// Shows the note for 3 s (longer while the pointer is over it).
     private func showNote(_ text: String, revealing url: URL? = nil, for seconds: TimeInterval = 3) {
@@ -173,11 +174,7 @@ struct GogglesConnectionView: View {
             MarkerControl(recorder: recorder)
         }
         .onAppear { SessionControlBoard.shared.register(recorder: recorder, for: session) }
-        .onChange(of: isLive) { live in
-            guard live, RecordingPrefs.autoStart, !recorder.isRecording else { return }
-            // Only for real video: wait until a picture was decoded in the last second.
-            session.whenPictureFlowing { if isLive && !recorder.isRecording { startRecording() } }
-        }
+        .onReceive(Timer.publish(every: 0.25, on: .main, in: .common).autoconnect()) { _ in autoRecordTick() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
             stopRecording(wait: true)
         }
@@ -238,6 +235,19 @@ struct GogglesConnectionView: View {
     private func noteSaved(_ url: URL) {
         let folder = (url.deletingLastPathComponent().path as NSString).abbreviatingWithTildeInPath
         showNote(L("Saved to %@", folder), revealing: url, for: 8)
+    }
+
+    /// Auto record (every 0.25 s while the setting is on): see `AutoRecordPolicy`.
+    private func autoRecordTick() {
+        let enabled = RecordingPrefs.autoStart
+        let fps = coordinator.stats?.fps
+        let needSample = enabled && !recorder.isRecording && (fps ?? 0) > AutoRecordPolicy.startFps
+        switch autoRecord.observe(fps: fps, sample: needSample ? session.currentPictureSample() : nil,
+                                  recording: recorder.isRecording, enabled: enabled, now: Date()) {
+        case .start: if isLive && !recorder.isRecording { startRecording() }
+        case .stop: if recorder.isRecording { stopRecording(wait: false) }
+        case .none: break
+        }
     }
 
     private func startRecording() {

@@ -151,6 +151,13 @@ final class DecodeSession: ObservableObject {
         DispatchQueue.main.async { poll() }
     }
 
+    /// A coarse look at the newest decoded picture (nil when none arrived in the last second). Main queue.
+    func currentPictureSample() -> PictureWatch.Sample? {
+        guard hasRecentPicture() else { return nil }
+        frameLock.lock(); let buffer = latestDecoded; frameLock.unlock()
+        return buffer.flatMap { PictureWatch.sample($0) }
+    }
+
     /// Input was dropped upstream (backlog): the decoder must restart at the next IDR.
     func noteInputDropped() {
         decoderReady = false

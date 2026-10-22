@@ -15,14 +15,20 @@ import SwiftUI
 /// How the camera motion is measured. `translation` is the original behaviour (no roll correction).
 enum StabilizerMode: String, CaseIterable {
     case translation
+    /// The measurement `translation` used before it was tuned on real footage (translational registration of the whole
+    /// frame). Kept selectable to compare against the new default; on real footage it was slightly shakier than no stabilization.
+    case translationPrevious = "translation-previous"
     case similarityHomography = "similarity-homography"
+    /// Never the default: on real footage it was about 14% shakier than no stabilization, with roll errors near 5 degrees (garbage tile fits).
     case similarityTiles = "similarity-tiles"
 }
 
 enum StabilizerPrefs {
     static let modeKey = "stabilizeMode"
-    /// The similarity modes won `StabilizerBenchmarkTests.testModeBenchmark` on synthetic clips, but stay opt-in until
-    /// they have been compared with real goggles footage.
+    /// Real goggles footage (`GogglesView --stab-file`, see StabHarness.swift): tiles was the worst (garbage tile fits, roll
+    /// drift), roll correction gave no measurable gain on shaky runs and costs about 2% more zoom (it only helped on near-static
+    /// footage), so translation stays the default. It is measured with the homography registration since the translational
+    /// request made the picture shakier than the input on real footage.
     static let defaultMode = StabilizerMode.translation
     static var mode: StabilizerMode {
         (UserDefaults.standard.string(forKey: modeKey)).flatMap(StabilizerMode.init(rawValue:)) ?? defaultMode
@@ -177,6 +183,18 @@ struct StabilizerStats: Equatable {
     var meanCorrectionPx: Double { frames > 0 ? sumCorrectionPx / Double(frames) : 0 }
 }
 
+/// What is analysed to measure the camera motion. Real goggles footage (see `StabHarness`) showed that the whole frame
+/// at 640 px is not the best choice: the central part measures the shake without edge overlays and vignetting, and the
+/// registration cost grows with the pixel count.
+struct StabilizerTuning: Equatable {
+    /// Width (px) the analysed image is scaled to.
+    var analysisWidth = 384
+    /// Central fraction of the frame that is analysed (1 = whole frame).
+    var analysisROI = 0.7
+    /// Previous behaviour: translation mode measured with the plain translational registration (cheaper, but shakier on real footage).
+    var legacyTranslationRegistration = false
+}
+
 final class Stabilizer {
     private let lock = NSLock()
     /// Guards the small cross-thread state below, so readers never wait for a frame to finish.
@@ -204,8 +222,9 @@ final class Stabilizer {
     private var previousSmall: CVPixelBuffer?
     private var outPool: CVPixelBufferPool?
     private var smallPool: CVPixelBufferPool?
-    private var poolKey: (w: Int, h: Int, fmt: OSType)?
-    private static let analysisWidth = 640
+    private var poolKey: (w: Int, h: Int, fmt: OSType, aw: Int)?
+    /// Tuning knobs; the dev harness sweeps them on recorded footage. Pools are rebuilt when the width changes.
+    var tuning = StabilizerTuning()
 
     deinit { StabilizerStatus.shared.set(ObjectIdentifier(self), paused: false) }
 
@@ -279,7 +298,7 @@ final class Stabilizer {
         let w = CVPixelBufferGetWidth(input), h = CVPixelBufferGetHeight(input)
         guard w > 64, h > 64 else { return input }
         let fmt = CVPixelBufferGetPixelFormatType(input)
-        if poolKey?.w != w || poolKey?.h != h || poolKey?.fmt != fmt {
+        if poolKey?.w != w || poolKey?.h != h || poolKey?.fmt != fmt || poolKey?.aw != tuning.analysisWidth {
             makePools(w: w, h: h, fmt: fmt)
             previousSmall = nil
             smoother.reset(); rollSmoother.reset()
@@ -289,16 +308,18 @@ final class Stabilizer {
               let small = makeBuffer(from: smallPool),
               let out = makeBuffer(from: outPool) else { return input }
 
-        let scale = CGFloat(Self.analysisWidth) / CGFloat(w)
+        let roi = CGFloat(min(max(tuning.analysisROI, 0.3), 1))
+        let scale = CGFloat(tuning.analysisWidth) / (CGFloat(w) * roi)
         let image = CIImage(cvPixelBuffer: input)
-        ci.render(image.transformed(by: CGAffineTransform(scaleX: scale, y: scale)), to: small)
+        let crop = CGRect(x: CGFloat(w) * (1 - roi) / 2, y: CGFloat(h) * (1 - roi) / 2, width: CGFloat(w) * roi, height: CGFloat(h) * roi)
+        ci.render(image.cropped(to: crop).transformed(by: CGAffineTransform(translationX: -crop.minX, y: -crop.minY).concatenating(CGAffineTransform(scaleX: scale, y: scale))), to: small)
 
         var motion = CGPoint.zero
         var rollMotion = 0.0
         var measureFailed = false
         var outlier = false
         if let prev = previousSmall {
-            if let m = Stabilizer.measure(from: prev, to: small, mode: mode) {
+            if let m = (tuning.legacyTranslationRegistration && mode == .translation ? Stabilizer.measure(from: prev, to: small).map { ($0, 0.0) } : Stabilizer.measure(from: prev, to: small, mode: mode)) {
                 let gated = Stabilizer.gate(CGPoint(x: m.t.x / scale, y: m.t.y / scale), width: CGFloat(w))
                 motion = gated.motion
                 outlier = gated.rejected
@@ -341,10 +362,11 @@ final class Stabilizer {
                   colorSpace: image.colorSpace ?? CGColorSpace(name: CGColorSpace.itur_709))
         copyAttachments(from: input, to: out)
         if Self.probeResidual, let probeSmall = makeBuffer(from: smallPool) {
-            ci.render(CIImage(cvPixelBuffer: out).transformed(by: CGAffineTransform(scaleX: scale, y: scale)), to: probeSmall)
+            let probeScale = CGFloat(tuning.analysisWidth) / CGFloat(w)
+            ci.render(CIImage(cvPixelBuffer: out).transformed(by: CGAffineTransform(scaleX: probeScale, y: probeScale)), to: probeSmall)
             if let prevOut = previousOutSmall, let r = Stabilizer.measure(from: prevOut, to: probeSmall) {
                 statLock.lock()
-                _stats.sumResidualPx += Double(hypot(r.x / scale, r.y / scale)); _stats.residualFrames += 1
+                _stats.sumResidualPx += Double(hypot(r.x / probeScale, r.y / probeScale)); _stats.residualFrames += 1
                 statLock.unlock()
             }
             previousOutSmall = probeSmall
@@ -386,7 +408,10 @@ final class Stabilizer {
     /// Content motion between two frames for `mode`: translation of the frame centre plus roll (radians, counter-clockwise, y up).
     static func measure(from: CVPixelBuffer, to: CVPixelBuffer, mode: StabilizerMode) -> (t: CGPoint, roll: Double)? {
         switch mode {
-        case .translation: return measure(from: from, to: to).map { ($0, 0) }
+        // Translation only, but measured with the homography registration: on real footage the translational request
+        // returned garbage jumps and made the picture shakier than the input, the homography one did not.
+        case .translation: return measureHomography(from: from, to: to).map { ($0.t, 0) }
+        case .translationPrevious: return Stabilizer.measure(from: from, to: to).map { ($0, 0.0) }
         case .similarityHomography: return measureHomography(from: from, to: to)
         case .similarityTiles: return measureTiles(from: from, to: to)
         }
@@ -423,22 +448,22 @@ final class Stabilizer {
             CVPixelBufferCreateWithBytes(nil, tw, th, kCVPixelFormatType_32BGRA, base, bpr, nil, nil, nil, &t)
             return t
         }
-        // Vision request creation is not thread-safe (crashes in VNSession), so build serially and only perform concurrently.
+        // Vision request creation is not thread-safe (crashes in VNSession).
         var jobs: [(i: Int, j: Int, req: VNTranslationalImageRegistrationRequest, handler: VNImageRequestHandler)] = []
         for k in 0..<9 {
             let i = k % 3, j = k / 3
             guard let tf = tile(from, i, j), let tt = tile(to, i, j) else { continue }
             jobs.append((i, j, VNTranslationalImageRegistrationRequest(targetedCVPixelBuffer: tt), VNImageRequestHandler(cvPixelBuffer: tf, options: [:])))
         }
+        // Performed serially: concurrent perform() calls raced inside VisionCore (NSRangeException in its weak-object
+        // collection, after about 1000 frames of real footage).
         var slots = [(r: SIMD2<Double>, d: SIMD2<Double>)?](repeating: nil, count: jobs.count)
-        let slotLock = NSLock()
-        DispatchQueue.concurrentPerform(iterations: jobs.count) { k in
+        for k in 0..<jobs.count {
             let (i, j, req, handler) = jobs[k]
             guard (try? handler.perform([req])) != nil,
-                  let o = req.results?.first as? VNImageTranslationAlignmentObservation else { return }
-            let e = (r: SIMD2((Double(i) + 0.5) / 3 * w - w / 2, (Double(j) + 0.5) / 3 * h - h / 2),
-                     d: SIMD2(-o.alignmentTransform.tx, -o.alignmentTransform.ty))
-            slotLock.lock(); slots[k] = e; slotLock.unlock()
+                  let o = req.results?.first as? VNImageTranslationAlignmentObservation else { continue }
+            slots[k] = (r: SIMD2((Double(i) + 0.5) / 3 * w - w / 2, (Double(j) + 0.5) / 3 * h - h / 2),
+                        d: SIMD2(-o.alignmentTransform.tx, -o.alignmentTransform.ty))
         }
         let samples = slots.compactMap { $0 }
         func fit(_ s: [(r: SIMD2<Double>, d: SIMD2<Double>)]) -> (t: SIMD2<Double>, roll: Double) {
@@ -475,10 +500,10 @@ final class Stabilizer {
             CVPixelBufferPoolCreate(nil, nil, attrs as CFDictionary, &p)
             return p
         }
-        let sw = Self.analysisWidth, sh = max(2, Int((Double(h) / Double(w) * Double(sw)).rounded()))
+        let sw = tuning.analysisWidth, sh = max(2, Int((Double(h) / Double(w) * Double(sw)).rounded()))
         outPool = pool(w, h, fmt)
         smallPool = pool(sw, sh, kCVPixelFormatType_32BGRA)
-        poolKey = (w, h, fmt)
+        poolKey = (w, h, fmt, tuning.analysisWidth)
     }
 
     private func makeBuffer(from pool: CVPixelBufferPool) -> CVPixelBuffer? {
@@ -510,6 +535,7 @@ struct StabilizerSettingsSection: View {
             SettingsRow("Stabilization mode", indented: true) {
                 Picker("Stabilization mode", selection: $mode) {
                     Text("Translation only").tag(StabilizerMode.translation.rawValue)
+                    Text("Translation only (previous method)").tag(StabilizerMode.translationPrevious.rawValue)
                     Text("Translation and roll (homography)").tag(StabilizerMode.similarityHomography.rawValue)
                     Text("Translation and roll (tiles)").tag(StabilizerMode.similarityTiles.rawValue)
                 }.labelsHidden().disabled(!enabled)

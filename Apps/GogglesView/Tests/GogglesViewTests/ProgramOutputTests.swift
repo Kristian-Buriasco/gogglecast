@@ -146,3 +146,26 @@ import CoreGraphics
         #expect(s(0, false) == .off)
     }
 }
+
+@Suite struct KeepDisplaysAwakeTests {
+    @Test func onByDefaultButOnlyWhileTheOutputsAreShown() {
+        let d = UserDefaults(suiteName: "KeepAwakeTests")!
+        d.removePersistentDomain(forName: "KeepAwakeTests")
+        #expect(!ProgramOutputPrefs.keepDisplaysAwake(d), "outputs off: nothing to keep awake")
+        d.set(true, forKey: ProgramOutputPrefs.enabledKey)
+        #expect(ProgramOutputPrefs.keepDisplaysAwake(d), "default on while shown")
+        d.set(false, forKey: ProgramOutputPrefs.keepAwakeKey)
+        #expect(!ProgramOutputPrefs.keepDisplaysAwake(d), "the user can turn it off")
+    }
+}
+
+@Suite struct ProgramOutputCleanTests {
+    @Test func cleanIsPerOutputAndOlderSavedOutputsStayOff() throws {
+        let old = #"{"id":"a","display":0,"layout":"grid","feed":"","showNames":true}"#
+        let o = try JSONDecoder().decode(ProgramOutputConfig.self, from: Data(old.utf8))
+        #expect(!o.isClean)
+        var c = o; c.clean = true
+        let back = try JSONDecoder().decode(ProgramOutputConfig.self, from: JSONEncoder().encode(c))
+        #expect(back.isClean)
+    }
+}

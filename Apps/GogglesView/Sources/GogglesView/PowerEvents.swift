@@ -79,6 +79,8 @@ final class PowerEvents {
 
     private var observers: [NSObjectProtocol] = []
     private var keeper: PowerActivityKeeper?
+    /// Keeps the displays (and so the HDMI feed) awake while the program outputs are shown.
+    private var displayKeeper: PowerActivityKeeper?
     private let center: NotificationCenter
     private let schedule: (TimeInterval, @escaping () -> Void) -> Void
     private var sessions: () -> [PowerAwareSession] = { [] }
@@ -109,6 +111,11 @@ final class PowerEvents {
             let k = PowerActivityKeeper(isBusy: isBusy)
             k.start()
             keeper = k
+            let d = PowerActivityKeeper(
+                isBusy: { ProgramOutputPrefs.keepDisplaysAwake() },
+                begin: { ProcessInfo.processInfo.beginActivity(options: [.userInitiated, .idleDisplaySleepDisabled], reason: $0) })
+            d.start()
+            displayKeeper = d
         }
     }
 

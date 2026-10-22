@@ -4,6 +4,16 @@ All notable changes to this project are documented here. Format based on [Keep a
 
 ## [Unreleased]
 
+## [0.11.2] - 2026-10-20
+
+### Added
+- Settings > HDMI > "Keep displays awake" (on by default): while the program outputs are shown, the Mac no longer lets its displays go to sleep, which used to blank the HDMI feed after a couple of minutes of no input. A locked Mac still covers every display.
+
+### Changed
+- Settings > Picture > Stabilization mode has a new "Translation only (previous method)" entry, so the old measurement can be compared with the new default.
+- The live stabilizer now measures motion with the homography registration on the central 70% of the picture at 384 px. On real recorded footage the previous translation mode was slightly worse than no stabilization; the new default removes a little jitter (about 3% on the test clip) and crops about 8%, at about 8.5 ms per frame. The Tiles mode measured worse than no stabilization on real footage and stays opt-in.
+- Auto recording (Settings > Recording > "Start recording automatically when live") now follows the frame rate: it starts once the rate holds above 10 fps for a second and the picture is really changing, stops when the rate sits at 0 for 2 seconds, and starts a new recording when the feed comes back. It only stops recordings it started, and after you stop one by hand it waits for the feed to go away and return before starting again.
+
 ## [0.11.1] - 2026-10-20
 
 A dedicated HDMI tab, an emergency way to close program outputs and two layout fixes.

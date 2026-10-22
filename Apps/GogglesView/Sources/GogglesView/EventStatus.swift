@@ -73,6 +73,23 @@ enum EventRules {
 
 enum PictureState: Equatable { case unknown, ok, black, frozen }
 
+/// Decides when a feed is genuinely live for auto-recording: the sampled picture keeps changing (not a static
+/// menu or idle frame) and is not black. Feed it a sample every few hundred milliseconds.
+struct PictureChangeGate {
+    private var last: UInt64?
+    private(set) var changes = 0
+
+    mutating func reset() { last = nil; changes = 0 }
+
+    /// True once `needed` samples in a row differed from their predecessor.
+    mutating func observe(_ sample: PictureWatch.Sample?, needed: Int = 3) -> Bool {
+        guard let sample, sample.luma >= PictureWatch.blackLuma else { reset(); return false }
+        if let l = last { changes = l == sample.signature ? 0 : changes + 1 }
+        last = sample.signature
+        return changes >= needed
+    }
+}
+
 /// One feed's picture watcher: feed it a small sample every couple of seconds.
 struct PictureWatch {
     struct Sample: Equatable {
