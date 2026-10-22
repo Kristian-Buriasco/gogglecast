@@ -4,15 +4,31 @@ All notable changes to this project are documented here. Format based on [Keep a
 
 ## [Unreleased]
 
-## [0.11.2] - 2026-10-20
+## [0.12.0] - 2026-10-22
+
+Event release. Everything in it was built for, and used at, a live FPV race with two Goggles 3 feeding an HDMI mixer: the program outputs got faster and easier to run unattended, you can be alerted on your phone, and recording starts and stops by itself.
 
 ### Added
-- Settings > HDMI > "Keep displays awake" (on by default): while the program outputs are shown, the Mac no longer lets its displays go to sleep, which used to blank the HDMI feed after a couple of minutes of no input. A locked Mac still covers every display.
+- Browser control center (Settings > Outputs, off by default): a /control page served by the local web viewer, for an iPad or phone on your network. It shows every feed and output, starts and stops recordings and switches outputs. It uses its own token, separate from the viewer token, over plain HTTP, so use it only on a network you trust.
+- Settings > HDMI > "Preview in the app": turn it off to draw the picture on the HDMI outputs only, which lightens the Mac when two feeds run.
+- Settings > HDMI > per-output "Output resolution" (display default, 1080p or 720p). The change is made by the app only, the main display is never changed, and the mode is restored when the output closes or the app quits.
+- Settings > HDMI > "Keep displays awake" (on by default): while the program outputs are shown, the Mac no longer lets its displays go to sleep, which used to blank the HDMI feed after a long time without input. A locked Mac still covers every display.
+- Settings > HDMI > a "Clean output" toggle on each output, so one output can be clean while another keeps names and warnings. The existing switch is now "Clean output on all outputs".
+- Control-Option-Command-comma closes only the output on the main display and, pressed again, brings it back, while the HDMI outputs keep running. Control-Option-Command-period still closes all outputs.
+- A program output that is not clean now also shows NO SIGNAL, the dimming and the pulsing border when a connected feed delivers 0 fps, not only when the connection is lost.
+- Auto recording (Settings > Recording > "Start recording automatically when live") follows the frame rate: it starts once the rate holds above 10 fps for a second and the picture is really changing, stops when the rate sits at 0 for 2 seconds, and starts a new recording when the feed comes back. It only stops recordings it started, and after you stop one by hand it waits for the feed to go away and return before starting again.
+- Stabilizer study tools for developers: `--stab-file`, `--stab-study` and `--stab-measure` run the stabilizer on a recorded clip and report jitter, roll and cost per frame.
 
 ### Changed
-- Settings > Picture > Stabilization mode has a new "Translation only (previous method)" entry, so the old measurement can be compared with the new default.
-- The live stabilizer now measures motion with the homography registration on the central 70% of the picture at 384 px. On real recorded footage the previous translation mode was slightly worse than no stabilization; the new default removes a little jitter (about 3% on the test clip) and crops about 8%, at about 8.5 ms per frame. The Tiles mode measured worse than no stabilization on real footage and stays opt-in.
-- Auto recording (Settings > Recording > "Start recording automatically when live") now follows the frame rate: it starts once the rate holds above 10 fps for a second and the picture is really changing, stops when the rate sits at 0 for 2 seconds, and starts a new recording when the feed comes back. It only stops recordings it started, and after you stop one by hand it waits for the feed to go away and return before starting again.
+- Remote alerts are instant: a lost connection is sent the moment it drops (the alert rules run on events, not on a timer), and the ntfy request is faster.
+- Smoother display with two feeds: the newest frame always wins, a late frame is dropped instead of queued, the decode and state work run at explicit priorities, and the colour lookup table is cached instead of rebuilt per frame.
+- The re-encoder runs only while something needs it (instant replay, network streams or the web viewer), stays warm for 2 seconds after the last user, and sends a keyframe to anyone who joins late.
+- The stabilizer measures motion with a tuned registration (central 70% of the picture at 384 px, about 8.5 ms per frame). On raw recorded race footage no live mode reliably beat leaving stabilization off, and the previous method scored slightly better on average, so "Translation only (previous method)" is a selectable entry in Settings > Picture and the default stays "Translation only". Tiles was the worst on real footage and stays opt-in. For footage you publish, offline stabilization with look-ahead did far better.
+
+### Known limits
+- A locked Mac, or one showing the screen saver, blanks the HDMI outputs: the lock screen is drawn above anything an app can show. Keep the Mac unlocked, with "Keep displays awake" on.
+- ntfy on iOS delivers alerts as normal notifications; Apple critical alerts are not supported by the ntfy app.
+- Live stabilization did not beat leaving it off on raw race footage. Leave it off for FPV.
 
 ## [0.11.1] - 2026-10-20
 
