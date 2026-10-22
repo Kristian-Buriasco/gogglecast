@@ -158,3 +158,14 @@ import CoreGraphics
         #expect(!ProgramOutputPrefs.keepDisplaysAwake(d), "the user can turn it off")
     }
 }
+
+@Suite struct ProgramOutputCleanTests {
+    @Test func cleanIsPerOutputAndOlderSavedOutputsStayOff() throws {
+        let old = #"{"id":"a","display":0,"layout":"grid","feed":"","showNames":true}"#
+        let o = try JSONDecoder().decode(ProgramOutputConfig.self, from: Data(old.utf8))
+        #expect(!o.isClean)
+        var c = o; c.clean = true
+        let back = try JSONDecoder().decode(ProgramOutputConfig.self, from: JSONEncoder().encode(c))
+        #expect(back.isClean)
+    }
+}

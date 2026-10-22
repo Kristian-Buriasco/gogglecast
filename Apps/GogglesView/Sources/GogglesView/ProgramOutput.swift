@@ -25,6 +25,10 @@ struct ProgramOutputConfig: Codable, Equatable, Identifiable {
     /// OutputResolution raw value; nil (older saved JSON) = "default" = never change the display.
     var resolution: String?
 
+    /// Names, warnings and the no-signal marker hidden on this output only; nil (older saved JSON) = off.
+    var clean: Bool?
+    var isClean: Bool { clean ?? false }
+
     var outputResolution: OutputResolution { resolution.flatMap(OutputResolution.init(rawValue:)) ?? .displayDefault }
     var isGrid: Bool { layout != "single" }
 }
@@ -204,7 +208,8 @@ private struct ProgramTile: View {
     @ObservedObject private var status = EventStatus.shared
     @State private var pulse = false
 
-    private var lost: Bool { showSignal && coordinator.uiState.kind != .live }
+    /// Not live, or live but the stream delivers 0 fps (stats are nil until the first measurement, so that is not a loss).
+    private var lost: Bool { showSignal && (coordinator.uiState.kind != .live || coordinator.stats?.fps == 0) }
     private var issueText: String {
         status.rows.first { $0.id == feed.id }?.issues.map(\.text).joined(separator: " · ") ?? ""
     }
@@ -218,7 +223,7 @@ private struct ProgramTile: View {
         ZStack(alignment: .topLeading) {
             Color.black
             GogglesVideoView(session: feed.session, isSecondary: true, isProgram: true)
-            if showSignal && coordinator.uiState.kind != .live {
+            if lost {
                 Color.black.opacity(0.6)
                 Text(verbatim: L("NO SIGNAL")).font(.system(size: 28, weight: .bold)).foregroundStyle(.red)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -292,11 +297,17 @@ final class ProgramOutputController: ObservableObject {
     @Published private(set) var resolutionResults: [String: ResolutionResult] = [:]
     private var panicRef: EventHotKeyRef?
     private var panicHandler: EventHandlerRef?
+    private var mainRef: EventHotKeyRef?
+    /// Outputs the user closed with the main-display hotkey; they stay closed until the outputs are switched off and on.
+    private var closedOnMain = Set<String>()
 
     /// Emergency close, works from any app: for example when an output landed on the only screen and the
     /// picture covers the controls. Registered only while an output is on screen.
     static let panicCombo = HotkeyCombo(keyCode: UInt32(kVK_ANSI_Period), carbonModifiers: UInt32(controlKey | optionKey | cmdKey))
+    /// Closes only the output(s) on the main display, so the HDMI outputs keep running.
+    static let mainCombo = HotkeyCombo(keyCode: UInt32(kVK_ANSI_Comma), carbonModifiers: UInt32(controlKey | optionKey | cmdKey))
     private static let panicID = EventHotKeyID(signature: OSType(0x47565050), id: 1) // 'GVPP'
+    private static let mainID = EventHotKeyID(signature: OSType(0x47565050), id: 2)
 
     /// Panic hotkey + preview state follow whether an output window is on screen (so the preview always returns when they close).
     private func settle() {
@@ -305,7 +316,7 @@ final class ProgramOutputController: ObservableObject {
     }
 
     private func updatePanicHotkey() {
-        guard !windows.isEmpty else { removePanicHotkey(); return }
+        guard !windows.isEmpty || !closedOnMain.isEmpty else { removePanicHotkey(); return }
         guard panicRef == nil else { return }
         var spec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
         InstallEventHandler(GetApplicationEventTarget(), { _, event, _ in
@@ -313,17 +324,41 @@ final class ProgramOutputController: ObservableObject {
             GetEventParameter(event, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID),
                               nil, MemoryLayout<EventHotKeyID>.size, nil, &id)
             // Other hotkeys share the application target: leave theirs to their own handler.
-            guard id.signature == ProgramOutputController.panicID.signature, id.id == ProgramOutputController.panicID.id else { return OSStatus(eventNotHandledErr) }
-            DispatchQueue.main.async { UserDefaults.standard.set(false, forKey: ProgramOutputPrefs.enabledKey) }
+            guard id.signature == ProgramOutputController.panicID.signature else { return OSStatus(eventNotHandledErr) }
+            switch id.id {
+            case ProgramOutputController.panicID.id:
+                DispatchQueue.main.async { UserDefaults.standard.set(false, forKey: ProgramOutputPrefs.enabledKey) }
+            case ProgramOutputController.mainID.id:
+                DispatchQueue.main.async { ProgramOutputController.shared.closeMainOutputs() }
+            default:
+                return OSStatus(eventNotHandledErr)
+            }
             return noErr
         }, 1, &spec, nil, &panicHandler)
         RegisterEventHotKey(Self.panicCombo.keyCode, Self.panicCombo.carbonModifiers, Self.panicID,
                             GetApplicationEventTarget(), 0, &panicRef)
+        RegisterEventHotKey(Self.mainCombo.keyCode, Self.mainCombo.carbonModifiers, Self.mainID,
+                            GetApplicationEventTarget(), 0, &mainRef)
+    }
+
+    /// Closes the outputs shown on the main display and keeps the others on screen; pressed again, it brings them back.
+    private func closeMainOutputs() {
+        if !closedOnMain.isEmpty { closedOnMain = []; refresh(); return }
+        let screens = Self.screenInfos()
+        guard let mainID = screens.first(where: \.isMain)?.id else { return }
+        let outputs = ProgramOutputPrefs.outputs()
+        for (output, display) in zip(outputs, ProgramDisplayChoice.assign(outputs: outputs, screens: screens)) where display == mainID {
+            closedOnMain.insert(output.id)
+            close(output.id)
+        }
+        settle()
     }
 
     private func removePanicHotkey() {
         if let panicRef { UnregisterEventHotKey(panicRef) }
         panicRef = nil
+        if let mainRef { UnregisterEventHotKey(mainRef) }
+        mainRef = nil
         if let panicHandler { RemoveEventHandler(panicHandler) }
         panicHandler = nil
     }
@@ -392,7 +427,7 @@ final class ProgramOutputController: ObservableObject {
 
         let outputs = ProgramOutputPrefs.outputs()
         for id in Set(windows.keys).subtracting(outputs.map(\.id)) { close(id) }
-        guard ProgramOutputPrefs.enabled() else { missingOutputs = []; for id in Array(windows.keys) { close(id) }; syncResolutions([:], outputs: []); settle(); return }
+        guard ProgramOutputPrefs.enabled() else { missingOutputs = []; closedOnMain = []; for id in Array(windows.keys) { close(id) }; syncResolutions([:], outputs: []); settle(); return }
 
         let assigned = ProgramDisplayChoice.assign(outputs: outputs, screens: Self.screenInfos())
         missingOutputs = zip(outputs.indices, assigned).filter { $0.1 == nil }.map { L("Program output %lld", $0.0 + 1) }
@@ -403,13 +438,13 @@ final class ProgramOutputController: ObservableObject {
             ProgramFeed(id: $0.deviceId, name: $1, session: $0.decodeSession, coordinator: $0.coordinator)
         }
         for (output, displayID) in zip(outputs, assigned) {
-            guard let displayID, let screen = screen(for: displayID) else { close(output.id); continue }
+            guard let displayID, let screen = screen(for: displayID), !closedOnMain.contains(output.id) else { close(output.id); continue }
             var feeds = allFeeds
             if !output.isGrid {
                 let chosen = output.feed.isEmpty ? active()?.deviceId : output.feed
                 feeds = feeds.filter { $0.id == chosen }
             }
-            let clean = ProgramOutputPrefs.clean()
+            let clean = ProgramOutputPrefs.clean() || output.isClean
             let key = "\(displayID)|\(screen.frame)|\(output.layout)|\(output.showNames)|\(clean)|" + feeds.map { "\($0.id):\($0.name)" }.joined(separator: ",")
             guard key != shownKeys[output.id] else { continue }
             shownKeys[output.id] = key
@@ -455,7 +490,7 @@ struct ProgramOutputSettingsSection: View {
                           info: "A clean full screen picture on each chosen display, for a vision mixer, projector or TV: one output per HDMI connection. A grid shows every open goggles window and marks a feed with no signal; one feed shows just that picture. Names never include the goggles serial number. Zebra stripes and peaking are not drawn here.") {
                 SettingsToggleRow("Show the program outputs", isOn: $enabled)
                 SettingsToggleRow("Open the program outputs when the app starts", isOn: $openAtLaunch)
-                SettingsToggleRow("Clean output", isOn: $clean, help: "Hides all names, warnings and the no-signal marker.")
+                SettingsToggleRow("Clean output on all outputs", isOn: $clean, help: "Hides all names, warnings and the no-signal marker.")
                 SettingsToggleRow("Stabilize output", isOn: $stabilize, help: "Also stabilizes the preview. Works in race mode.")
                 SettingsToggleRow("Keep displays awake", isOn: $keepAwake, help: "While the outputs are shown, so the HDMI feed does not go dark. A locked Mac still covers every display.")
                 SettingsToggleRow("Preview in the app", isOn: previewOnMac, help: "Draw the picture on the HDMI outputs only, to lighten the Mac.")
@@ -551,6 +586,8 @@ private struct OutputGroup: View {
                 .labelsHidden().frame(width: 260)
                 .accessibilityLabel(Text("Output resolution"))
             }
+            SettingsToggleRow("Clean output", isOn: Binding(get: { output.isClean }, set: { output.clean = $0 ? true : nil }),
+                              help: "Hides all names, warnings and the no-signal marker.")
             SettingsRow("Show") {
                 Picker("Show", selection: $output.layout) {
                     Text("All feeds in a grid").tag("grid")
@@ -589,7 +626,7 @@ private struct OutputGroup: View {
                 case nil: return (.green, L("Showing on %@", n))
                 }
             case .onMain:
-                let base = L("Main display: it will cover your controls")
+                let base = L("Main display: it will cover your controls. Control-Option-Command-comma closes just this output, and again brings it back.")
                 return (.orange, resolutionResult == .refusedMain ? base + " " + L("The main display's resolution is never changed.") : base)
             }
         }()

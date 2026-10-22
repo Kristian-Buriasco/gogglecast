@@ -635,6 +635,7 @@
 "Show the program outputs" = "Show the program outputs";
 "Open the program outputs when the app starts" = "Open the program outputs when the app starts";
 "Clean output" = "Clean output";
+"Clean output on all outputs" = "Clean output on all outputs";
 "Hides all names, warnings and the no-signal marker." = "Hides all names, warnings and the no-signal marker.";
 "Stabilize output" = "Stabilize output";
 "Also stabilizes the preview. Works in race mode." = "Also stabilizes the preview. Works in race mode.";
@@ -666,7 +667,7 @@
 "Showing on %@. Resolution not changed: no %@ mode on this display." = "Showing on %@. Resolution not changed: no %@ mode on this display.";
 "Showing on %@. Resolution not changed: macOS refused the change." = "Showing on %@. Resolution not changed: macOS refused the change.";
 "Showing on %@" = "Showing on %@";
-"Main display: it will cover your controls" = "Main display: it will cover your controls";
+"Main display: it will cover your controls. Control-Option-Command-comma closes just this output, and again brings it back." = "Main display: it will cover your controls. Control-Option-Command-comma closes just this output, and again brings it back.";
 "The main display's resolution is never changed." = "The main display's resolution is never changed.";
 /* RTMPPublisher.swift */
 "Invalid RTMP URL (expected rtmp://host/app)" = "Invalid RTMP URL (expected rtmp://host/app)";
