@@ -134,18 +134,20 @@ if args.contains("--unregister") {
 
 if args.contains("--install-camera-extension") {
     // Task 4.1: THROWAWAY spike installer -- see CameraExtensionInstaller.swift's
-    // doc comment. Runs the process for up to 60s waiting on the async
+    // doc comment. Runs the process for up to 120 s waiting on the async
     // OSSystemExtensionRequest callbacks (requestNeedsUserApproval can fire
     // and then require a human to act in System Settings, so this doesn't
     // just exit immediately).
     let installer = CameraExtensionInstaller()
-    let semaphore = DispatchSemaphore(value: 0)
+    var finished = false
     var succeeded = false
     installer.install { ok in
         succeeded = ok
-        semaphore.signal()
+        finished = true
     }
-    _ = semaphore.wait(timeout: .now() + 60)
+    // The request delegate runs on the main queue, so spin the run loop instead of blocking the main thread.
+    let deadline = Date().addingTimeInterval(120)
+    while !finished && Date() < deadline { RunLoop.main.run(mode: .default, before: Date().addingTimeInterval(0.2)) }
     print("--install-camera-extension: done (succeeded=\(succeeded))")
     exit(succeeded ? 0 : 1)
 }

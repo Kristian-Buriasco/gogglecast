@@ -18,6 +18,8 @@
 	<string>1.0</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
+	<key>NSSystemExtensionUsageDescription</key>
+	<string>Shows the DJI Goggles 3 picture as a camera named "DJI Goggles 3" in OBS and other apps.</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>14.0</string>
 	<!-- Required for a camera extension: the Mach service CoreMediaIO uses to talk to it. The name
@@ -25,7 +27,7 @@
 	<key>CMIOExtension</key>
 	<dict>
 		<key>CMIOExtensionMachServiceName</key>
-		<string>group.com.kburiasco.gogglesview.camera</string>
+		<string>5A3R74QNBJ.com.kburiasco.gogglesview.camera</string>
 	</dict>
 </dict>
 </plist>

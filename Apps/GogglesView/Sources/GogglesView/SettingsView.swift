@@ -107,6 +107,7 @@ struct SettingsView: View {
                     case .hdmi:
                         ProgramOutputSettingsSection()
                     case .integrations:
+                        CameraExtensionSettingsSection()
                         OBSSettingsSection()
                         EventHooksSettingsSection()
                         AutomationSettingsSection()

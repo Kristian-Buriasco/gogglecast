@@ -2,24 +2,17 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- Task 4.1: required to call OSSystemExtensionRequest at all.
-	     CORRECTED per design.md §8.5's post-Task-4.1 finding: this
-	     entitlement requires a PAID Apple Developer Program membership to
-	     even provision (confirmed via AMFI -413 "No matching profile
-	     found" and Apple's own capability matrix); it is NOT available
-	     on a free/personal team the way an earlier version of this
-	     comment claimed. Building the app WITH this entitlement, on this
-	     machine, makes the app fail AMFI validation and refuse to launch
-	     at all, not just refuse to install the extension. This variant
-	     exists ONLY for testing the actual extension-install path once a
-	     paid membership is active (see docs/dev-setup.md); it is NOT the
-	     default build (see GogglesView.entitlements for that, and
-	     build-stub-bundle.sh's GOGGLESVIEW_WITH_EXTENSION_INSTALL flag). -->
+	<!-- Release variant with the OBS virtual camera (CMIO system extension). The system-extension install
+	     entitlement is restricted: it only launches when the app carries a matching Developer ID provisioning
+	     profile (Contents/embedded.provisionprofile, passed to build-stub-bundle.sh as GOGGLESVIEW_APP_PROFILE).
+	     The identifiers below come from that profile. Used with GOGGLESVIEW_WITH_EXTENSION_INSTALL=1. -->
 	<key>com.apple.developer.system-extension.install</key>
 	<true/>
-	<key>com.apple.security.application-groups</key>
-	<array>
-		<string>group.com.kburiasco.gogglesview</string>
-	</array>
+	<key>com.apple.application-identifier</key>
+	<string>5A3R74QNBJ.com.kburiasco.gogglesview</string>
+	<key>com.apple.developer.team-identifier</key>
+	<string>5A3R74QNBJ</string>
+	<key>com.apple.security.cs.disable-library-validation</key>
+	<true/>
 </dict>
 </plist>

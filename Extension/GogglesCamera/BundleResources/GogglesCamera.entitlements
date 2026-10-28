@@ -2,22 +2,20 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- A CMIOExtension system extension always runs sandboxed; this
-	     entitlement declares it explicitly, matching Apple's CMIOExtension
-	     sample project and design.md §8.5's entitlement list. -->
+	<!-- A CMIOExtension system extension always runs sandboxed; this entitlement declares it explicitly.
+	     The identifiers come from the extension's Developer ID provisioning profile
+	     (GOGGLESVIEW_EXT_PROFILE). The helper's Mach service name starts with the Team ID, which is what
+	     the sandbox's mach-lookup exception for names with the process's own Team ID prefix relies on. -->
 	<key>com.apple.security.app-sandbox</key>
 	<true/>
-	<!-- Declared per design.md §4.1 Change 2 ("listed in the app group
-	     shared by app, helper and extension"). NOT what this spike's
-	     mach-lookup exception actually relies on: that is the Team-ID
-	     prefix on the Mach service name itself (see MachService.swift's
-	     doc comment and task-4.1-report.md for the citation). Kept here
-	     defensively for parity with the design doc's stated decision and
-	     for any future shared-container use, not because it is required
-	     for this spike's XPC connection to work. -->
+	<key>com.apple.application-identifier</key>
+	<string>5A3R74QNBJ.com.kburiasco.gogglesview.camera</string>
+	<key>com.apple.developer.team-identifier</key>
+	<string>5A3R74QNBJ</string>
+	<!-- Team-ID-prefixed group: the CMIO Mach service name in Info.plist must start with a group the extension holds. -->
 	<key>com.apple.security.application-groups</key>
 	<array>
-		<string>group.com.kburiasco.gogglesview</string>
+		<string>5A3R74QNBJ.com.kburiasco.gogglesview</string>
 	</array>
 </dict>
 </plist>

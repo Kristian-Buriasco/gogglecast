@@ -180,6 +180,14 @@ if [[ -n "$EXT_BIN" ]]; then
     cp "$EXT_BIN" "$EXT_BUNDLE/Contents/MacOS/GogglesCameraExtension"
 fi
 
+# Developer ID provisioning profiles (restricted entitlements such as system-extension install need them).
+if [[ -n "${GOGGLESVIEW_APP_PROFILE:-}" ]]; then
+    cp "$GOGGLESVIEW_APP_PROFILE" "$APP_BUNDLE/Contents/embedded.provisionprofile"
+fi
+if [[ -n "${GOGGLESVIEW_EXT_PROFILE:-}" && -n "$EXT_BIN" ]]; then
+    cp "$GOGGLESVIEW_EXT_PROFILE" "$EXT_BUNDLE/Contents/embedded.provisionprofile"
+fi
+
 echo "==> Code-signing GogglesHelper (hardened runtime)"
 codesign --force --options runtime --timestamp --sign "$SIGN_IDENTITY" "$APP_BUNDLE/Contents/MacOS/GogglesHelper"
 

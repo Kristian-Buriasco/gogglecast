@@ -4,6 +4,26 @@ All notable changes to this project are documented here. Format based on [Keep a
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-10-28
+
+The first full release. GogglesView is signed with a Developer ID certificate and notarized by Apple, and everything built since 0.9 is in it.
+
+### Added
+- The OBS virtual camera: a camera named "DJI Goggles 3" that OBS, video calls and other apps can use. Enable it in Settings > Integrations > Virtual camera, approve it once in System Settings > General > Login Items & Extensions > Camera Extensions, and keep GogglesView running with the goggles live, because the picture comes from the app's helper.
+
+### Changed
+- The helper's service name now uses the Team ID of the signing account (`5A3R74QNBJ`), because the camera extension's sandbox only reaches services named that way. The helper has to be approved again after installing.
+- The app-group entitlement is gone from the app (nothing used it). The camera extension uses a team-prefixed group.
+- Releases carry Developer ID provisioning profiles for the app and the camera extension, which macOS requires before it lets an app install a system extension.
+- The "Enable virtual camera" step replaces the old command-line-only installer, which also never received macOS's approval callbacks.
+
+### Known limits
+- The virtual camera was installed and listed by macOS ("DJI Goggles 3"), but its picture was not yet checked end to end in OBS on a second Mac.
+- The signing identity changed in 0.12.1, so 0.12.0 users install this version by hand once. Later updates install normally.
+- A locked Mac, or one showing the screen saver, blanks the HDMI outputs.
+- ntfy on iOS delivers alerts as normal notifications; Apple critical alerts are not supported by the ntfy app.
+- Live stabilization did not beat leaving it off on raw race footage. Leave it off for FPV.
+
 ## [0.12.1] - 2026-10-28
 
 Signed with a Developer ID certificate and notarized by Apple.

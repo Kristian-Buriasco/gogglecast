@@ -137,7 +137,7 @@ GogglesView is an independent project, not affiliated with or endorsed by DJI. "
 
 ## Known limitations
 
-- OBS virtual camera ("DJI Goggles 3", CMIO camera extension) is built but untested: it needs a paid Apple Developer Program membership to install (see `docs/dev-setup.md`). Until then, use the capture window with OBS Window Capture.
+- OBS virtual camera ("DJI Goggles 3", CMIO camera extension) is enabled in Settings > Integrations > Virtual camera. Its picture has not been checked end to end on a second Mac yet; if it stays black in OBS, use the capture window with OBS Window Capture.
 - Releases are notarized. Builds from source are dev-signed and need right-click > Open.
 - Pass-through of the goggles' encoded stream only: no audio, no re-encoding or scaling controls.
 

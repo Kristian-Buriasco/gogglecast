@@ -32,4 +32,4 @@ import Foundation
 // (the LaunchDaemon plist) and `Apps/GogglesView/Sources/GogglesView/MachService.swift`
 // were updated to match in the same commit.
 // ─────────────────────────────────────────────────────────────────────────
-let machServiceName = "U8LK2QA3FL.com.kburiasco.gogglesview.helper"
+let machServiceName = "5A3R74QNBJ.com.kburiasco.gogglesview.helper"

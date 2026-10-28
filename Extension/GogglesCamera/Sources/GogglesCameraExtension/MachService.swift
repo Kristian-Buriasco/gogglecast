@@ -10,4 +10,4 @@ import Foundation
 // answering whether that lookup is permitted from inside this process's
 // sandbox.
 // ─────────────────────────────────────────────────────────────────────────
-let helperMachServiceName = "U8LK2QA3FL.com.kburiasco.gogglesview.helper"
+let helperMachServiceName = "5A3R74QNBJ.com.kburiasco.gogglesview.helper"

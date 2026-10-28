@@ -31,4 +31,4 @@ import Foundation
 // sandboxed CMIOExtension spike needs this exact prefixed name to exercise
 // the sandbox's documented mach-lookup exception for names beginning with
 // the requesting process's own Team ID.
-public let helperMachServiceName = "U8LK2QA3FL.com.kburiasco.gogglesview.helper"
+public let helperMachServiceName = "5A3R74QNBJ.com.kburiasco.gogglesview.helper"

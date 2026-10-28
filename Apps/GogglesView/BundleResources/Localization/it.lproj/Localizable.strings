@@ -1093,3 +1093,12 @@
 "Keep displays awake" = "Keep displays awake";
 "While the outputs are shown, so the HDMI feed does not go dark. A locked Mac still covers every display." = "While the outputs are shown, so the HDMI feed does not go dark. A locked Mac still covers every display.";
 "Translation only (previous method)" = "Translation only (previous method)";
+
+/* TODO: translate (English placeholder) */
+"Waiting for your approval in System Settings > General > Login Items & Extensions > Camera Extensions." = "Waiting for your approval in System Settings > General > Login Items & Extensions > Camera Extensions.";
+"Enabled. Choose DJI Goggles 3 as a video source in OBS." = "Enabled. Choose DJI Goggles 3 as a video source in OBS.";
+"The camera could not be enabled. Check System Settings > General > Login Items & Extensions." = "The camera could not be enabled. Check System Settings > General > Login Items & Extensions.";
+"Virtual camera" = "Virtual camera";
+"Adds a camera named DJI Goggles 3 that OBS and other apps can use as a video source. macOS asks you to approve it once. GogglesView has to be running with the goggles live, because the picture comes from the app's helper." = "Adds a camera named DJI Goggles 3 that OBS and other apps can use as a video source. macOS asks you to approve it once. GogglesView has to be running with the goggles live, because the picture comes from the app's helper.";
+"Camera extension" = "Camera extension";
+"Enable virtual camera" = "Enable virtual camera";
