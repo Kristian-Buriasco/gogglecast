@@ -4,6 +4,19 @@ All notable changes to this project are documented here. Format based on [Keep a
 
 ## [Unreleased]
 
+## [0.12.1] - 2026-10-28
+
+Signed with a Developer ID certificate and notarized by Apple.
+
+### Changed
+- Releases are now notarized and stapled: macOS opens GogglesView with a normal "downloaded from the internet" prompt, with no right-click > Open step, and it also opens on a Mac with no internet connection.
+- App Shortcuts are limited to 10 (Siri and Spotlight tiles) because the current Xcode refuses more. Toggle Zebra Stripes and Toggle Focus Peaking no longer have a tile or phrase; they are still available as actions in the Shortcuts app.
+- The unused app-group entitlement was removed (it needs a provisioning profile that a Developer ID build does not have).
+
+### Known limits
+- The signing identity changed, so this version has to be installed by hand once: the in-app updater only accepts updates signed like the running app, so an app updating from 0.12.0 will not take it. Later updates install normally.
+- The first launch asks you to approve the helper again in System Settings > General > Login Items & Extensions.
+
 ## [0.12.0] - 2026-10-22
 
 Event release. Everything in it was built for, and used at, a live FPV race with two Goggles 3 feeding an HDMI mixer: the program outputs got faster and easier to run unattended, you can be alerted on your phone, and recording starts and stops by itself.

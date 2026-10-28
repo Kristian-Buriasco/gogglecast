@@ -16,9 +16,6 @@
 	     profile. -->
 	<key>com.apple.security.cs.disable-library-validation</key>
 	<true/>
-	<key>com.apple.security.application-groups</key>
-	<array>
-		<string>group.com.kburiasco.gogglesview</string>
-	</array>
+	<!-- application-groups removed: nothing reads the group, and on macOS it is a restricted entitlement that needs a provisioning profile, which a Developer ID build does not have. -->
 </dict>
 </plist>

@@ -335,12 +335,7 @@ struct GogglesViewShortcuts: AppShortcutsProvider {
         AppShortcut(intent: ToggleFreezeIntent(), phrases: [
             "Freeze the view in \(.applicationName)",
         ], shortTitle: "Toggle Freeze", systemImageName: "snowflake")
-        AppShortcut(intent: ToggleZebraIntent(), phrases: [
-            "Toggle zebra stripes in \(.applicationName)",
-        ], shortTitle: "Toggle Zebra Stripes", systemImageName: "line.diagonal")
-        AppShortcut(intent: ToggleFocusPeakingIntent(), phrases: [
-            "Toggle focus peaking in \(.applicationName)",
-        ], shortTitle: "Toggle Focus Peaking", systemImageName: "scope")
+        // Zebra and focus peaking stay available as Shortcuts actions; Xcode 27 allows at most 10 App Shortcuts (Siri/Spotlight tiles).
         AppShortcut(intent: GetStatusIntent(), phrases: [
             "Get \(.applicationName) status",
         ], shortTitle: "Get Status", systemImageName: "info.circle")

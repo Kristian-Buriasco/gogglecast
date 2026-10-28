@@ -202,7 +202,7 @@
       <div>
         <h1>Guarda quello che vedono i tuoi goggles</h1>
         <p class="lede">Il video live dei DJI Goggles 3 sul tuo Mac, via USB-C. Registralo, rivedilo, mandalo a OBS.</p>
-        <a class="dl" id="dl" href="https://github.com/Kristian-Buriasco/gogglecast/releases/latest">Scarica GogglesView 0.12.0 (3.5 MB)</a>
+        <a class="dl" id="dl" href="https://github.com/Kristian-Buriasco/gogglecast/releases/latest">Scarica GogglesView 0.12.1 (3.5 MB)</a>
         <a class="alt" href="https://github.com/Kristian-Buriasco/gogglecast">Gratuita, licenza GPL-3.0. Apple Silicon, macOS 14 o successivo. Leggi il sorgente.</a>
       </div>
       <div class="screen"><img src="../images/live-view.png" alt="Finestra di GogglesView con un video live e la sovrapposizione delle statistiche" width="1931" height="1091"></div>
@@ -338,7 +338,7 @@
           <h2 id="setup-h">Configurazione in quattro passi</h2>
           <ol>
             <li><span>Sui goggles apri Impostazioni, poi Informazioni, e attiva <code>OTG Wired Connection to Computer</code>. Scollega il cavo prima di cambiare l'opzione, poi ricollegalo.</span></li>
-            <li><span>Trascina GogglesView in Applicazioni. La prima volta fai clic destro e scegli Apri, perché le versioni non sono notarizzate.</span></li>
+            <li><span>Trascina GogglesView in Applicazioni e aprilo. Le versioni sono firmate e notarizzate da Apple.</span></li>
             <li><span>Approva l'helper in Impostazioni di Sistema, Generali, Elementi login ed estensioni. È lui a gestire il dispositivo USB.</span></li>
             <li><span>Avvia Share Liveview sui goggles e scegli i goggles nell'app.</span></li>
           </ol>
@@ -381,8 +381,8 @@
           <dd>Altri goggles DJI potrebbero funzionare o no. Nessuno ha controllato.</dd>
           <dt>Solo Apple Silicon</dt>
           <dd>La libreria USB inclusa è universale, ma nulla è stato eseguito su un Mac Intel.</dd>
-          <dt>Non notarizzata</dt>
-          <dd>Servirebbe un account sviluppatore Apple a pagamento. macOS ti chiede di confermare il primo avvio. Gli aggiornamenti dentro l'app sono verificati con il checksum della release e la firma del codice.</dd>
+          <dt>Firmata e notarizzata</dt>
+          <dd>Le versioni sono firmate con un certificato Developer ID e notarizzate da Apple, quindi macOS le apre con la sua richiesta normale. Gli aggiornamenti dentro l'app sono verificati con il checksum della release e la firma del codice.</dd>
           <dt>Nessuna chiamata a casa</dt>
           <dd>L'app contatta GitHub per cercare aggiornamenti e nient'altro, a meno che tu non configuri uno stream o un webhook. Puoi disattivare il controllo aggiornamenti.</dd>
           <dt>Qualcosa non va</dt>

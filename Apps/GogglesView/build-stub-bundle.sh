@@ -181,11 +181,11 @@ if [[ -n "$EXT_BIN" ]]; then
 fi
 
 echo "==> Code-signing GogglesHelper (hardened runtime)"
-codesign --force --options runtime --sign "$SIGN_IDENTITY" "$APP_BUNDLE/Contents/MacOS/GogglesHelper"
+codesign --force --options runtime --timestamp --sign "$SIGN_IDENTITY" "$APP_BUNDLE/Contents/MacOS/GogglesHelper"
 
 if [[ -n "$EXT_BIN" ]]; then
     echo "==> Code-signing GogglesCamera.systemextension (hardened runtime + entitlements)"
-    codesign --force --options runtime \
+    codesign --force --options runtime --timestamp \
         --entitlements "$EXT_DIR/BundleResources/GogglesCamera.entitlements" \
         --sign "$SIGN_IDENTITY" "$EXT_BUNDLE"
 fi
@@ -206,12 +206,12 @@ else
 fi
 
 echo "==> Code-signing GogglesView (app binary, entitlements)"
-codesign --force --options runtime \
+codesign --force --options runtime --timestamp \
     --entitlements "$APP_ENTITLEMENTS" \
     --sign "$SIGN_IDENTITY" "$APP_BUNDLE/Contents/MacOS/GogglesView"
 
 echo "==> Code-signing the app bundle as a whole"
-codesign --force --options runtime \
+codesign --force --options runtime --timestamp \
     --entitlements "$APP_ENTITLEMENTS" \
     --sign "$SIGN_IDENTITY" "$APP_BUNDLE"
 

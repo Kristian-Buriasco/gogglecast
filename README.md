@@ -9,7 +9,7 @@
 
 A free, native macOS app that shows the live video feed from DJI Goggles 3 on a Mac over USB-C. The protocol is reverse-engineered; no extra hardware or dongle is needed.
 
-**[Download the latest release](https://github.com/Kristian-Buriasco/gogglecast/releases/latest)** (DMG, Apple Silicon, not notarized).
+**[Download the latest release](https://github.com/Kristian-Buriasco/gogglecast/releases/latest)** (DMG, Apple Silicon, signed and notarized).
 
 ![Live view with the stats overlay](docs/images/live-view.png)
 
@@ -84,7 +84,7 @@ Frame rate follows what the goggles send: about 35 frames per second in our test
 
 ## Install and first run
 
-Download the DMG from the Releases page, or build from source (below) / use `scripts/make-dmg.sh`. Releases are dev-signed, not notarized.
+Download the DMG from the Releases page, or build from source (below) / use `scripts/make-dmg.sh`. Releases are signed with a Developer ID certificate and notarized by Apple.
 
 Or with Homebrew:
 
@@ -94,7 +94,7 @@ brew install --cask Kristian-Buriasco/gogglesview/gogglesview
 
 The cask lives in [homebrew-gogglesview](https://github.com/Kristian-Buriasco/homebrew-gogglesview) and is bumped by hand after each release.
 
-1. Copy `GogglesView.app` to `/Applications`. The build is signed with an Apple Development certificate (or ad-hoc), not notarized, so on first launch right-click the app and choose Open.
+1. Copy `GogglesView.app` to `/Applications`. Releases are notarized, so macOS opens the app with its normal download prompt. A build from source is signed with your own certificate (or ad-hoc) and needs right-click > Open on first launch.
 2. On first launch the app registers a privileged helper daemon (`GogglesHelper`) via `SMAppService`. macOS requires one-time approval: System Settings > General > Login Items & Extensions, enable GogglesView. The helper owns the USB device; the app talks to it over XPC.
 3. Enable OTG on the goggles, connect them, start live view.
 
@@ -138,7 +138,7 @@ GogglesView is an independent project, not affiliated with or endorsed by DJI. "
 ## Known limitations
 
 - OBS virtual camera ("DJI Goggles 3", CMIO camera extension) is built but untested: it needs a paid Apple Developer Program membership to install (see `docs/dev-setup.md`). Until then, use the capture window with OBS Window Capture.
-- Not notarized; dev-signed. Gatekeeper requires right-click > Open.
+- Releases are notarized. Builds from source are dev-signed and need right-click > Open.
 - Pass-through of the goggles' encoded stream only: no audio, no re-encoding or scaling controls.
 
 ## Architecture
